@@ -78,7 +78,8 @@ async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'products', 'supplier_id', 'INT UNSIGNED NULL AFTER brand_id');
   await addColumn(conn, dbName, 'products', 'ean13', 'VARCHAR(13) NULL AFTER supplier_id');
   await addColumn(conn, dbName, 'products', 'dun14', 'VARCHAR(14) NULL AFTER ean13');
-  await addColumn(conn, dbName, 'products', 'units_per_pack', 'INT UNSIGNED NULL AFTER dun14');
+  await addColumn(conn, dbName, 'products', 'plu', 'INT UNSIGNED NULL AFTER dun14');
+  await addColumn(conn, dbName, 'products', 'units_per_pack', 'INT UNSIGNED NULL AFTER plu');
   await addColumn(conn, dbName, 'products', 'packs_per_pallet', 'INT UNSIGNED NULL AFTER units_per_pack');
   await addColumn(conn, dbName, 'products', 'sold_by_weight', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER packs_per_pallet');
   const addedCostGross = await addColumn(conn, dbName, 'products', 'cost_gross_price', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER unit');
@@ -98,6 +99,7 @@ async function upgradeSchema(conn, dbName) {
 
   await addIndex(conn, dbName, 'products', 'uq_products_ean13', 'UNIQUE KEY `uq_products_ean13` (`ean13`)');
   await addIndex(conn, dbName, 'products', 'uq_products_dun14', 'UNIQUE KEY `uq_products_dun14` (`dun14`)');
+  await addIndex(conn, dbName, 'products', 'uq_products_plu', 'UNIQUE KEY `uq_products_plu` (`plu`)');
   await addIndex(conn, dbName, 'products', 'idx_products_brand', 'KEY `idx_products_brand` (`brand_id`)');
   await addIndex(conn, dbName, 'products', 'idx_products_supplier', 'KEY `idx_products_supplier` (`supplier_id`)');
   await addConstraint(conn, dbName, 'products', 'fk_products_brand',
@@ -134,6 +136,11 @@ async function upgradeSchema(conn, dbName) {
         )
       WHERE so.customer_warehouse_id IS NULL`,
   );
+
+  // ------------------------------------------------- production batch details
+  await addColumn(conn, dbName, 'production_orders', 'lot_number', 'VARCHAR(60) NULL AFTER product_id');
+  await addColumn(conn, dbName, 'production_orders', 'expiry_date', 'DATE NULL AFTER lot_number');
+  await addIndex(conn, dbName, 'production_orders', 'idx_production_orders_expiry', 'KEY `idx_production_orders_expiry` (`expiry_date`)');
 }
 
 async function main() {

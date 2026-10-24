@@ -212,6 +212,13 @@ function addDaysISO(dateStr, days) {
   return d.toISOString().slice(0, 10);
 }
 
+// Lot numbers are commonly the production date written as DD.MM.YY.
+function lotFromDate(dateStr) {
+  const match = String(dateStr || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  return `${match[3]}.${match[2]}.${match[1].slice(2)}`;
+}
+
 function pagination(total, page, perPage) {
   const totalPages = Math.max(1, Math.ceil(total / perPage));
   const current = Math.min(Math.max(1, page), totalPages);
@@ -286,6 +293,7 @@ function forLocale(locale = DEFAULT_LOCALE) {
     buildQuery,
     todayISO,
     addDaysISO,
+    lotFromDate,
     pagination,
     truncate,
     TONES,
@@ -327,6 +335,7 @@ module.exports = {
   buildQuery,
   todayISO,
   addDaysISO,
+  lotFromDate,
   pagination,
   truncate,
   pluralize,

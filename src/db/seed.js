@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const { initDb, withTransaction, closeDb } = require('./index');
 const { nextNumber } = require('../lib/sequences');
 const { createCheckForPayment, recordHistory, statusEvent } = require('../lib/checks');
+const { lotFromDate } = require('../lib/helpers');
 const { seedPosDemo } = require('./posSeed');
 
 const FORCE = process.env.FORCE_SEED === '1';
@@ -170,25 +171,25 @@ async function main() {
       {
         sku: 'AUR-P100', name: 'Aurora Pendant 100', cat: 'LED Fixtures', type: 'finished_good', unit: 'pcs',
         costNet: 38.5, saleNet: 129.0, stock: 24, reorder: 10, sellable: 1, purchasable: 0, manufactured: 1, track: 1,
-        brand: 'Aurora Lighting', supplier: null, ean13: '0841234500017', dun14: '10841234500014',
+        brand: 'Aurora Lighting', supplier: null, ean13: '0841234500017', dun14: '10841234500014', plu: 4101,
         unitsPerPack: 1, packsPerPallet: 48, weighted: 0,
       },
       {
         sku: 'AUR-L200', name: 'Aurora Linear 200', cat: 'LED Fixtures', type: 'finished_good', unit: 'pcs',
         costNet: 62.0, saleNet: 219.0, stock: 12, reorder: 8, sellable: 1, purchasable: 0, manufactured: 1, track: 1,
-        brand: 'Aurora Lighting', supplier: null, ean13: '0841234500024', dun14: '10841234500021',
+        brand: 'Aurora Lighting', supplier: null, ean13: '0841234500024', dun14: '10841234500021', plu: 4102,
         unitsPerPack: 1, packsPerPallet: 24, weighted: 0,
       },
       {
         sku: 'AUR-D50', name: 'Aurora Desk Lamp 50', cat: 'LED Fixtures', type: 'finished_good', unit: 'pcs',
         costNet: 21.0, saleNet: 79.0, stock: 41, reorder: 15, sellable: 1, purchasable: 0, manufactured: 1, track: 1,
-        brand: 'Lumen Select', supplier: null, ean13: '0841234500031', dun14: '10841234500038',
+        brand: 'Lumen Select', supplier: null, ean13: '0841234500031', dun14: '10841234500038', plu: 4103,
         unitsPerPack: 2, packsPerPallet: 60, weighted: 0,
       },
       {
         sku: 'AUR-S300', name: 'Aurora Spot 300', cat: 'LED Fixtures', type: 'finished_good', unit: 'pcs',
         costNet: 28.75, saleNet: 99.0, stock: 6, reorder: 10, sellable: 1, purchasable: 0, manufactured: 1, track: 1,
-        brand: 'Aurora Lighting', supplier: null, ean13: '0841234500048', dun14: '10841234500045',
+        brand: 'Aurora Lighting', supplier: null, ean13: '0841234500048', dun14: '10841234500045', plu: 4104,
         unitsPerPack: 1, packsPerPallet: 40, weighted: 0,
       },
       {
@@ -285,6 +286,7 @@ async function main() {
         supplier_id: supplier ? supplier.id : null,
         ean13: p.ean13,
         dun14: p.dun14,
+        plu: p.plu ?? null,
         units_per_pack: p.unitsPerPack,
         packs_per_pallet: p.packsPerPallet,
         sold_by_weight: p.weighted,
@@ -1202,6 +1204,8 @@ async function main() {
         sales_order_id: order.id,
         bom_id: bom[finishedLine.sku],
         product_id: prod[finishedLine.sku],
+        lot_number: lotFromDate(startDate),
+        expiry_date: addDays(dueDate, 365),
         quantity: finishedLine.quantity,
         start_date: startDate,
         due_date: dueDate,

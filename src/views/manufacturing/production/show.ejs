@@ -161,6 +161,8 @@
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Output</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatQty(order.quantity) %> <%= order.unit %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Start date</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.start_date) %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Due date</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.due_date) %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Lot number') %></dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= order.lot_number || '—' %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Expiry date') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.expiry_date) %></dd></div>
               <% if (order.completed_at) { %>
                 <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Completed</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(order.completed_at) %></dd></div>
               <% } %>
@@ -172,6 +174,26 @@
               </a>
             <% } %>
           </div>
+
+          <% if (['planned', 'released', 'in_progress'].includes(order.status)) { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Batch & expiry') %></h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Both values are required before production can be completed.') %></p>
+              <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/batch" class="mt-4 space-y-3">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <div>
+                  <label for="batch-lot" class="form-label"><%= t('Lot number') %> <span class="text-error-500">*</span></label>
+                  <input id="batch-lot" name="lot_number" type="text" maxlength="60" value="<%= order.lot_number || defaultLot %>" class="form-input" required>
+                  <p class="form-help"><%= t('Usually the production date as DD.MM.YY.') %></p>
+                </div>
+                <div>
+                  <label for="batch-expiry" class="form-label"><%= t('Expiry date') %> <span class="text-error-500">*</span></label>
+                  <input id="batch-expiry" name="expiry_date" type="date" value="<%= String(order.expiry_date || '').slice(0, 10) %>" class="form-input" required>
+                </div>
+                <button type="submit" class="btn btn-secondary btn-sm w-full"><%= t('Save batch details') %></button>
+              </form>
+            </div>
+          <% } %>
 
           <div class="card p-5 md:p-6">
             <h2 class="card-title">Product &amp; order</h2>

@@ -87,6 +87,18 @@
                 <label for="due_date" class="form-label">Due date</label>
                 <input id="due_date" name="due_date" type="date" value="<%= String(row.due_date || '').slice(0, 10) %>" class="form-input">
               </div>
+              <div>
+                <label for="lot_number" class="form-label"><%= t('Lot number') %> <span class="text-error-500">*</span></label>
+                <input id="lot_number" name="lot_number" type="text" maxlength="60" value="<%= row.lot_number || '' %>" class="form-input <%= errors.lot_number ? 'form-input-error' : '' %>" required>
+                <% if (errors.lot_number) { %><p class="form-error"><%= errors.lot_number %></p><% } %>
+                <p class="form-help"><%= t('Usually the production date as DD.MM.YY. It follows the start date until you change it.') %></p>
+              </div>
+              <div>
+                <label for="expiry_date" class="form-label"><%= t('Expiry date') %> <span class="text-error-500">*</span></label>
+                <input id="expiry_date" name="expiry_date" type="date" value="<%= String(row.expiry_date || '').slice(0, 10) %>" class="form-input <%= errors.expiry_date ? 'form-input-error' : '' %>" required>
+                <% if (errors.expiry_date) { %><p class="form-error"><%= errors.expiry_date %></p><% } %>
+                <p class="form-help"><%= t('The date this production batch expires.') %></p>
+              </div>
               <div class="md:col-span-2">
                 <label for="notes" class="form-label">Notes</label>
                 <textarea id="notes" name="notes" rows="3" class="form-textarea" placeholder="Work centre, shift, special instructions…"><%= row.notes || '' %></textarea>
@@ -151,6 +163,26 @@
       }
       select.addEventListener('change', update);
       update();
+    })();
+
+    (function () {
+      const start = document.getElementById('start_date');
+      const lot = document.getElementById('lot_number');
+      if (!start || !lot) return;
+
+      const lotFromISO = (value) => {
+        const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return match ? `${match[3]}.${match[2]}.${match[1].slice(2)}` : '';
+      };
+
+      let lotIsCustom = Boolean(lot.value.trim()) && lot.value.trim() !== lotFromISO(start.value);
+      lot.addEventListener('input', () => {
+        lotIsCustom = true;
+      });
+      start.addEventListener('change', () => {
+        if (lotIsCustom) return;
+        lot.value = lotFromISO(start.value);
+      });
     })();
   </script>
   <%- include('/layouts/footer') %>

@@ -400,6 +400,11 @@ const ES = {
   'Identifiers': 'Identificadores',
   'EAN-13': 'EAN-13',
   'DUN-14': 'DUN-14',
+  'PLU': 'PLU',
+  'Numeric PLU code, optional': 'Código PLU numérico, opcional',
+  'Price look-up code used to identify manufactured products. Must be unique.':
+    'Código de búsqueda de precios usado para identificar productos fabricados. Debe ser único.',
+  'Another product already uses this PLU.': 'Otro producto ya usa este PLU.',
   'Barcodes': 'Códigos de barras',
   'Barcode preview': 'Vista previa del código de barras',
   'Download SVG': 'Descargar SVG',
@@ -734,6 +739,25 @@ const ES = {
   'Order cancelled': 'Orden cancelada',
   'Order status': 'Estado de la orden',
   'Start date': 'Fecha de inicio',
+  'Lot number': 'Número de lote',
+  'Expiry date': 'Fecha de vencimiento',
+  'Lot / expiry': 'Lote / vencimiento',
+  'Expires {date}': 'Vence {date}',
+  'Batch & expiry': 'Lote y vencimiento',
+  'Both values are required before production can be completed.':
+    'Ambos valores son obligatorios antes de completar la producción.',
+  'Usually the production date as DD.MM.YY. It follows the start date until you change it.':
+    'Normalmente es la fecha de producción en formato DD.MM.YY. Sigue la fecha de inicio hasta que la cambies.',
+  'Usually the production date as DD.MM.YY.': 'Normalmente es la fecha de producción en formato DD.MM.YY.',
+  'The date this production batch expires.': 'La fecha en que vence este lote de producción.',
+  'Save batch details': 'Guardar datos del lote',
+  'Batch details updated.': 'Datos del lote actualizados.',
+  'Batch details cannot be changed for this production order.':
+    'Los datos del lote no se pueden cambiar para esta orden de producción.',
+  'Lot number is required.': 'El número de lote es obligatorio.',
+  'Valid expiry date required.': 'Ingresá una fecha de vencimiento válida.',
+  'Enter lot number and expiry date before completing production.':
+    'Ingresá el número de lote y la fecha de vencimiento antes de completar la producción.',
   'Edit order': 'Editar orden',
   'Product & order': 'Producto y orden',
   'Current stock:': 'Stock actual:',

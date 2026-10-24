@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS products (
   supplier_id   INT UNSIGNED NULL,
   ean13         VARCHAR(13) NULL,
   dun14         VARCHAR(14) NULL,
+  plu           INT UNSIGNED NULL,
   units_per_pack   INT UNSIGNED NULL,
   packs_per_pallet INT UNSIGNED NULL,
   sold_by_weight   TINYINT(1) NOT NULL DEFAULT 0,
@@ -189,6 +190,7 @@ CREATE TABLE IF NOT EXISTS products (
   UNIQUE KEY uq_products_sku (sku),
   UNIQUE KEY uq_products_ean13 (ean13),
   UNIQUE KEY uq_products_dun14 (dun14),
+  UNIQUE KEY uq_products_plu (plu),
   KEY idx_products_name (name),
   KEY idx_products_type (type),
   KEY idx_products_category (category_id),
@@ -641,6 +643,8 @@ CREATE TABLE IF NOT EXISTS production_orders (
   sales_order_id INT UNSIGNED NULL,
   bom_id         INT UNSIGNED NOT NULL,
   product_id     INT UNSIGNED NOT NULL,
+  lot_number     VARCHAR(60) NULL,
+  expiry_date    DATE NULL,
   quantity       DECIMAL(14,3) NOT NULL DEFAULT 0,
   start_date     DATE NULL,
   due_date       DATE NULL,
@@ -655,6 +659,7 @@ CREATE TABLE IF NOT EXISTS production_orders (
   KEY idx_production_orders_status (status),
   KEY idx_production_orders_order (sales_order_id),
   KEY idx_production_orders_product (product_id),
+  KEY idx_production_orders_expiry (expiry_date),
   CONSTRAINT fk_production_orders_order FOREIGN KEY (sales_order_id)
     REFERENCES sales_orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_production_orders_bom FOREIGN KEY (bom_id)

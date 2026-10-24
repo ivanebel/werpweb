@@ -64,7 +64,7 @@
                 <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
                   <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
                 </span>
-                <input id="q" type="search" name="q" value="<%= search %>" class="form-input pl-10" placeholder="Production no., product, SKU or order…">
+                <input id="q" type="search" name="q" value="<%= search %>" class="form-input pl-10" placeholder="Production no., product, SKU, lot or order…">
               </div>
             </div>
             <div class="w-full sm:w-auto">
@@ -90,6 +90,7 @@
               <tr>
                 <th class="table-th">Production</th>
                 <th class="table-th">Product</th>
+                <th class="table-th"><%= t('Lot / expiry') %></th>
                 <th class="table-th">BOM</th>
                 <th class="table-th">Sales order</th>
                 <th class="table-th text-right">Quantity</th>
@@ -108,6 +109,12 @@
                   <td class="table-td">
                     <span class="text-gray-700 dark:text-gray-300"><%= row.product_name %></span>
                     <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= row.product_sku %></span>
+                  </td>
+                  <td class="table-td">
+                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= row.lot_number || '—' %></span>
+                    <% if (row.expiry_date) { %>
+                      <span class="mt-0.5 block text-xs text-gray-400"><%= t('Expires {date}', { date: h.formatDate(row.expiry_date) }) %></span>
+                    <% } %>
                   </td>
                   <td class="table-td"><%= row.bom_name %></td>
                   <td class="table-td">
@@ -133,7 +140,7 @@
               <% }) %>
               <% if (!rows.length) { %>
                 <tr>
-                  <td colspan="9" class="px-6 py-16 text-center">
+                  <td colspan="10" class="px-6 py-16 text-center">
                     <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
                       <%- include('/partials/icon', { name: 'factory', className: 'h-6 w-6' }) %>
                     </span>

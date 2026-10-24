@@ -2,7 +2,7 @@
 
 const { query, one, withTransaction } = require('../db');
 const { nextNumber } = require('../lib/sequences');
-const { todayISO, addDaysISO } = require('../lib/helpers');
+const { todayISO, addDaysISO, lotFromDate } = require('../lib/helpers');
 
 const round3 = (n) => Math.round((Number(n) + Number.EPSILON) * 1000) / 1000;
 
@@ -82,13 +82,14 @@ async function createProductionFromSalesOrder(salesOrderId, userId) {
       });
       const [result] = await conn.query(
         `INSERT INTO production_orders
-           (production_no, sales_order_id, bom_id, product_id, quantity, start_date, due_date, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'planned', ?, ?)`,
+           (production_no, sales_order_id, bom_id, product_id, lot_number, quantity, start_date, due_date, status, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'planned', ?, ?)`,
         [
           productionNo,
           salesOrderId,
           boms[0].id,
           item.product_id,
+          lotFromDate(orderDate),
           item.quantity,
           orderDate,
           order.expected_date || addDaysISO(orderDate, 14),
@@ -120,6 +121,9 @@ async function completeProductionOrder(productionOrderId, userId) {
     const order = rows[0];
     if (order.status === 'completed') throw Object.assign(new Error('Production order is already completed.'), { status: 422 });
     if (order.status === 'cancelled') throw Object.assign(new Error('Cancelled production orders cannot be completed.'), { status: 422 });
+    if (!order.lot_number || !order.expiry_date) {
+      throw Object.assign(new Error('Enter lot number and expiry date before completing production.'), { status: 422 });
+    }
 
     const [materials] = await conn.query(
       `SELECT m.*, p.sku, p.name, p.stock_qty, p.track_stock, p.cost_price

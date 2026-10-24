@@ -90,6 +90,12 @@ async function applyPricingAndRules(data, existing = null) {
     const n = Number(data[key]);
     data[key] = Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
   }
+  if (data.plu === null || data.plu === undefined || data.plu === '') {
+    data.plu = null;
+  } else {
+    const n = Number(data.plu);
+    data.plu = Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
+  }
   data.brand_id = data.brand_id ? Number.parseInt(data.brand_id, 10) : null;
   data.supplier_id = data.supplier_id ? Number.parseInt(data.supplier_id, 10) : null;
   data.sold_by_weight = Number(data.sold_by_weight) === 1 ? 1 : 0;
@@ -109,6 +115,10 @@ async function applyPricingAndRules(data, existing = null) {
   if (data.dun14) {
     const dup = await one('SELECT id FROM products WHERE dun14 = ? AND id <> ? LIMIT 1', [data.dun14, excludeId]);
     if (dup) errors.dun14 = 'Another product already uses this DUN-14.';
+  }
+  if (data.plu !== null) {
+    const dup = await one('SELECT id FROM products WHERE plu = ? AND id <> ? LIMIT 1', [data.plu, excludeId]);
+    if (dup) errors.plu = 'Another product already uses this PLU.';
   }
 
   data.cost_gross_price = round2(Math.max(0, Number(data.cost_gross_price || 0)));
@@ -159,6 +169,7 @@ const fields = [
   { name: 'unit', label: 'Unit of measure', type: 'text', default: 'pcs', section: 'Product', help: 'Used as the quantity label, e.g. pcs, pack, kg or m.' },
   { name: 'ean13', label: 'EAN-13', type: 'text', section: 'Identifiers', maxLength: 13, placeholder: '13 digits, optional', help: 'Retail barcode. Leave blank when the product has none.' },
   { name: 'dun14', label: 'DUN-14', type: 'text', section: 'Identifiers', maxLength: 14, placeholder: '14 digits, optional', help: 'Case / pallet barcode. Leave blank when the product has none.' },
+  { name: 'plu', label: 'PLU', type: 'number', min: 0, max: 4294967295, integer: true, section: 'Identifiers', placeholder: 'Numeric PLU code, optional', help: 'Price look-up code used to identify manufactured products. Must be unique.' },
   { name: 'units_per_pack', label: 'Units per pack', type: 'number', min: 0, integer: true, section: 'Packaging', help: 'Number of selling units in one supplier pack.' },
   { name: 'packs_per_pallet', label: 'Packs per pallet', type: 'number', min: 0, integer: true, section: 'Packaging', help: 'Number of packs on a full pallet.' },
   { name: 'sold_by_weight', label: 'Sold / bought by weight', type: 'checkbox', default: 0, section: 'Packaging', help: 'Allows decimal quantities and indicates a weight-based product (kg / g).' },
@@ -190,7 +201,7 @@ const resourceRouter = makeResourceRouter({
   numberField: 'sku',
   number: { prefix: 'SKU', year: false, pad: 5 },
   titleField: 'name',
-  searchFields: ['t.sku', 't.name', 't.description', 't.ean13', 't.dun14', 'pc.name', 'b.name'],
+  searchFields: ['t.sku', 't.name', 't.description', 't.ean13', 't.dun14', 't.plu', 'pc.name', 'b.name'],
   filters: [
     { name: 'type', label: 'Type', options: typeOptions },
     { name: 'brand_id', label: 'Brand', optionsFrom: brandOptions },
