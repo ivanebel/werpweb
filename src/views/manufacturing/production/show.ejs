@@ -203,6 +203,12 @@
             <div class="mt-4 grid grid-cols-1 gap-2">
               <a href="/products/<%= order.product_id %>" class="btn btn-secondary btn-sm">Open product</a>
               <a href="/manufacturing/boms/<%= order.bom_id %>" class="btn btn-secondary btn-sm">Open BOM</a>
+              <% if (order.lot_number) { %>
+                <a href="/manufacturing/scale-records?lot=<%= encodeURIComponent(order.lot_number) %>" class="btn btn-secondary btn-sm">
+                  <%- include('/partials/icon', { name: 'scale', className: 'h-4 w-4' }) %>
+                  <%= t('View scale records') %>
+                </a>
+              <% } %>
               <% if (order.order_no) { %>
                 <a href="/sales-orders/<%= order.sales_order_id %>" class="btn btn-secondary btn-sm"><%= t('Sales order {number}', { number: order.order_no }) %></a>
               <% } %>

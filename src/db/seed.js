@@ -1250,6 +1250,30 @@ async function main() {
           notes: 'Finished goods produced',
           created_by: adminId,
         });
+
+        // Demo scale/labeler records for the completed batch. The real data
+        // comes from the Bizerba middleware; these rows make the page usable
+        // immediately after a fresh seed.
+        const finishedPlu = (productDefs.find((p) => p.sku === finishedLine.sku) || {}).plu ?? null;
+        const scaleCount = Math.max(12, Math.min(36, Number(finishedLine.quantity) || 12));
+        for (let n = 0; n < scaleCount; n++) {
+          const realWeight = Math.round((2.4 + between(-0.08, 0.08)) * 1000) / 1000;
+          const inRange = rand() > 0.06 ? 1 : 0;
+          await insert(conn, 'scale_records', {
+            product_id: prod[finishedLine.sku],
+            plu: finishedPlu,
+            lot_number: lotFromDate(startDate),
+            expiry_date: addDays(dueDate, 365),
+            weighed_at: `${startDate} ${String(8 + Math.floor(n / 6)).padStart(2, '0')}:${String((n * 7) % 60).padStart(2, '0')}:00`,
+            in_range: inRange,
+            real_weight: realWeight,
+            printed_weight: inRange ? realWeight : 0,
+            printed_price: inRange ? round2(realWeight * (productPrices[finishedLine.sku] || 0)) : 0,
+            label_id: `LBL-${String(productionId).padStart(4, '0')}-${String(n + 1).padStart(4, '0')}`,
+            box_id: `BOX-${String(productionId).padStart(4, '0')}-${String(Math.floor(n / 6) + 1).padStart(2, '0')}`,
+            pallet_id: `PAL-${String(productionId).padStart(4, '0')}-${String(Math.floor(n / 18) + 1).padStart(2, '0')}`,
+          });
+        }
       }
     }
 

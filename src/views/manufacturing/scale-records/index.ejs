@@ -1,0 +1,252 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Scale records') %></h1>
+          <p class="page-subtitle"><%= t('Every item that passed through the scale and labeler. Search by lot number or weighing date and review filtered totals.') %></p>
+        </div>
+        <a href="<%= h.buildQuery('/manufacturing/scale-records', query) %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'refresh', className: 'h-4 w-4' }) %>
+          <%= t('Refresh') %>
+        </a>
+      </div>
+
+      <div class="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/15 dark:text-blue-light-400">
+            <%- include('/partials/icon', { name: 'list', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Items') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.items, 0) %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            <%- include('/partials/icon', { name: 'scale', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Total real weight') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatQty(stats.totalRealWeight) %> <span class="text-sm font-medium text-gray-400">kg</span></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
+            <%- include('/partials/icon', { name: 'cube', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Boxes') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.boxes, 0) %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <%- include('/partials/icon', { name: 'truck', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Pallets') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.pallets, 0) %></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-5 p-5">
+        <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <h2 class="card-title"><%= t('Filtered summary') %></h2>
+          <p class="text-xs text-gray-400"><%= t('Weights are shown in kilograms.') %></p>
+        </div>
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 xl:grid-cols-8">
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Average weight') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatQty(stats.averageWeight) %> <span class="text-xs font-normal text-gray-400">kg</span></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Minimum weight') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatQty(stats.minWeight) %> <span class="text-xs font-normal text-gray-400">kg</span></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Maximum weight') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatQty(stats.maxWeight) %> <span class="text-xs font-normal text-gray-400">kg</span></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Printed weight') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatQty(stats.totalPrintedWeight) %> <span class="text-xs font-normal text-gray-400">kg</span></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Printed value') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= money(stats.totalPrintedPrice) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Labels') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatNumber(stats.labels, 0) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('In range') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-success-600 dark:text-success-400"><%= h.formatNumber(stats.inRange, 0) %></dd>
+            <dd class="text-xs text-gray-400"><%= h.formatNumber(stats.inRangePct, 1) %>%</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Out of range') %></dt>
+            <dd class="mt-1 text-lg font-semibold <%= stats.outOfRange ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white' %>"><%= h.formatNumber(stats.outOfRange, 0) %></dd>
+            <dd class="text-xs text-gray-400"><%= h.formatNumber(stats.outOfRangePct, 1) %>%</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="border-b border-gray-100 p-5 dark:border-gray-800">
+          <form id="scale-filter-form" method="GET" action="/manufacturing/scale-records" class="flex flex-1 flex-wrap items-end gap-3">
+            <div class="min-w-[240px] flex-1 md:max-w-sm">
+              <label for="lot" class="form-label"><%= t('Lot number') %></label>
+              <div class="relative">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
+                </span>
+                <input id="lot" type="search" name="lot" value="<%= lot %>" class="form-input pl-10" placeholder="<%= t('Lot number or partial lot…') %>">
+              </div>
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="from" class="form-label"><%= t('Weighed from') %></label>
+              <input id="from" type="datetime-local" name="from" value="<%= fromValue %>" class="form-input sm:w-52">
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="to" class="form-label"><%= t('Weighed to') %></label>
+              <input id="to" type="datetime-local" name="to" value="<%= toValue %>" class="form-input sm:w-52">
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="range" class="form-label"><%= t('Weighing range') %></label>
+              <select id="range" name="range" class="form-select sm:w-44">
+                <option value=""><%= t('All records') %></option>
+                <option value="in" <%= rangeFilter === 'in' ? 'selected' : '' %>><%= t('In range') %></option>
+                <option value="out" <%= rangeFilter === 'out' ? 'selected' : '' %>><%= t('Out of range') %></option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-secondary"><%= t('Apply') %></button>
+            <% if (hasFilters) { %><a href="/manufacturing/scale-records" class="btn btn-ghost"><%= t('Reset') %></a><% } %>
+            <div class="flex w-full flex-wrap items-center gap-2 pt-1">
+              <span class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Quick range') %></span>
+              <button type="button" class="btn btn-ghost btn-sm" data-quick-range="today"><%= t('Today') %></button>
+              <button type="button" class="btn btn-ghost btn-sm" data-quick-range="7d"><%= t('Last 7 days') %></button>
+              <button type="button" class="btn btn-ghost btn-sm" data-quick-range="month"><%= t('This month') %></button>
+            </div>
+          </form>
+        </div>
+
+        <div class="flex flex-col gap-2 border-b border-gray-100 px-5 py-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+          <h2 class="card-title"><%= t('Filtered results') %></h2>
+          <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <%= h.pluralize(pagination.total, 'scale record') %>
+          </span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table-base min-w-[1280px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Weighed at') %></th>
+                <th class="table-th"><%= t('Product') %></th>
+                <th class="table-th"><%= t('PLU') %></th>
+                <th class="table-th"><%= t('Lot / expiry') %></th>
+                <th class="table-th text-right"><%= t('Real weight (kg)') %></th>
+                <th class="table-th text-right"><%= t('Printed weight (kg)') %></th>
+                <th class="table-th text-right"><%= t('Printed price') %></th>
+                <th class="table-th"><%= t('Label') %></th>
+                <th class="table-th"><%= t('Box') %></th>
+                <th class="table-th"><%= t('Pallet') %></th>
+                <th class="table-th"><%= t('Range') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach(row => { %>
+                <tr class="table-row">
+                  <td class="table-td whitespace-nowrap">
+                    <span class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(row.weighed_at) %></span>
+                    <span class="mt-0.5 block text-[11px] text-gray-400"><%= t('Created') %>: <%= h.formatDateTime(row.created_at) %></span>
+                  </td>
+                  <td class="table-td">
+                    <% if (row.product_id) { %>
+                      <a href="/products/<%= row.product_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.product_name %></a>
+                      <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= row.product_sku %></span>
+                    <% } else { %>
+                      <span class="text-gray-500 dark:text-gray-400"><%= t('Unknown product') %></span>
+                    <% } %>
+                  </td>
+                  <td class="table-td font-mono text-xs"><%= row.plu ?? '—' %></td>
+                  <td class="table-td">
+                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= row.lot_number || '—' %></span>
+                    <% if (row.expiry_date) { %>
+                      <span class="mt-0.5 block text-xs text-gray-400"><%= t('Expires {date}', { date: h.formatDate(row.expiry_date) }) %></span>
+                    <% } %>
+                  </td>
+                  <td class="table-td text-right font-medium"><%= h.formatQty(row.real_weight) %></td>
+                  <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(row.printed_weight) %></td>
+                  <td class="table-td text-right font-medium"><%= money(row.printed_price) %></td>
+                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.label_id || '—' %></span></td>
+                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.box_id || '—' %></span></td>
+                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.pallet_id || '—' %></span></td>
+                  <td class="table-td">
+                    <% if (Number(row.in_range) === 1) { %>
+                      <span class="badge bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/15 dark:text-success-400"><%= t('In range') %></span>
+                    <% } else { %>
+                      <span class="badge bg-error-50 text-error-700 ring-error-600/20 dark:bg-error-500/15 dark:text-error-400"><%= t('Out of range') %></span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!rows.length) { %>
+                <tr>
+                  <td colspan="11" class="px-6 py-16 text-center">
+                    <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                      <%- include('/partials/icon', { name: 'printer', className: 'h-6 w-6' }) %>
+                    </span>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No scale records found') %></p>
+                    <p class="mt-1 text-sm text-gray-400"><%= hasFilters ? t('No records match the current filters.') : t('Records appear here as the Bizerba scale sends weighed items.') %></p>
+                    <% if (hasFilters) { %>
+                      <a href="/manufacturing/scale-records" class="btn btn-secondary btn-sm mt-4"><%= t('Clear filters') %></a>
+                    <% } %>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+
+        <%- include('/partials/pagination', { pagination, basePath: '/manufacturing/scale-records', query }) %>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+    (function () {
+      const form = document.getElementById('scale-filter-form');
+      if (!form) return;
+      const from = form.querySelector('#from');
+      const to = form.querySelector('#to');
+      const pad = (value) => String(value).padStart(2, '0');
+      const inputValue = (date) => `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+      const startOfDay = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0));
+      const endOfDay = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 0));
+      form.querySelectorAll('[data-quick-range]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const now = new Date();
+          let start = startOfDay(now);
+          let end = endOfDay(now);
+          if (button.dataset.quickRange === '7d') {
+            start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6, 0, 0, 0));
+          } else if (button.dataset.quickRange === 'month') {
+            start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
+          }
+          from.value = inputValue(start);
+          to.value = inputValue(end);
+          form.submit();
+        });
+      });
+    })();
+  </script>
+</div>

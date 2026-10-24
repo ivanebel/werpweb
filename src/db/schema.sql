@@ -684,6 +684,37 @@ CREATE TABLE IF NOT EXISTS production_order_materials (
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- One row per item that passed through the Bizerba GLM-e scale/labeler.
+-- Weights are stored in kilograms. Product data is snapshotted so the history
+-- remains readable if a product is renamed or removed later.
+CREATE TABLE IF NOT EXISTS scale_records (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  product_id     INT UNSIGNED NULL,
+  plu            INT UNSIGNED NULL,
+  lot_number     VARCHAR(60) NULL,
+  expiry_date    DATE NULL,
+  weighed_at     DATETIME NOT NULL,
+  in_range       TINYINT(1) NOT NULL DEFAULT 0,
+  real_weight    DECIMAL(14,3) NOT NULL DEFAULT 0,
+  printed_weight DECIMAL(14,3) NOT NULL DEFAULT 0,
+  printed_price  DECIMAL(14,2) NOT NULL DEFAULT 0,
+  label_id       VARCHAR(80) NULL,
+  box_id         VARCHAR(80) NULL,
+  pallet_id      VARCHAR(80) NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_scale_records_weighed (weighed_at, id),
+  KEY idx_scale_records_lot (lot_number, weighed_at),
+  KEY idx_scale_records_product (product_id, weighed_at),
+  KEY idx_scale_records_plu (plu, weighed_at),
+  KEY idx_scale_records_range (in_range, weighed_at),
+  KEY idx_scale_records_label (label_id),
+  KEY idx_scale_records_box (box_id),
+  KEY idx_scale_records_pallet (pallet_id),
+  CONSTRAINT fk_scale_records_product FOREIGN KEY (product_id)
+    REFERENCES products (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS stock_movements (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   product_id     INT UNSIGNED NOT NULL,

@@ -13,6 +13,54 @@ function arr(value) {
   return Array.isArray(value) ? value : [value];
 }
 
+// Scale filters accept both date-only values and datetime-local values. A
+// date-only "to" value includes the whole day, which is what users expect.
+function filterDateTime(value, endOfDay = false) {
+  let raw = String(value || '').trim().replace(' ', 'T');
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    raw += endOfDay ? 'T23:59:59' : 'T00:00:00';
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)) {
+    raw += endOfDay ? ':59' : ':00';
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw)) return null;
+  if (Number.isNaN(new Date(`${raw}Z`).getTime())) return null;
+  return raw.replace('T', ' ');
+}
+
+function dateTimeInputValue(value, endOfDay = false) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (!match) return '';
+  return `${match[1]}T${match[2] || (endOfDay ? '23' : '00')}:${match[3] || (endOfDay ? '59' : '00')}`;
+}
+
+function scaleRecordFilters(queryParams) {
+  const lot = String(queryParams.lot || '').trim();
+  const range = ['in', 'out'].includes(String(queryParams.range || ''))
+    ? String(queryParams.range)
+    : '';
+  const from = filterDateTime(queryParams.from, false);
+  const to = filterDateTime(queryParams.to, true);
+  const where = [];
+  const params = [];
+  if (lot) {
+    where.push('sr.lot_number LIKE ?');
+    params.push(`%${lot}%`);
+  }
+  if (from) {
+    where.push('sr.weighed_at >= ?');
+    params.push(from);
+  }
+  if (to) {
+    where.push('sr.weighed_at <= ?');
+    params.push(to);
+  }
+  if (range === 'in') where.push('sr.in_range = 1');
+  if (range === 'out') where.push('sr.in_range = 0');
+  return { where, params, lot, range, from, to };
+}
+
 async function productOptions() {
   const rows = await query(
     `SELECT id, sku, name, type, unit, cost_price, sale_price, stock_qty FROM products WHERE status = 'active' ORDER BY name`,
@@ -853,6 +901,81 @@ router.post('/production-orders/:id(\\d+)/delete', async (req, res, next) => {
     await getPool().query('DELETE FROM production_orders WHERE id = ?', [order.id]);
     req.flash('success', 'Production order deleted.');
     res.redirect('/manufacturing/production-orders');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------------------------------------------------- scale records
+router.get('/scale-records', async (req, res, next) => {
+  try {
+    const { where, params, lot, range } = scaleRecordFilters(req.query);
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const statsRow = await one(
+      `SELECT
+         COUNT(*) AS items,
+         COALESCE(SUM(sr.real_weight), 0) AS total_real_weight,
+         COALESCE(SUM(sr.printed_weight), 0) AS total_printed_weight,
+         COALESCE(SUM(sr.printed_price), 0) AS total_printed_price,
+         COALESCE(AVG(sr.real_weight), 0) AS average_weight,
+         COALESCE(MIN(sr.real_weight), 0) AS min_weight,
+         COALESCE(MAX(sr.real_weight), 0) AS max_weight,
+         COUNT(DISTINCT NULLIF(sr.label_id, '')) AS labels,
+         COUNT(DISTINCT NULLIF(sr.box_id, '')) AS boxes,
+         COUNT(DISTINCT NULLIF(sr.pallet_id, '')) AS pallets,
+         COALESCE(SUM(sr.in_range = 1), 0) AS in_range,
+         COALESCE(SUM(sr.in_range = 0), 0) AS out_of_range
+       FROM scale_records sr
+       ${whereSql}`,
+      params,
+    );
+
+    const total = Number(statsRow.items || 0);
+    const inRange = Number(statsRow.in_range || 0);
+    const outOfRange = Number(statsRow.out_of_range || 0);
+    const stats = {
+      items: total,
+      totalRealWeight: Number(statsRow.total_real_weight || 0),
+      totalPrintedWeight: Number(statsRow.total_printed_weight || 0),
+      totalPrintedPrice: Number(statsRow.total_printed_price || 0),
+      averageWeight: Number(statsRow.average_weight || 0),
+      minWeight: Number(statsRow.min_weight || 0),
+      maxWeight: Number(statsRow.max_weight || 0),
+      labels: Number(statsRow.labels || 0),
+      boxes: Number(statsRow.boxes || 0),
+      pallets: Number(statsRow.pallets || 0),
+      inRange,
+      outOfRange,
+      inRangePct: total ? (inRange / total) * 100 : 0,
+      outOfRangePct: total ? (outOfRange / total) * 100 : 0,
+    };
+
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const perPage = 50;
+    const pag = pagination(total, page, perPage);
+    const rows = await query(
+      `SELECT sr.*, p.name AS product_name, p.sku AS product_sku, p.unit AS product_unit
+         FROM scale_records sr
+         LEFT JOIN products p ON p.id = sr.product_id
+         ${whereSql}
+        ORDER BY sr.weighed_at DESC, sr.id DESC
+        LIMIT ? OFFSET ?`,
+      [...params, perPage, (pag.page - 1) * perPage],
+    );
+
+    res.render('manufacturing/scale-records/index', {
+      title: req.t('Scale records'),
+      active: 'manufacturing-scale-records',
+      breadcrumbs: [{ label: req.t('Manufacturing') }, { label: req.t('Scale records') }],
+      rows,
+      pagination: pag,
+      stats,
+      lot,
+      rangeFilter: range,
+      fromValue: dateTimeInputValue(req.query.from, false),
+      toValue: dateTimeInputValue(req.query.to, true),
+      hasFilters: Boolean(lot || range || req.query.from || req.query.to),
+    });
   } catch (err) {
     next(err);
   }
