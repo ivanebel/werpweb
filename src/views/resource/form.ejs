@@ -94,6 +94,39 @@
                       <% } %>
                       <% if (errors[f.name]) { %><p class="form-error"><%= errors[f.name] %></p><% } %>
                       <% if (f.help) { %><p class="form-help"><%= f.help %></p><% } %>
+                      <% if (resource.key === 'products' && (f.name === 'ean13' || f.name === 'dun14')) { %>
+                        <div
+                          class="mt-3 hidden rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40"
+                          data-barcode-preview
+                          data-type="<%= f.name %>"
+                          data-input="<%= f.name %>"
+                          data-length="<%= f.name === 'ean13' ? 13 : 14 %>"
+                          data-label="<%= f.label %>"
+                          data-preview-label="<%= t('Barcode preview') %>"
+                          data-length-template="<%= t('Enter {length} digits to preview the barcode.') %>"
+                          data-digits-label="<%= t('Use digits only.') %>"
+                          data-check-template="<%= t('The check digit should be {digit}. The preview uses the corrected code.') %>"
+                          data-valid-template="<%= t('Valid {label}. Download the SVG for label printing.') %>"
+                        >
+                          <div class="flex flex-col gap-3">
+                            <div data-barcode-canvas class="hidden min-h-[72px] w-full items-center justify-center rounded-lg bg-white p-2">
+                              <img data-barcode-image src="" alt="" class="h-16 w-auto max-w-full">
+                            </div>
+                            <div class="min-w-0">
+                              <p data-barcode-message class="text-xs text-gray-500 dark:text-gray-400"></p>
+                              <div data-barcode-actions class="mt-2 hidden flex flex-wrap items-center gap-2">
+                                <a data-barcode-download href="#" class="btn btn-secondary btn-sm" download>
+                                  <%- include('/partials/icon', { name: 'download', className: 'h-4 w-4' }) %>
+                                  <span><%= t('Download SVG') %></span>
+                                </a>
+                                <button type="button" data-barcode-correct class="btn btn-ghost btn-sm hidden">
+                                  <%= t('Use corrected code') %>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      <% } %>
                     </div>
                   <% } %>
                 <% }) %>
@@ -142,6 +175,106 @@
     const el = field(name);
     if (el) el.value = Number(value || 0).toFixed(2);
   };
+
+  // Live barcode previews for EAN-13 / DUN-14 identifiers.
+  const barcodeCheckDigit = (payload) => {
+    let sum = 0;
+    for (let i = 0; i < payload.length; i += 1) {
+      sum += Number(payload[payload.length - 1 - i]) * (i % 2 === 0 ? 3 : 1);
+    }
+    return String((10 - (sum % 10)) % 10);
+  };
+
+  document.querySelectorAll('[data-barcode-preview]').forEach((box) => {
+    const input = field(box.dataset.input);
+    if (!input) return;
+
+    const previewLength = Number(box.dataset.length || 0);
+    const canvas = box.querySelector('[data-barcode-canvas]');
+    const image = box.querySelector('[data-barcode-image]');
+    const message = box.querySelector('[data-barcode-message]');
+    const actions = box.querySelector('[data-barcode-actions]');
+    const download = box.querySelector('[data-barcode-download]');
+    const correct = box.querySelector('[data-barcode-correct]');
+    let timer = null;
+    const show = (element, visible) => element.classList.toggle('hidden', !visible);
+
+    const setMessage = (text, tone) => {
+      message.textContent = text || '';
+      message.classList.toggle('text-warning-600', tone === 'warning');
+      message.classList.toggle('dark:text-warning-400', tone === 'warning');
+      message.classList.toggle('text-success-600', tone === 'success');
+      message.classList.toggle('dark:text-success-400', tone === 'success');
+      message.classList.toggle('text-gray-500', tone !== 'warning' && tone !== 'success');
+      message.classList.toggle('dark:text-gray-400', tone !== 'warning' && tone !== 'success');
+    };
+
+    const update = () => {
+      const raw = input.value.trim();
+      if (!raw) {
+        box.classList.add('hidden');
+        show(canvas, false);
+        show(actions, false);
+        show(correct, false);
+        setMessage('');
+        return;
+      }
+
+      box.classList.remove('hidden');
+      const code = raw.replace(/\s+/g, '');
+      if (!/^\d+$/.test(code)) {
+        show(canvas, false);
+        show(actions, false);
+        show(correct, false);
+        setMessage(box.dataset.digitsLabel);
+        return;
+      }
+      if (code.length !== previewLength) {
+        show(canvas, false);
+        show(actions, false);
+        show(correct, false);
+        setMessage(box.dataset.lengthTemplate.replace('{length}', String(previewLength)));
+        return;
+      }
+
+      const expected = barcodeCheckDigit(code.slice(0, -1));
+      const stored = code.slice(-1);
+      const corrected = expected !== stored;
+      const barcodeCode = corrected ? code.slice(0, -1) + expected : code;
+      const imageUrl = `/products/barcode?type=${encodeURIComponent(box.dataset.type)}&code=${encodeURIComponent(code)}`;
+
+      image.src = imageUrl;
+      image.alt = `${box.dataset.previewLabel} ${barcodeCode}`;
+      show(canvas, true);
+      show(actions, true);
+      download.href = `${imageUrl}&download=1`;
+      show(correct, corrected);
+
+      if (corrected) {
+        correct.dataset.corrected = barcodeCode;
+        setMessage(box.dataset.checkTemplate.replace('{digit}', expected), 'warning');
+      } else {
+        delete correct.dataset.corrected;
+        setMessage(box.dataset.validTemplate.replace('{label}', box.dataset.label), 'success');
+      }
+    };
+
+    const schedule = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(update, 250);
+    };
+
+    input.addEventListener('input', schedule);
+    input.addEventListener('blur', update);
+    correct.addEventListener('click', () => {
+      if (!correct.dataset.corrected) return;
+      input.value = correct.dataset.corrected;
+      update();
+      input.focus();
+    });
+
+    update();
+  });
 
   function recalcPricing() {
     const costGross = num('cost_gross_price');

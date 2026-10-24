@@ -1,7 +1,9 @@
 'use strict';
 
+const express = require('express');
 const { makeResourceRouter } = require('./resource');
 const { query, one, getPool } = require('../db');
+const { analyzeBarcode, barcodeFilename, renderBarcodeSvg } = require('../lib/barcodes');
 
 const typeOptions = [
   { value: 'finished_good', label: 'Finished good' },
@@ -44,6 +46,35 @@ function netCost(gross, vatRate, levyRate) {
 
 function netSale(gross, vatRate) {
   return round2(Number(gross || 0) + rateAmount(gross, vatRate));
+}
+
+function barcodeAsset(type, code) {
+  const info = analyzeBarcode(type, code);
+  const queryCode = encodeURIComponent(info.code);
+  return {
+    type,
+    label: info.label || (type === 'ean13' ? 'EAN-13' : 'DUN-14'),
+    code: info.code,
+    barcodeCode: info.barcodeCode || info.code,
+    valid: info.valid,
+    canRender: info.canRender,
+    corrected: Boolean(info.corrected),
+    expectedCheckDigit: info.expectedCheckDigit,
+    reason: info.reason,
+    imageUrl: info.canRender
+      ? `/products/barcode?type=${encodeURIComponent(type)}&code=${queryCode}`
+      : null,
+    downloadUrl: info.canRender
+      ? `/products/barcode?type=${encodeURIComponent(type)}&code=${queryCode}&download=1`
+      : null,
+  };
+}
+
+function productBarcodes(row) {
+  return [
+    row.ean13 ? barcodeAsset('ean13', row.ean13) : null,
+    row.dun14 ? barcodeAsset('dun14', row.dun14) : null,
+  ].filter(Boolean);
 }
 
 async function applyPricingAndRules(data, existing = null) {
@@ -150,7 +181,7 @@ const fields = [
   { name: 'description', label: 'Description', type: 'textarea', full: true, section: 'Notes' },
 ];
 
-module.exports = makeResourceRouter({
+const resourceRouter = makeResourceRouter({
   key: 'products',
   basePath: '/products',
   title: 'Products',
@@ -179,6 +210,7 @@ module.exports = makeResourceRouter({
     { key: 'cost_price', label: 'Net cost', type: 'money', align: 'right' },
     { key: 'status', label: 'Status', type: 'status' },
   ],
+  showData: async (row) => ({ productBarcodes: productBarcodes(row) }),
   beforeCreate: async (data) => applyPricingAndRules(data, null),
   beforeUpdate: async (data, req, existing) => applyPricingAndRules(data, existing),
   afterUpdate: async (id, data, existing, req) => {
@@ -258,3 +290,32 @@ module.exports = makeResourceRouter({
     ];
   },
 });
+
+const router = express.Router();
+
+router.get('/barcode', (req, res) => {
+  const type = String(req.query.type || '').toLowerCase();
+  const code = String(req.query.code || '');
+  const download = String(req.query.download || '') === '1';
+
+  let rendered;
+  try {
+    rendered = renderBarcodeSvg(type, code);
+  } catch (err) {
+    return res.status(400).type('text/plain').send('Invalid barcode value.');
+  }
+
+  res.set({
+    'Content-Type': 'image/svg+xml; charset=utf-8',
+    'Cache-Control': 'private, max-age=300',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  if (download) {
+    res.set('Content-Disposition', `attachment; filename="${barcodeFilename(type, rendered.info)}"`);
+  }
+  return res.send(rendered.svg);
+});
+
+router.use(resourceRouter);
+
+module.exports = router;
