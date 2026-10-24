@@ -8,7 +8,7 @@
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div class="flex items-start gap-4">
           <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-            <%- include('/partials/icon', { name: resource.key === 'customers' ? 'users' : resource.key === 'suppliers' ? 'truck' : resource.key === 'employees' ? 'user-group' : resource.key === 'products' ? 'cube' : (resource.key === 'product-categories' || resource.key === 'brands') ? 'tag' : 'cube', className: 'h-6 w-6' }) %>
+            <%- include('/partials/icon', { name: resource.key === 'checks' ? 'check-circle' : resource.key === 'customers' ? 'users' : resource.key === 'suppliers' ? 'truck' : resource.key === 'employees' ? 'user-group' : resource.key === 'products' ? 'cube' : (resource.key === 'product-categories' || resource.key === 'brands') ? 'tag' : 'cube', className: 'h-6 w-6' }) %>
           </span>
           <div>
             <div class="flex flex-wrap items-center gap-2">
@@ -16,11 +16,16 @@
               <% if (row.status) { %><%- statusBadge(row.status) %><% } %>
             </div>
             <p class="page-subtitle">
-              <% if (row.customer_no) { %><%= t('Customer {number}', { number: row.customer_no }) %><% } %>
-              <% if (row.supplier_no) { %><%= t('Supplier {number}', { number: row.supplier_no }) %><% } %>
-              <% if (row.employee_no) { %><%= t('Employee {number}', { number: row.employee_no }) %><% } %>
-              <% if (row.sku && resource.key === 'products') { %>SKU <%= row.sku %><% } %>
-              <% if (row.product_count !== undefined && (resource.key === 'product-categories' || resource.key === 'brands')) { %><%= h.pluralize(row.product_count, 'product') %><% } %>
+              <% if (resource.key === 'checks') { %>
+                <%= t('Check {number}', { number: row.check_number || row.check_no }) %>
+                <% if (row.party_name) { %> · <%= row.party_name %><% } %>
+              <% } else { %>
+                <% if (row.customer_no) { %><%= t('Customer {number}', { number: row.customer_no }) %><% } %>
+                <% if (row.supplier_no) { %><%= t('Supplier {number}', { number: row.supplier_no }) %><% } %>
+                <% if (row.employee_no) { %><%= t('Employee {number}', { number: row.employee_no }) %><% } %>
+                <% if (row.sku && resource.key === 'products') { %>SKU <%= row.sku %><% } %>
+                <% if (row.product_count !== undefined && (resource.key === 'product-categories' || resource.key === 'brands')) { %><%= h.pluralize(row.product_count, 'product') %><% } %>
+              <% } %>
             </p>
           </div>
         </div>
@@ -56,7 +61,7 @@
           const s = f.section || defaultSection;
           if (!displaySections.includes(s)) displaySections.push(s);
         });
-        const moneyFields = ['cost_gross_price', 'cost_price', 'sale_gross_price', 'sale_price', 'credit_limit', 'salary'];
+        const moneyFields = ['cost_gross_price', 'cost_price', 'sale_gross_price', 'sale_price', 'credit_limit', 'salary', 'amount'];
         const hasValue = v => v !== null && v !== undefined && v !== '';
         const visibleFields = f => hasValue(row[f.name]);
         const visibleSections = displaySections.filter(section =>
@@ -109,6 +114,47 @@
         </div>
 
         <div class="space-y-5">
+          <% if (resource.key === 'checks' && checkStatusOptions) { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Change status') %></h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Move the check through its lifecycle. Every change is recorded in the history below.') %></p>
+              <form action="<%= checkStatusAction %>" method="POST" class="mt-4 space-y-3">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <div>
+                  <label for="check-status" class="form-label"><%= t('New status') %></label>
+                  <select id="check-status" name="status" class="form-select" required>
+                    <% checkStatusOptions.forEach(option => { %>
+                      <option value="<%= option.value %>" <%= String(row.status) === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <label for="check-status-date" class="form-label"><%= t('Status date') %></label>
+                  <input id="check-status-date" type="date" name="status_date" value="<%= checkToday %>" class="form-input">
+                </div>
+                <div>
+                  <label for="check-status-supplier" class="form-label"><%= t('Supplier / endorsee') %></label>
+                  <select id="check-status-supplier" name="supplier_id" class="form-select">
+                    <option value=""><%= t('— None —') %></option>
+                    <% checkSupplierOptions.forEach(option => { %>
+                      <option value="<%= option.value %>" <%= String(row.supplier_id || '') === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+                    <% }) %>
+                  </select>
+                  <p class="form-help"><%= t('Required when the check is endorsed or issued.') %></p>
+                </div>
+                <div>
+                  <label for="check-status-bank" class="form-label"><%= t('Deposited bank') %></label>
+                  <input id="check-status-bank" type="text" name="deposited_bank" value="<%= row.deposited_bank || '' %>" maxlength="120" class="form-input">
+                </div>
+                <div>
+                  <label for="check-status-notes" class="form-label"><%= t('Notes') %></label>
+                  <input id="check-status-notes" type="text" name="status_notes" maxlength="500" class="form-input" placeholder="<%= t('Optional note for this change') %>">
+                </div>
+                <button type="submit" class="btn btn-primary w-full"><%= t('Update status') %></button>
+              </form>
+            </div>
+          <% } %>
+
           <div class="card p-5 md:p-6">
             <h2 class="card-title">Record details</h2>
             <dl class="mt-4 space-y-3 text-sm">

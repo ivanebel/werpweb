@@ -11,6 +11,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Dashboard** with revenue and purchasing trends, sales by category, production pipeline, low-stock alerts, recent orders and outstanding invoices (ApexCharts).
 - **Contacts** - customers, suppliers and employees with full CRUD, search, filters and detail pages. Customer lists show the outstanding receivable balance and supplier lists show the outstanding payable balance, net of unapplied payment credits.
 - **Customer receipts and supplier payments** — record cash, bank transfers, customer checks, endorsed third-party checks or a mix in the same payment. Allocate receipts to open sales invoices, credit notes and tax withholdings; allocate supplier payments to purchase invoices, credit notes and debit notes. Partial payments and overpayments are supported, unapplied amounts become party credit, and customer payment orders can be printed or saved as PDF.
+- **Check portfolio** — track every check received from customers or issued/endorsed to suppliers. Each check has a full lifecycle (**Available**, **Deposited**, **Endorsed**, **Paid**, **Rejected**, **Expired**), its own dates, bank, drawer and supplier, linked payments, and a detailed status history. Customer check receipts automatically create available checks; supplier check payments automatically create issued checks, and an available check can be selected when endorsing a supplier payment.
 - **Inventory** — products (raw materials, finished goods, consumables, services), brands and categories, including stock levels, reorder warnings, EAN-13/DUN-14 identifiers, pack/pallet quantities, weighted products, cost/sale price breakdowns and manufacturing flags.
 - **Sales** — sales orders, sales invoices and deliveries. Orders can be confirmed, invoiced and delivered partially or completely. Each customer can have several receiving warehouses (separate from the billing address). Sales orders store the customer's own order number, a destination warehouse, the docking station and the expected reception date/time; deliveries and their printed documents show these details. Customers can also store their own product codes, which are printed on sales documents and packing slips.
 - **Purchasing** — purchase orders and purchase invoices (bills). Receiving a bill posts stock into inventory.
@@ -60,7 +61,7 @@ Open <http://localhost:3000> and sign in with:
 
 > Change the password and `SESSION_SECRET` before using the app for real data.
 
-The seed script creates a demo company, **Aurora Lighting Works**, with customers and their warehouses, suppliers, employees, products, BOMs, orders (including customer order numbers, destinations, docking stations and reception times), invoices, customer receipts, supplier payments, deliveries, production orders and POS demo shops/sales. It skips seeding when customers already exist; use `FORCE_SEED=1 npm run db:seed` to add another demo data set. `FORCE_SEED=1` also clears the existing POS demo tables before reseeding them.
+The seed script creates a demo company, **Aurora Lighting Works**, with customers and their warehouses, suppliers, employees, products, BOMs, orders (including customer order numbers, destinations, docking stations and reception times), invoices, customer receipts, supplier payments, checks, deliveries, production orders and POS demo shops/sales. It skips seeding when customers already exist; use `FORCE_SEED=1 npm run db:seed` to add another demo data set. `FORCE_SEED=1` also clears the existing POS demo tables before reseeding them.
 
 To add POS demo data to a database that is already seeded, run `npm run db:seed-pos`. Use `FORCE_SEED=1 npm run db:seed-pos` to replace the current POS locations and sales. This deliberately deletes existing POS records, but never touches products, stock or Unit #1 documents.
 
@@ -131,7 +132,17 @@ npm run db:seed-pos   # add POS demo shops and sales to an existing database
 npm run db:setup      # migrate + seed
 ```
 
-The schema is in `src/db/schema.sql`. Money is stored as `DECIMAL(14,2)`, quantities as `DECIMAL(14,3)`. Document numbers are generated per year, e.g. `SO-2026-0001`, `INV-2026-0001`, `PO-2026-0001`, `BILL-2026-0001`, `DLV-2026-0001`, `PRD-2026-0001`, `RCP-2026-0001` for customer receipts and `PMT-2026-0001` for supplier payments.
+The schema is in `src/db/schema.sql`. Money is stored as `DECIMAL(14,2)`, quantities as `DECIMAL(14,3)`. Document numbers are generated per year, e.g. `SO-2026-0001`, `INV-2026-0001`, `PO-2026-0001`, `BILL-2026-0001`, `DLV-2026-0001`, `PRD-2026-0001`, `RCP-2026-0001` for customer receipts, `PMT-2026-0001` for supplier payments and `CHK-2026-0001` for checks.
+
+## Checks integration test
+
+Start the app with `npm run dev` (or `npm start`) and, in another terminal, run:
+
+```bash
+npm run test:checks
+```
+
+The test logs in with the seeded admin account, creates its own customer, supplier, invoices, payments and checks, verifies the check lifecycle and payment integration, and removes everything it created. Run it against a development database, not production.
 
 ---
 
@@ -166,6 +177,14 @@ The schema is in `src/db/schema.sql`. Money is stored as `DECIMAL(14,2)`, quanti
 4. Add customer **credit notes** or **tax withholdings** when they reduce the amount collected. For supplier payments, add **credit notes** that reduce the amount paid or **debit notes** that add an amount due.
 5. The summary shows total sources, the amount applied to invoices and any **unapplied credit**. A receipt larger than the invoice balance leaves the difference as customer credit; a payment larger than the supplier balance leaves supplier credit.
 6. Open the receipt and choose **Print / PDF** for a customer payment order. Payments are immutable: use **Reverse** to remove a payment and restore the invoice balances and statuses.
+
+### Check portfolio
+
+1. Open **Treasury → Checks** to see every received, deposited, endorsed, paid, rejected and expired check, with totals for open and available value.
+2. Create a check manually when it arrives outside a payment, or let a customer payment with a check method create an **available** received check automatically. A supplier payment with a check method creates an **issued** check, already **endorsed** to that supplier.
+3. When endorsing a supplier payment, choose an existing available check in the payment method row to reuse the check record instead of creating a duplicate. The check moves to **Endorsed** and keeps its original customer and receipt history.
+4. On the check detail page, use **Change status** to record deposits, endorsements, settlement, rejection or expiry. Every change is written to the check history with its date, user and optional note.
+5. Linked checks appear on the payment page. Reversing a payment detaches its checks; checks created by that payment and not moved further are removed, while checks already deposited or endorsed are kept and, when appropriate, returned to **Available**.
 
 ### Manufacturing
 
@@ -217,6 +236,7 @@ src/
     settings.js          Cached company settings
     sequences.js         Per-year document numbering
     production.js        BOM snapshots and production completion
+    checks.js            Check statuses, history, payment links and reversal
   middleware/web.js      Sessions, CSRF, locals, auth and role guards
   routes/                One router per module
   views/                 EJS layouts, pages and partials

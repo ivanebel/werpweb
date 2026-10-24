@@ -194,6 +194,25 @@
                         <input type="date" name="method_date[]" value="<%= method.check_date || '' %>" class="form-input">
                       </div>
                     </div>
+                    <% if (typeKey === 'supplier') { %>
+                      <div class="mt-3 hidden rounded-lg border border-brand-100 bg-brand-50/50 p-3 dark:border-brand-500/20 dark:bg-brand-500/5" data-method-check>
+                        <label class="form-label"><%= t('Use an available check') %></label>
+                        <select name="method_check_id[]" class="form-select" data-method-check-select>
+                          <option value=""><%= t('Create a new check record') %></option>
+                          <% availableChecks.forEach(check => { %>
+                            <option value="<%= check.id %>"
+                                    data-amount="<%= check.amount %>"
+                                    data-reference="<%= check.check_number || '' %>"
+                                    data-bank="<%= check.bank_name || '' %>"
+                                    data-date="<%= check.issue_date || '' %>"
+                                    <%= String(method.check_id || '') === String(check.id) ? 'selected' : '' %>>
+                              <%= check.check_no %><% if (check.check_number) { %> · <%= check.check_number %><% } %> · <%= check.customer_name || check.drawer_name || '' %> · <%= money(check.amount) %>
+                            </option>
+                          <% }) %>
+                        </select>
+                        <p class="form-help"><%= t('Only available checks can be endorsed. Leave blank to create a new check record.') %></p>
+                      </div>
+                    <% } %>
                     <div class="mt-3 flex items-end gap-3">
                       <div class="flex-1">
                         <label class="form-label"><%= t('Notes') %></label>
@@ -342,6 +361,24 @@
           <input type="date" name="method_date[]" class="form-input">
         </div>
       </div>
+      <% if (typeKey === 'supplier') { %>
+        <div class="mt-3 hidden rounded-lg border border-brand-100 bg-brand-50/50 p-3 dark:border-brand-500/20 dark:bg-brand-500/5" data-method-check>
+          <label class="form-label"><%= t('Use an available check') %></label>
+          <select name="method_check_id[]" class="form-select" data-method-check-select>
+            <option value=""><%= t('Create a new check record') %></option>
+            <% availableChecks.forEach(check => { %>
+              <option value="<%= check.id %>"
+                      data-amount="<%= check.amount %>"
+                      data-reference="<%= check.check_number || '' %>"
+                      data-bank="<%= check.bank_name || '' %>"
+                      data-date="<%= check.issue_date || '' %>">
+                <%= check.check_no %><% if (check.check_number) { %> · <%= check.check_number %><% } %> · <%= check.customer_name || check.drawer_name || '' %> · <%= money(check.amount) %>
+              </option>
+            <% }) %>
+          </select>
+          <p class="form-help"><%= t('Only available checks can be endorsed. Leave blank to create a new check record.') %></p>
+        </div>
+      <% } %>
       <div class="mt-3 flex items-end gap-3">
         <div class="flex-1">
           <label class="form-label"><%= t('Notes') %></label>

@@ -8,6 +8,7 @@
 const bcrypt = require('bcryptjs');
 const { initDb, withTransaction, closeDb } = require('./index');
 const { nextNumber } = require('../lib/sequences');
+const { createCheckForPayment, recordHistory, statusEvent } = require('../lib/checks');
 const { seedPosDemo } = require('./posSeed');
 
 const FORCE = process.env.FORCE_SEED === '1';
@@ -745,6 +746,13 @@ async function main() {
       );
       const sourceTotal = round2(methodTotal + creditTotal + withholdingTotal);
       const appliedTotal = round2(allocations.reduce((sum, line) => sum + line.amount, 0));
+      const [partyRows] = await conn.query(
+        direction === 'customer'
+          ? 'SELECT company_name FROM customers WHERE id = ? LIMIT 1'
+          : 'SELECT company_name FROM suppliers WHERE id = ? LIMIT 1',
+        [partyId],
+      );
+      const partyName = partyRows[0] ? partyRows[0].company_name : null;
       const paymentNo = await nextNumber({
         prefix: direction === 'customer' ? 'RCP' : 'PMT',
         table: 'payments',
@@ -782,6 +790,18 @@ async function main() {
           notes: line.notes || null,
           sort_order: i,
         });
+        if (line.method === 'own_check' || line.method === 'endorsed_check') {
+          await createCheckForPayment(conn, {
+            direction,
+            party: { id: partyId, company_name: partyName },
+            line,
+            paymentDate,
+            paymentId,
+            paymentNo,
+            userId: adminId,
+            companyName: settings.company_name,
+          });
+        }
       }
       for (let i = 0; i < adjustments.length; i += 1) {
         const line = adjustments[i];
@@ -815,7 +835,7 @@ async function main() {
           ]);
         }
       }
-      return paymentNo;
+      return { paymentId, paymentNo };
     };
 
     if (openSales[0]) {
@@ -925,6 +945,205 @@ async function main() {
           },
         ],
         notes: 'Demo partial supplier payment; the balance remains open.',
+      });
+
+      const remaining = round2(total - bank);
+      if (remaining > 0) {
+        await addDemoPayment({
+          direction: 'supplier',
+          partyId: openPurchases[1].supplier_id,
+          reference: 'Supplier check settlement',
+          methods: [
+            {
+              method: 'own_check',
+              amount: remaining,
+              reference: `SUP-CHK-${Date.now().toString().slice(-6)}`,
+              bank_name: 'Bay Area Commercial Bank',
+              check_date: paymentDate,
+              notes: 'Balance settled with our own check.',
+            },
+          ],
+          allocations: [
+            {
+              invoice_type: 'purchase',
+              invoice_id: openPurchases[1].id,
+              invoice_no: openPurchases[1].bill_no,
+              amount: remaining,
+              markPaid: true,
+            },
+          ],
+          notes: 'Demo supplier payment settled with an issued check.',
+        });
+      }
+    }
+
+    // ------------------------------------------------------------- checks
+    const demoCustomerId = openSales[0] ? openSales[0].customer_id : customers[0] ? customers[0].id : null;
+    const demoCustomer2Id = openSales[1] ? openSales[1].customer_id : demoCustomerId;
+    const demoSupId = openPurchases[0] ? openPurchases[0].supplier_id : suppliers[0] ? suppliers[0].id : null;
+    const customerName = (id) => {
+      const match = customers.find((customer) => customer.id === id);
+      return match ? match.name : 'Demo customer';
+    };
+
+    const addDemoCheck = async ({
+      entryType = 'received',
+      status = 'available',
+      customerId = null,
+      supplierId = null,
+      amount,
+      checkNumber,
+      bankName,
+      drawerName,
+      issueDate,
+      dueDate = null,
+      receivedDate = null,
+      depositedBank = null,
+      depositedDate = null,
+      endorsedDate = null,
+      settledDate = null,
+      notes = null,
+      statusNotes = null,
+    }) => {
+      const initialStatus = entryType === 'issued' ? 'endorsed' : 'available';
+      const checkNo = await nextNumber({
+        prefix: 'CHK',
+        table: 'checks',
+        column: 'check_no',
+        conn,
+        date: issueDate,
+      });
+      const checkId = await insert(conn, 'checks', {
+        check_no: checkNo,
+        check_number: checkNumber,
+        bank_name: bankName,
+        drawer_name: drawerName,
+        amount,
+        entry_type: entryType,
+        status,
+        customer_id: customerId,
+        supplier_id: supplierId,
+        issue_date: issueDate,
+        due_date: dueDate,
+        received_date: receivedDate,
+        deposited_bank: depositedBank,
+        deposited_date: depositedDate,
+        endorsed_date: endorsedDate,
+        settled_date: settledDate,
+        source: 'manual',
+        notes,
+        created_by: adminId,
+      });
+      await recordHistory(conn, {
+        checkId,
+        event: 'created',
+        fromStatus: null,
+        toStatus: initialStatus,
+        eventDate: receivedDate || issueDate,
+        notes: null,
+        userId: adminId,
+      });
+      if (status !== initialStatus) {
+        await recordHistory(conn, {
+          checkId,
+          event: statusEvent(status),
+          fromStatus: initialStatus,
+          toStatus: status,
+          eventDate: settledDate || endorsedDate || depositedDate || issueDate,
+          notes: statusNotes,
+          userId: adminId,
+        });
+      }
+      return checkId;
+    };
+
+    if (demoCustomerId) {
+      await addDemoCheck({
+        customerId: demoCustomerId,
+        amount: 850,
+        checkNumber: 'DEMO-AVAILABLE-01',
+        bankName: 'Bay Area Commercial Bank',
+        drawerName: customerName(demoCustomerId),
+        issueDate: daysAgo(4),
+        dueDate: addDays(daysAgo(4), 20),
+        receivedDate: daysAgo(4),
+        notes: 'Received from a customer and waiting for deposit.',
+      });
+      await addDemoCheck({
+        customerId: demoCustomerId,
+        amount: 430,
+        checkNumber: 'DEMO-PAID-01',
+        bankName: 'Pacific Trade Bank',
+        drawerName: customerName(demoCustomerId),
+        issueDate: daysAgo(20),
+        dueDate: addDays(daysAgo(20), 10),
+        receivedDate: daysAgo(20),
+        status: 'paid',
+        settledDate: daysAgo(3),
+        notes: 'Customer check that cleared successfully.',
+        statusNotes: 'Cleared by the bank.',
+      });
+      await addDemoCheck({
+        customerId: demoCustomerId,
+        amount: 275,
+        checkNumber: 'DEMO-EXPIRED-01',
+        bankName: 'Golden Gate Credit Union',
+        drawerName: customerName(demoCustomerId),
+        issueDate: daysAgo(40),
+        dueDate: addDays(daysAgo(40), 1),
+        receivedDate: daysAgo(40),
+        status: 'expired',
+        settledDate: daysAgo(5),
+        notes: 'Customer check kept for history after its validity date.',
+        statusNotes: 'Past its validity date.',
+      });
+    }
+    if (demoCustomer2Id) {
+      await addDemoCheck({
+        customerId: demoCustomer2Id,
+        amount: 1240.5,
+        checkNumber: 'DEMO-DEPOSITED-01',
+        bankName: 'Bay Area Commercial Bank',
+        drawerName: customerName(demoCustomer2Id),
+        issueDate: daysAgo(12),
+        dueDate: addDays(daysAgo(12), 15),
+        receivedDate: daysAgo(12),
+        status: 'deposited',
+        depositedBank: 'Bay Area Commercial Bank',
+        depositedDate: daysAgo(7),
+        notes: 'Customer check deposited in the main operating account.',
+        statusNotes: 'Deposited in the main operating account.',
+      });
+      await addDemoCheck({
+        customerId: demoCustomer2Id,
+        amount: 310,
+        checkNumber: 'DEMO-REJECTED-01',
+        bankName: 'Pacific Trade Bank',
+        drawerName: customerName(demoCustomer2Id),
+        issueDate: daysAgo(25),
+        dueDate: addDays(daysAgo(25), 5),
+        receivedDate: daysAgo(25),
+        status: 'rejected',
+        settledDate: daysAgo(6),
+        notes: 'Customer check rejected by the issuing bank.',
+        statusNotes: 'Rejected by the issuing bank.',
+      });
+    }
+    if (demoSupId) {
+      await addDemoCheck({
+        entryType: 'issued',
+        supplierId: demoSupId,
+        amount: 980,
+        checkNumber: 'DEMO-ISSUED-01',
+        bankName: 'Bay Area Commercial Bank',
+        drawerName: settings.company_name,
+        issueDate: daysAgo(15),
+        dueDate: addDays(daysAgo(15), 10),
+        receivedDate: daysAgo(15),
+        endorsedDate: daysAgo(15),
+        status: 'endorsed',
+        notes: 'Own check issued to a supplier and pending settlement.',
+        statusNotes: 'Delivered to the supplier.',
       });
     }
 

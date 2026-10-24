@@ -21,6 +21,19 @@ const STATUS = {
   overdue: { label: 'Overdue', tone: 'error' },
   pending: { label: 'Pending', tone: 'warning' },
   shipped: { label: 'Shipped', tone: 'info' },
+  // checks
+  available: { label: 'Available', tone: 'info' },
+  deposited: { label: 'Deposited', tone: 'warning' },
+  endorsed: { label: 'Endorsed', tone: 'purple' },
+  rejected: { label: 'Rejected', tone: 'error' },
+  expired: { label: 'Expired', tone: 'gray' },
+  issued: { label: 'Issued', tone: 'purple' },
+  // check history events
+  created: { label: 'Created', tone: 'success' },
+  updated: { label: 'Updated', tone: 'info' },
+  linked: { label: 'Linked', tone: 'info' },
+  unlinked: { label: 'Unlinked', tone: 'gray' },
+  reopened: { label: 'Reopened', tone: 'info' },
   // production
   planned: { label: 'Planned', tone: 'gray' },
   released: { label: 'Released', tone: 'purple' },

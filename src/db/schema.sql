@@ -563,6 +563,78 @@ CREATE TABLE IF NOT EXISTS payment_adjustments (
     REFERENCES payments (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------------
+-- Checks received from customers or issued/endorsed to suppliers.
+-- A check keeps its own lifecycle and audit trail, independently of the
+-- payment that brought it in or the payment where it was endorsed.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS checks (
+  id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  check_no            VARCHAR(30) NOT NULL,
+  check_number        VARCHAR(60) NULL,
+  bank_name           VARCHAR(120) NULL,
+  drawer_name         VARCHAR(150) NULL,
+  amount              DECIMAL(14,2) NOT NULL DEFAULT 0,
+  entry_type          ENUM('received','issued') NOT NULL DEFAULT 'received',
+  status              ENUM('available','deposited','endorsed','paid','rejected','expired') NOT NULL DEFAULT 'available',
+  customer_id         INT UNSIGNED NULL,
+  supplier_id         INT UNSIGNED NULL,
+  issue_date          DATE NULL,
+  due_date            DATE NULL,
+  received_date       DATE NULL,
+  deposited_bank      VARCHAR(120) NULL,
+  deposited_date      DATE NULL,
+  endorsed_date       DATE NULL,
+  settled_date        DATE NULL,
+  received_payment_id INT UNSIGNED NULL,
+  issued_payment_id   INT UNSIGNED NULL,
+  source              ENUM('manual','payment') NOT NULL DEFAULT 'manual',
+  notes               TEXT NULL,
+  created_by          INT UNSIGNED NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_checks_no (check_no),
+  KEY idx_checks_status (status),
+  KEY idx_checks_entry_type (entry_type),
+  KEY idx_checks_customer (customer_id),
+  KEY idx_checks_supplier (supplier_id),
+  KEY idx_checks_dates (issue_date, due_date),
+  KEY idx_checks_received_payment (received_payment_id),
+  KEY idx_checks_issued_payment (issued_payment_id),
+  KEY idx_checks_created_by (created_by),
+  CONSTRAINT fk_checks_customer FOREIGN KEY (customer_id)
+    REFERENCES customers (id) ON DELETE SET NULL,
+  CONSTRAINT fk_checks_supplier FOREIGN KEY (supplier_id)
+    REFERENCES suppliers (id) ON DELETE SET NULL,
+  CONSTRAINT fk_checks_received_payment FOREIGN KEY (received_payment_id)
+    REFERENCES payments (id) ON DELETE SET NULL,
+  CONSTRAINT fk_checks_issued_payment FOREIGN KEY (issued_payment_id)
+    REFERENCES payments (id) ON DELETE SET NULL,
+  CONSTRAINT fk_checks_user FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS check_history (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  check_id    INT UNSIGNED NOT NULL,
+  event       ENUM('created','updated','deposited','endorsed','paid','rejected','expired','reopened','linked','unlinked') NOT NULL,
+  from_status ENUM('available','deposited','endorsed','paid','rejected','expired') NULL,
+  to_status   ENUM('available','deposited','endorsed','paid','rejected','expired') NULL,
+  event_date  DATE NOT NULL,
+  notes       VARCHAR(500) NULL,
+  user_id     INT UNSIGNED NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_check_history_check (check_id, created_at),
+  KEY idx_check_history_date (event_date),
+  CONSTRAINT fk_check_history_check FOREIGN KEY (check_id)
+    REFERENCES checks (id) ON DELETE CASCADE,
+  CONSTRAINT fk_check_history_user FOREIGN KEY (user_id)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS production_orders (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_no  VARCHAR(30) NOT NULL,

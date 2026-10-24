@@ -81,7 +81,9 @@ function localizedConfig(config, locale) {
     titleLower: title.toLowerCase(),
     newLabel: t(`New ${config.singular}`),
     editLabel: t(`Edit ${config.singular}`),
-    indexSubtitle: t('Create, edit and review your {items}.', { items: title.toLowerCase() }),
+    indexSubtitle: config.indexSubtitle
+      ? t(config.indexSubtitle)
+      : t('Create, edit and review your {items}.', { items: title.toLowerCase() }),
     fields: localizeFields(config.fields || [], t),
     filters: localizeFilters(config.filters || [], t),
     columns: localizeColumns(config.columns || [], t),
@@ -360,8 +362,10 @@ function makeResourceRouter(config) {
       if (typeof config.relatedLoader === 'function') {
         related = localizeRelated((await config.relatedLoader(row, req)) || [], req.t);
       }
+      const extra = typeof config.showData === 'function' ? await config.showData(row, req) : {};
 
       res.render('resource/show', {
+        ...extra,
         title: row[config.titleField || 'name'] || lc.singular,
         active: config.active || config.key,
         breadcrumbs: [

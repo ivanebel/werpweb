@@ -26,6 +26,7 @@ const purchaseOrderRoutes = require('./routes/purchaseOrders');
 const salesInvoiceRoutes = require('./routes/salesInvoices');
 const purchaseInvoiceRoutes = require('./routes/purchaseInvoices');
 const paymentRoutes = require('./routes/payments');
+const checkRoutes = require('./routes/checks');
 const deliveryRoutes = require('./routes/deliveries');
 const manufacturingRoutes = require('./routes/manufacturing');
 const posRoutes = require('./routes/pos');
@@ -123,6 +124,7 @@ async function createApp() {
   app.use('/sales', salesInvoiceRoutes);
   app.use('/purchases', purchaseInvoiceRoutes);
   app.use('/payments', paymentRoutes);
+  app.use('/checks', checkRoutes);
   app.use('/deliveries', deliveryRoutes);
   app.use('/manufacturing', manufacturingRoutes);
   app.use('/pos', posRoutes);

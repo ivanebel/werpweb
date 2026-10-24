@@ -5,6 +5,13 @@ const { query, one, scalar, withTransaction } = require('../db');
 const { nextNumber } = require('../lib/sequences');
 const { pagination, toNumber, todayISO } = require('../lib/helpers');
 const { translator } = require('../lib/i18n');
+const {
+  loadAvailableChecks,
+  createCheckForPayment,
+  linkCheckForPayment,
+  reversePaymentChecks,
+} = require('../lib/checks');
+const { getSettings } = require('../lib/settings');
 
 const router = express.Router();
 const PER_PAGE = 12;
@@ -112,7 +119,7 @@ function normalizeDate(value) {
 }
 
 function blankMethod() {
-  return { method: 'cash', amount: '', reference: '', bank_name: '', check_date: '', notes: '' };
+  return { method: 'cash', amount: '', reference: '', bank_name: '', check_date: '', notes: '', check_id: '' };
 }
 
 function emptyTotals() {
@@ -184,7 +191,16 @@ function parseMethodRows(body) {
   const banks = asArray(body.method_bank);
   const dates = asArray(body.method_date);
   const notes = asArray(body.method_notes);
-  const count = Math.max(types.length, amounts.length, references.length, banks.length, dates.length, notes.length);
+  const checkIds = asArray(body.method_check_id);
+  const count = Math.max(
+    types.length,
+    amounts.length,
+    references.length,
+    banks.length,
+    dates.length,
+    notes.length,
+    checkIds.length,
+  );
   const rows = [];
   for (let i = 0; i < count; i += 1) {
     rows.push({
@@ -194,6 +210,7 @@ function parseMethodRows(body) {
       bank_name: banks[i] === undefined ? '' : banks[i],
       check_date: dates[i] === undefined ? '' : dates[i],
       notes: notes[i] === undefined ? '' : notes[i],
+      check_id: checkIds[i] === undefined ? '' : checkIds[i],
     });
   }
   return rows;
@@ -220,12 +237,14 @@ function parseAdjustmentRows(body) {
 function validateMethods(rows, t) {
   const lines = [];
   const errors = [];
+  const usedChecks = new Set();
   for (const row of rows) {
     const amount = round2(toNumber(row.amount, 0));
     const reference = textValue(row.reference, 120);
     const bankName = textValue(row.bank_name, 120);
     const checkDate = normalizeDate(row.check_date);
     const notes = textValue(row.notes, 255);
+    const checkId = Number.parseInt(row.check_id, 10) || null;
     const hasDetails = Boolean(reference || bankName || row.check_date || notes);
     if (amount === 0 && !hasDetails) continue;
     if (amount <= 0) {
@@ -236,6 +255,14 @@ function validateMethods(rows, t) {
       errors.push(t('Invalid payment method.'));
       continue;
     }
+    const linkableCheckId = row.method === 'endorsed_check' ? checkId : null;
+    if (linkableCheckId) {
+      if (usedChecks.has(linkableCheckId)) {
+        errors.push(t('The same check cannot be used more than once in a payment.'));
+        continue;
+      }
+      usedChecks.add(linkableCheckId);
+    }
     lines.push({
       method: row.method,
       amount,
@@ -243,6 +270,7 @@ function validateMethods(rows, t) {
       bank_name: bankName,
       check_date: checkDate,
       notes,
+      check_id: linkableCheckId,
     });
   }
   return { lines, errors };
@@ -409,6 +437,7 @@ async function renderForm(req, res, state, status = 200) {
   const type = state.type;
   const cfg = localizeType(type, req.locale);
   const partyOptions = await loadPartyOptions(type);
+  const availableChecks = type === 'supplier' ? await loadAvailableChecks() : [];
   const selected = {};
   for (const allocation of state.allocations || []) {
     selected[String(allocation.invoice_id)] = allocation.amount;
@@ -423,6 +452,7 @@ async function renderForm(req, res, state, status = 200) {
     paymentType: cfg,
     typeKey: type,
     partyOptions,
+    availableChecks,
     partyId: state.partyId || '',
     openInvoices: state.openInvoices || [],
     selected,
@@ -526,10 +556,19 @@ async function loadPaymentDetail(id) {
   );
   if (!payment) return null;
 
-  const [allocations, methods, adjustments] = await Promise.all([
+  const [allocations, methods, adjustments, checks] = await Promise.all([
     query('SELECT * FROM payment_allocations WHERE payment_id = ? ORDER BY id', [id]),
     query('SELECT * FROM payment_methods WHERE payment_id = ? ORDER BY sort_order, id', [id]),
     query('SELECT * FROM payment_adjustments WHERE payment_id = ? ORDER BY sort_order, id', [id]),
+    query(
+      `SELECT k.*, COALESCE(c.company_name, s.company_name, k.drawer_name) AS party_name
+         FROM checks k
+         LEFT JOIN customers c ON c.id = k.customer_id
+         LEFT JOIN suppliers s ON s.id = k.supplier_id
+        WHERE k.received_payment_id = ? OR k.issued_payment_id = ?
+        ORDER BY k.id`,
+      [id, id],
+    ),
   ]);
 
   if (payment.direction === 'customer') {
@@ -556,7 +595,7 @@ async function loadPaymentDetail(id) {
     payment.party_tax_id = payment.supplier_tax_id;
   }
 
-  return { ...payment, allocations, methods, adjustments };
+  return { ...payment, allocations, methods, adjustments, checks };
 }
 
 // ---------------------------------------------------------------- index
@@ -670,7 +709,15 @@ router.post('/', async (req, res, next) => {
     }
 
     const cfg = TYPES[parsed.type];
+    const settings = await getSettings();
     const paymentId = await withTransaction(async (conn) => {
+      const paymentNo = await nextNumber({
+        prefix: cfg.prefix,
+        table: 'payments',
+        column: 'payment_no',
+        date: parsed.paymentDate,
+        conn,
+      });
       const [result] = await conn.query(
         `INSERT INTO payments
            (payment_no, direction, ${cfg.partyField}, payment_date, reference,
@@ -678,13 +725,7 @@ router.post('/', async (req, res, next) => {
             applied_amount, unapplied_amount, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          await nextNumber({
-            prefix: cfg.prefix,
-            table: 'payments',
-            column: 'payment_no',
-            date: parsed.paymentDate,
-            conn,
-          }),
+          paymentNo,
           parsed.type,
           parsed.partyId,
           parsed.paymentDate,
@@ -710,6 +751,34 @@ router.post('/', async (req, res, next) => {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [id, line.method, line.amount, line.reference, line.bank_name, line.check_date, line.notes, i],
         );
+
+        if (line.method === 'own_check' || line.method === 'endorsed_check') {
+          const linkCheckId = parsed.type === 'supplier' && line.method === 'endorsed_check' ? line.check_id : null;
+          if (linkCheckId) {
+            await linkCheckForPayment(conn, {
+              checkId: linkCheckId,
+              direction: parsed.type,
+              party: parsed.party,
+              line,
+              paymentDate: parsed.paymentDate,
+              paymentId: id,
+              paymentNo,
+              userId: req.session.user.id,
+              t: req.t,
+            });
+          } else {
+            await createCheckForPayment(conn, {
+              direction: parsed.type,
+              party: parsed.party,
+              line,
+              paymentDate: parsed.paymentDate,
+              paymentId: id,
+              paymentNo,
+              userId: req.session.user.id,
+              companyName: settings.company_name,
+            });
+          }
+        }
       }
       for (let i = 0; i < parsed.adjustmentLines.length; i += 1) {
         const line = parsed.adjustmentLines[i];
@@ -816,6 +885,7 @@ router.post('/:id(\\d+)/delete', async (req, res, next) => {
       for (const allocation of allocations) {
         await revertAllocation(conn, allocation);
       }
+      await reversePaymentChecks(conn, payment.id, req.session.user.id);
       await conn.query('DELETE FROM payments WHERE id = ?', [payment.id]);
     });
     req.flash('success', 'Payment reversed and deleted.');

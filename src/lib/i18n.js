@@ -1428,6 +1428,93 @@ const ES = {
     'Esta factura tiene imputaciones de pago. Revierta el pago antes de cambiar su tercero.',
   'The invoice total cannot be less than the amount already paid.':
     'El total de la factura no puede ser menor que el importe ya pagado.',
+  // ---------------------------------------------------------------- checks
+  'Treasury': 'Tesorería',
+  'Checks': 'Cheques',
+  'Check': 'Cheque',
+  'check': 'cheque',
+  'checks': 'cheques',
+  'New Check': 'Nuevo cheque',
+  'Edit Check': 'Editar cheque',
+  'Check no.': 'N.° de cheque',
+  'Check number': 'Número de cheque',
+  'Entry type': 'Tipo de entrada',
+  'Issued / given': 'Emitido / entregado',
+  'Issued': 'Emitido',
+  'Drawer / issuer': 'Librador / emisor',
+  'Bank': 'Banco',
+  'Issue date': 'Fecha de emisión',
+  'Received / given date': 'Fecha de recepción / entrega',
+  'Parties': 'Terceros',
+  'Supplier / endorsee': 'Proveedor / endosatario',
+  'Deposited': 'Depositado',
+  'Endorsed': 'Endosado',
+  'Rejected': 'Rechazado',
+  'Expired': 'Vencido',
+  'Deposited bank': 'Banco de depósito',
+  'Deposited date': 'Fecha de depósito',
+  'Endorsed date': 'Fecha de endoso',
+  'Settled date': 'Fecha de liquidación',
+  'Open check value': 'Valor de cheques abiertos',
+  'Available, deposited and endorsed': 'Disponibles, depositados y endosados',
+  'Track received, deposited, endorsed, paid, rejected and expired checks.':
+    'Seguimiento de cheques recibidos, depositados, endosados, pagados, rechazados y vencidos.',
+  'Change status': 'Cambiar estado',
+  'Move the check through its lifecycle. Every change is recorded in the history below.':
+    'Avanzá el cheque por su ciclo de vida. Cada cambio queda registrado en el historial.',
+  'New status': 'Nuevo estado',
+  'Status date': 'Fecha del estado',
+  'Required when the check is endorsed or issued.': 'Obligatorio cuando el cheque se endosa o se emite.',
+  'Optional note for this change': 'Nota opcional para este cambio',
+  'Update status': 'Actualizar estado',
+  'Check status updated successfully.': 'Estado del cheque actualizado correctamente.',
+  'Check history': 'Historial del cheque',
+  'No history has been recorded for this check yet.': 'Todavía no hay historial para este cheque.',
+  'Event': 'Evento',
+  'Linked payments': 'Pagos vinculados',
+  'Direction': 'Dirección',
+  'Updated': 'Actualizado',
+  'Linked': 'Vinculado',
+  'Unlinked': 'Desvinculado',
+  'Reopened': 'Reabierto',
+  'Generated automatically.': 'Se genera automáticamente.',
+  'Received checks are in our portfolio. Issued checks were given to a supplier.':
+    'Los cheques recibidos están en nuestra cartera. Los cheques emitidos se entregaron a un proveedor.',
+  'The customer who gave us the check, when applicable.': 'El cliente que nos entregó el cheque, cuando corresponda.',
+  'Check {number}': 'Cheque {number}',
+  'An issued check cannot stay available. Choose the status it has with the recipient.':
+    'Un cheque emitido no puede quedar disponible. Elegí el estado que tiene con el receptor.',
+  'Select the supplier or endorsee who received the check.':
+    'Seleccioná el proveedor o endosatario que recibió el cheque.',
+  'Select the supplier or endorsee for an endorsed check.':
+    'Seleccioná el proveedor o endosatario para un cheque endosado.',
+  'Please choose a valid status.': 'Elegí un estado válido.',
+  'Please choose a valid entry type.': 'Elegí un tipo de entrada válido.',
+  'Select a valid supplier or endorsee.': 'Seleccioná un proveedor o endosatario válido.',
+  'Check not found.': 'Cheque no encontrado.',
+  'This check is linked to a payment. Reverse the payment before deleting it.':
+    'Este cheque está vinculado a un pago. Revertí el pago antes de eliminarlo.',
+  'All entry type': 'Todos los tipos de entrada',
+  'Use an available check': 'Usar un cheque disponible',
+  'Create a new check record': 'Crear un nuevo registro de cheque',
+  'Only available checks can be endorsed. Leave blank to create a new check record.':
+    'Solo se pueden endosar cheques disponibles. Dejalo en blanco para crear un nuevo registro de cheque.',
+  'The same check cannot be used more than once in a payment.':
+    'El mismo cheque no se puede usar más de una vez en un pago.',
+  'The selected check is no longer available.': 'El cheque seleccionado ya no está disponible.',
+  'The selected check amount must match the payment method amount.':
+    'El importe del cheque seleccionado debe coincidir con el importe del medio de pago.',
+  'Reverse the linked payment before changing the check entry type.':
+    'Revertí el pago vinculado antes de cambiar el tipo de entrada del cheque.',
+  'Reverse the linked payment before changing the check amount.':
+    'Revertí el pago vinculado antes de cambiar el importe del cheque.',
+  'Reverse the linked payment before changing the check customer.':
+    'Revertí el pago vinculado antes de cambiar el cliente del cheque.',
+  'Reverse the supplier payment before returning this check to available or deposited.':
+    'Revertí el pago al proveedor antes de devolver este cheque a disponible o depositado.',
+  'Reverse the supplier payment before changing the endorsee.':
+    'Revertí el pago al proveedor antes de cambiar el endosatario.',
+  'Payment reversed.': 'Pago revertido.',
 };
 
 function normalizeLocale(value) {

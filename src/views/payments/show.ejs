@@ -167,6 +167,43 @@
             </div>
           </div>
 
+          <% if (payment.checks && payment.checks.length) { %>
+            <div class="card overflow-hidden">
+              <div class="card-header">
+                <h2 class="card-title"><%= t('Checks') %></h2>
+              </div>
+              <div class="table-wrap">
+                <table class="table-base">
+                  <thead>
+                    <tr>
+                      <th class="table-th"><%= t('Check no.') %></th>
+                      <th class="table-th"><%= t('Type') %></th>
+                      <th class="table-th"><%= t('Party') %></th>
+                      <th class="table-th"><%= t('Bank') %></th>
+                      <th class="table-th text-right"><%= t('Amount') %></th>
+                      <th class="table-th"><%= t('Status') %></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% payment.checks.forEach(check => { %>
+                      <tr class="table-row">
+                        <td class="table-td">
+                          <a href="/checks/<%= check.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= check.check_no %></a>
+                          <% if (check.check_number) { %><span class="mt-0.5 block text-xs text-gray-400"><%= check.check_number %></span><% } %>
+                        </td>
+                        <td class="table-td"><%- statusBadge(check.entry_type) %></td>
+                        <td class="table-td text-gray-500 dark:text-gray-400"><%= check.party_name || '—' %></td>
+                        <td class="table-td text-gray-500 dark:text-gray-400"><%= check.bank_name || '—' %></td>
+                        <td class="table-td text-right font-medium"><%= money(check.amount) %></td>
+                        <td class="table-td"><%- statusBadge(check.status) %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% } %>
+
           <div class="card overflow-hidden">
             <div class="card-header">
               <h2 class="card-title"><%= t('Adjustments') %></h2>

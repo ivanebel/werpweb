@@ -98,8 +98,45 @@
   const methodTemplate = document.getElementById('method-row-template');
   const addMethod = form.querySelector('[data-add-method]');
 
+  function syncCheckSelector(row) {
+    const container = row.querySelector('[data-method-check]');
+    if (!container) return;
+    const methodSelect = row.querySelector('select[name="method_type[]"]');
+    const checkSelect = row.querySelector('[data-method-check-select]');
+    const visible = direction === 'supplier' && methodSelect && methodSelect.value === 'endorsed_check';
+    container.classList.toggle('hidden', !visible);
+    if (!visible && checkSelect) checkSelect.value = '';
+  }
+
+  function applySelectedCheck(row) {
+    const select = row.querySelector('[data-method-check-select]');
+    if (!select || !select.value) return;
+    const option = select.selectedOptions[0];
+    if (!option) return;
+    const amount = row.querySelector('[data-method-amount]');
+    if (amount && option.dataset.amount) amount.value = option.dataset.amount;
+    const reference = row.querySelector('input[name="method_reference[]"]');
+    if (reference) reference.value = option.dataset.reference || '';
+    const bank = row.querySelector('input[name="method_bank[]"]');
+    if (bank) bank.value = option.dataset.bank || '';
+    const date = row.querySelector('input[name="method_date[]"]');
+    if (date) date.value = option.dataset.date || '';
+    recalculate();
+  }
+
   function bindMethodRow(row) {
     row.querySelectorAll('[data-method-amount]').forEach((input) => input.addEventListener('input', recalculate));
+    const methodSelect = row.querySelector('select[name="method_type[]"]');
+    if (methodSelect) {
+      methodSelect.addEventListener('change', () => {
+        syncCheckSelector(row);
+        recalculate();
+      });
+    }
+    const checkSelect = row.querySelector('[data-method-check-select]');
+    if (checkSelect) checkSelect.addEventListener('change', () => applySelectedCheck(row));
+    syncCheckSelector(row);
+
     const remove = row.querySelector('[data-remove-method]');
     if (!remove) return;
     remove.addEventListener('click', () => {
@@ -108,8 +145,11 @@
         row.querySelectorAll('input').forEach((input) => {
           input.value = '';
         });
-        const select = row.querySelector('select');
+        const select = row.querySelector('select[name="method_type[]"]');
         if (select) select.value = 'cash';
+        const check = row.querySelector('[data-method-check-select]');
+        if (check) check.value = '';
+        syncCheckSelector(row);
       } else {
         row.remove();
       }
