@@ -896,3 +896,8 @@ router.post('/:id(\\d+)/delete', async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.TYPES = TYPES;
+module.exports.METHOD_LABELS = METHOD_LABELS;
+module.exports.ADJUSTMENT_LABELS = ADJUSTMENT_LABELS;
+module.exports.localizeType = localizeType;
+module.exports.loadPaymentDetail = loadPaymentDetail;

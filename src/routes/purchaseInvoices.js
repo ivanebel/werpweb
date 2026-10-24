@@ -1,40 +1,6 @@
 'use strict';
 
 const { makeDocumentRouter } = require('./documents');
+const { purchase_invoice } = require('../lib/documentTypes');
 
-module.exports = makeDocumentRouter({
-  kind: 'purchase_invoice',
-  key: 'purchases',
-  basePath: '/purchases',
-  title: 'Purchase Invoices',
-  singular: 'Purchase Invoice',
-  active: 'purchases',
-  table: 'purchase_invoices',
-  itemTable: 'purchase_invoice_items',
-  itemFk: 'invoice_id',
-  numberField: 'bill_no',
-  numberPrefix: 'BILL',
-  party: { field: 'supplier_id', table: 'suppliers', label: 'Supplier' },
-  partyBase: '/suppliers',
-  dateField: 'invoice_date',
-  dateLabel: 'Invoice date',
-  dueField: 'due_date',
-  dueLabel: 'Due date',
-  defaultDueDays: 30,
-  statuses: ['draft', 'received', 'paid', 'overdue', 'cancelled'],
-  defaultStatus: 'draft',
-  productWhere: "is_purchasable = 1 AND status = 'active'",
-  priceField: 'cost_price',
-  hasAmountPaid: true,
-  hasStockPosting: true,
-  openStatuses: ['received', 'overdue'],
-  lockedStatuses: ['received', 'paid', 'overdue', 'cancelled'],
-  linkOrder: {
-    field: 'purchase_order_id',
-    table: 'purchase_orders',
-    itemTable: 'purchase_order_items',
-    itemFk: 'order_id',
-    queryParam: 'purchase_order_id',
-    numberField: 'order_no',
-  },
-});
+module.exports = makeDocumentRouter(purchase_invoice);

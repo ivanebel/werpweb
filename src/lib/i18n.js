@@ -1515,6 +1515,125 @@ const ES = {
   'Reverse the supplier payment before changing the endorsee.':
     'Revertí el pago al proveedor antes de cambiar el endosatario.',
   'Payment reversed.': 'Pago revertido.',
+
+  // ---------------------------------------------------------------- email
+  'email': 'correo',
+  'emails': 'correos',
+  'Email log': 'Registro de correos',
+  'Email settings': 'Configuración de correo',
+  'Email to': 'Destinatario',
+  'Subject': 'Asunto',
+  'Message': 'Mensaje',
+  'CC': 'CC',
+  'Failed': 'Fallido',
+  'Sent emails': 'Correos enviados',
+  'Email history': 'Historial de correos',
+  'Sent by': 'Enviado por',
+  'Recipient': 'Destinatario',
+  'Document type': 'Tipo de documento',
+  'All document types': 'Todos los tipos de documento',
+  'Filter': 'Filtrar',
+  'No emails found.': 'No se encontraron correos.',
+  'Track outgoing documents, recipients and delivery failures.':
+    'Seguí los documentos enviados, los destinatarios y los errores de entrega.',
+  'Compose email': 'Redactar correo',
+  'The email includes the full document details, ready to forward or print.':
+    'El correo incluye todos los detalles del documento, listo para reenviar o imprimir.',
+  'Change the SMTP server, sender address and signature.':
+    'Cambiá el servidor SMTP, la dirección del remitente y la firma.',
+  'Document, recipient or subject': 'Documento, destinatario o asunto',
+  'Separate multiple addresses with commas.': 'Separá varias direcciones con comas.',
+  'Your signature is added automatically below the document details.':
+    'Tu firma se agrega automáticamente debajo de los detalles del documento.',
+  'Signature': 'Firma',
+  'Send email': 'Enviar correo',
+  'Open document': 'Abrir documento',
+  'Recent emails': 'Correos recientes',
+  'No emails sent for this document yet.': 'Todavía no se enviaron correos de este documento.',
+  'Email is not configured yet.': 'El correo todavía no está configurado.',
+  'Set up the SMTP server and sender address before sending emails.':
+    'Configurá el servidor SMTP y la dirección del remitente antes de enviar correos.',
+  'Open email settings': 'Abrir configuración de correo',
+  'Ask an administrator to configure email settings.':
+    'Pedile a un administrador que configure el correo.',
+  'Not configured': 'Sin configurar',
+  'Configured': 'Configurado',
+  'Ready to send': 'Listo para enviar',
+  'Needs setup': 'Requiere configuración',
+  'SMTP server': 'Servidor SMTP',
+  'SMTP host': 'Servidor SMTP',
+  'Port': 'Puerto',
+  'SMTP username': 'Usuario SMTP',
+  'SMTP password': 'Contraseña SMTP',
+  'Sender name': 'Nombre del remitente',
+  'Sender email address': 'Correo del remitente',
+  'Reply-to address': 'Dirección de respuesta',
+  'Email signature': 'Firma del correo',
+  'Connection security': 'Seguridad de la conexión',
+  'STARTTLS / automatic': 'STARTTLS / automático',
+  'Implicit TLS (SSL)': 'TLS implícito (SSL)',
+  'Use the connection details provided by your email provider.':
+    'Usá los datos de conexión que te dio tu proveedor de correo.',
+  'For example smtp.gmail.com, smtp.office365.com or your hosting provider SMTP server.':
+    'Por ejemplo smtp.gmail.com, smtp.office365.com o el servidor SMTP de tu hosting.',
+  '587 is common for STARTTLS; 465 is common for implicit TLS.':
+    'El 587 es habitual para STARTTLS; el 465 es habitual para TLS implícito.',
+  'Port 465 usually requires implicit TLS. Port 587 usually uses STARTTLS.':
+    'El puerto 465 normalmente requiere TLS implícito. El puerto 587 normalmente usa STARTTLS.',
+  'Leave blank if the server does not require authentication.':
+    'Dejalo en blanco si el servidor no requiere autenticación.',
+  'A password is stored. Leave blank to keep it.':
+    'Hay una contraseña guardada. Dejala en blanco para conservarla.',
+  'No password is stored yet.': 'Todavía no hay una contraseña guardada.',
+  'Remove the stored password': 'Eliminar la contraseña guardada',
+  'Shown as the sender name in the recipient inbox.':
+    'Se muestra como nombre del remitente en la bandeja del destinatario.',
+  'Added to the bottom of every outgoing email. Leave blank to use the company name.':
+    'Se agrega al final de cada correo enviado. Dejalo en blanco para usar el nombre de la empresa.',
+  'Save email settings': 'Guardar configuración de correo',
+  'Send a test email': 'Enviar un correo de prueba',
+  'Save the settings above first, then send a test message to confirm the connection.':
+    'Guardá primero la configuración y después enviá un mensaje de prueba para confirmar la conexión.',
+  'Send test': 'Enviar prueba',
+  'Current configuration': 'Configuración actual',
+  'Documents you can email': 'Documentos que podés enviar por correo',
+  'Customer payment receipts': 'Recibos de pago de clientes',
+  'Delivery notes': 'Remitos',
+  'View email log': 'Ver registro de correos',
+  'Security note': 'Nota de seguridad',
+  'The SMTP password is stored in the database and is never displayed in the browser. Use an app-specific password when your provider supports it.':
+    'La contraseña SMTP se guarda en la base de datos y nunca se muestra en el navegador. Usá una contraseña específica de aplicación cuando tu proveedor lo permita.',
+  'Configure the outgoing SMTP server used to send orders, invoices and payment orders.':
+    'Configurá el servidor SMTP saliente que se usa para enviar órdenes, facturas y órdenes de pago.',
+  'You can view email settings, but only administrators and managers can change them.':
+    'Podés ver la configuración de correo, pero solo administradores y gerentes pueden cambiarla.',
+  'Enter a valid recipient email address.': 'Ingresá una dirección de correo válida.',
+  'Save a valid SMTP host and sender address before sending a test email.':
+    'Guardá un servidor SMTP y una dirección de remitente válidos antes de enviar un correo de prueba.',
+  'Test email sent to {email}.': 'Correo de prueba enviado a {email}.',
+  'Could not send the test email: {message}': 'No se pudo enviar el correo de prueba: {message}',
+  'Enter at least one recipient.': 'Ingresá al menos un destinatario.',
+  'Invalid email address: {value}': 'Dirección de correo inválida: {value}',
+  'Enter a subject.': 'Ingresá un asunto.',
+  'Email is not configured. Ask an administrator to set up SMTP in Email settings.':
+    'El correo no está configurado. Pedile a un administrador que configure SMTP en la configuración de correo.',
+  'Email could not be sent: {message}': 'No se pudo enviar el correo: {message}',
+  'Email sent to {email}.': 'Correo enviado a {email}.',
+  'Document not found.': 'Documento no encontrado.',
+  'Email settings saved.': 'Configuración de correo guardada.',
+  'Dear {name},': 'Estimado/a {name}:',
+  'Hello,': 'Hola:',
+  'Please find {document} {number} below.':
+    'A continuación encontrará {document} {number}.',
+  'Enter the SMTP port.': 'Ingresá el puerto SMTP.',
+  'Enter a valid SMTP port between 1 and 65535.':
+    'Ingresá un puerto SMTP válido entre 1 y 65535.',
+  'Enter the address emails should be sent from.':
+    'Ingresá la dirección desde la que se envían los correos.',
+  'Enter a valid sender email address.': 'Ingresá una dirección de remitente válida.',
+  'Enter a valid reply-to email address.': 'Ingresá una dirección de respuesta válida.',
+  'Best regards,': 'Saludos cordiales,',
+  'Supplier payment orders': 'Órdenes de pago a proveedores',
 };
 
 function normalizeLocale(value) {

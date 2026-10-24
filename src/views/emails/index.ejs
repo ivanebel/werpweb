@@ -1,0 +1,113 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Email log') %></h1>
+          <p class="page-subtitle"><%= t('Track outgoing documents, recipients and delivery failures.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/settings/email" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'cog', className: 'h-4 w-4' }) %> <%= t('Email settings') %>
+          </a>
+        </div>
+      </div>
+
+      <form method="GET" action="/emails" class="card mb-5 p-4 md:p-5">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div class="md:col-span-2">
+            <label for="q" class="form-label"><%= t('Search') %></label>
+            <input id="q" name="q" type="search" value="<%= search || '' %>" class="form-input" placeholder="<%= t('Document, recipient or subject') %>">
+          </div>
+          <div>
+            <label for="type" class="form-label"><%= t('Document type') %></label>
+            <select id="type" name="type" class="form-select">
+              <option value=""><%= t('All document types') %></option>
+              <% types.forEach((item) => { %>
+                <option value="<%= item.value %>" <%= type === item.value ? 'selected' : '' %>><%= item.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label for="status" class="form-label"><%= t('Status') %></label>
+            <div class="flex gap-2">
+              <select id="status" name="status" class="form-select">
+                <option value=""><%= t('All statuses') %></option>
+                <option value="sent" <%= status === 'sent' ? 'selected' : '' %>><%= t('Sent') %></option>
+                <option value="failed" <%= status === 'failed' ? 'selected' : '' %>><%= t('Failed') %></option>
+              </select>
+              <button type="submit" class="btn btn-primary shrink-0"><%= t('Filter') %></button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <div class="card overflow-hidden">
+        <div class="card-header flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="card-title"><%= t('Email history') %></h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= h.pluralize(pagination.total, 'email') %></p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Date') %></th>
+                <th class="table-th"><%= t('Document') %></th>
+                <th class="table-th"><%= t('Recipient') %></th>
+                <th class="table-th"><%= t('Subject') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+                <th class="table-th"><%= t('Sent by') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach((row) => { %>
+                <tr class="table-row align-top">
+                  <td class="table-td whitespace-nowrap text-xs text-gray-500 dark:text-gray-400"><%= h.formatDateTime(row.created_at) %></td>
+                  <td class="table-td">
+                    <div class="font-mono text-xs font-medium text-gray-800 dark:text-gray-200"><%= row.document_no %></div>
+                    <div class="text-[11px] text-gray-400"><%= emailLabel(row.document_type, locale) %> · <%= row.party_name || '—' %></div>
+                  </td>
+                  <td class="table-td text-xs text-gray-600 dark:text-gray-300">
+                    <div><%= row.to_email %></div>
+                    <% if (row.cc_email) { %><div class="text-[11px] text-gray-400">CC: <%= row.cc_email %></div><% } %>
+                  </td>
+                  <td class="table-td text-sm text-gray-600 dark:text-gray-300">
+                    <div><%= row.subject %></div>
+                    <% if (row.error_text) { %><div class="mt-1 max-w-md text-[11px] text-error-500"><%= row.error_text %></div><% } %>
+                  </td>
+                  <td class="table-td">
+                    <span class="badge <%= row.status === 'sent' ? 'bg-success-50 text-success-700 ring-success-100 dark:bg-success-500/15 dark:text-success-300 dark:ring-success-500/20' : 'bg-error-50 text-error-700 ring-error-100 dark:bg-error-500/15 dark:text-error-300 dark:ring-error-500/20' %>"><%= row.status === 'sent' ? t('Sent') : t('Failed') %></span>
+                  </td>
+                  <td class="table-td whitespace-nowrap text-xs text-gray-500 dark:text-gray-400"><%= row.sent_by_name || '—' %></td>
+                </tr>
+              <% }) %>
+              <% if (!rows.length) { %>
+                <tr><td colspan="6" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No emails found.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <% if (pagination.totalPages > 1) { %>
+          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+            <p class="text-xs text-gray-500 dark:text-gray-400"><%= t('Showing {from}–{to} of {total}', { from: pagination.from, to: pagination.to, total: pagination.total }) %></p>
+            <div class="flex items-center gap-1">
+              <% pagination.pages.forEach((page) => { %>
+                <% if (page.ellipsis) { %>
+                  <span class="px-2 text-gray-400">…</span>
+                <% } else { %>
+                  <a href="/emails?<%= new URLSearchParams({ q: search || '', type: type || '', status: status || '', page: page.page }).toString() %>" class="btn btn-sm <%= page.current ? 'btn-primary' : 'btn-secondary' %>"><%= page.page %></a>
+                <% } %>
+              <% }) %>
+            </div>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

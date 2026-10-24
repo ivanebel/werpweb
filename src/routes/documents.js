@@ -219,6 +219,35 @@ function statusesFor(config, kind) {
   return config.statuses;
 }
 
+async function loadDocumentData(config, id) {
+  const row = await findDoc(config, id);
+  if (!row) return null;
+  const items = await loadItems(config, row.id, config.party.table === 'customers' ? row[config.party.field] : null);
+
+  let linkedOrder = null;
+  if (config.linkOrder && row[config.linkOrder.field]) {
+    if (config.linkOrder.table === 'sales_orders') {
+      linkedOrder = await one(
+        `SELECT so.*, cw.name AS warehouse_name, cw.code AS warehouse_code,
+                cw.address_line1 AS warehouse_address, cw.city AS warehouse_city,
+                cw.state AS warehouse_state, cw.postal_code AS warehouse_postal,
+                cw.country AS warehouse_country
+           FROM sales_orders so
+           LEFT JOIN customer_warehouses cw ON cw.id = so.customer_warehouse_id
+          WHERE so.id = ? LIMIT 1`,
+        [row[config.linkOrder.field]],
+      );
+    } else {
+      linkedOrder = await one(
+        `SELECT * FROM \`${config.linkOrder.table}\` WHERE id = ?`,
+        [row[config.linkOrder.field]],
+      );
+    }
+  }
+
+  return { row, items, linkedOrder };
+}
+
 function actionsFor(config, row, locale) {
   const t = translator(locale);
   const base = `${config.basePath}/${row.id}`;
@@ -268,6 +297,8 @@ function actionsFor(config, row, locale) {
     if (!['paid', 'cancelled'].includes(row.status)) add('status', 'cancelled', 'Cancel', 'danger', true);
     link(`${base}/print`, 'Print / PDF', 'secondary');
   }
+
+  link(`/emails/compose?type=${config.kind}&id=${row.id}`, 'Email', 'secondary');
 
   return actions;
 }
@@ -1173,4 +1204,11 @@ function makeDocumentRouter(config) {
   return router;
 }
 
-module.exports = { makeDocumentRouter, loadProductOptions, loadPartyOptions, computeTotals };
+module.exports = {
+  makeDocumentRouter,
+  loadDocumentData,
+  localizeDocConfig,
+  loadProductOptions,
+  loadPartyOptions,
+  computeTotals,
+};

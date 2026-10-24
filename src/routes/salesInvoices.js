@@ -1,40 +1,6 @@
 'use strict';
 
 const { makeDocumentRouter } = require('./documents');
+const { sales_invoice } = require('../lib/documentTypes');
 
-module.exports = makeDocumentRouter({
-  kind: 'sales_invoice',
-  key: 'sales',
-  basePath: '/sales',
-  title: 'Sales Invoices',
-  singular: 'Sales Invoice',
-  active: 'sales',
-  table: 'sales_invoices',
-  itemTable: 'sales_invoice_items',
-  itemFk: 'invoice_id',
-  numberField: 'invoice_no',
-  numberPrefix: 'INV',
-  party: { field: 'customer_id', table: 'customers', label: 'Customer' },
-  partyBase: '/customers',
-  dateField: 'invoice_date',
-  dateLabel: 'Invoice date',
-  dueField: 'due_date',
-  dueLabel: 'Due date',
-  defaultDueDays: 30,
-  statuses: ['draft', 'sent', 'paid', 'overdue', 'cancelled'],
-  defaultStatus: 'draft',
-  productWhere: "is_sellable = 1 AND status = 'active'",
-  priceField: 'sale_price',
-  hasAmountPaid: true,
-  hasStockPosting: false,
-  openStatuses: ['sent', 'overdue'],
-  lockedStatuses: ['paid', 'cancelled'],
-  linkOrder: {
-    field: 'sales_order_id',
-    table: 'sales_orders',
-    itemTable: 'sales_order_items',
-    itemFk: 'order_id',
-    queryParam: 'sales_order_id',
-    numberField: 'order_no',
-  },
-});
+module.exports = makeDocumentRouter(sales_invoice);

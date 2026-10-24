@@ -1,0 +1,169 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <%
+        const canConfigure = ['admin', 'manager'].includes(currentUser.role);
+        const errorList = Object.values(errors || {});
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Email') %> <%= email.title %></h1>
+            <span class="badge bg-brand-50 text-brand-700 ring-brand-100 dark:bg-brand-500/15 dark:text-brand-300 dark:ring-brand-500/20"><%= email.number %></span>
+          </div>
+          <p class="page-subtitle"><%= email.partyName %><% if (email.partyEmail) { %> · <%= email.partyEmail %><% } %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="<%= email.showPath %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+          </a>
+          <a href="/emails" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'list', className: 'h-4 w-4' }) %> <%= t('Email log') %>
+          </a>
+        </div>
+      </div>
+
+      <% if (!emailConfigured) { %>
+        <div class="mb-5 flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+          <%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5 shrink-0' }) %>
+          <div>
+            <p class="font-semibold"><%= t('Email is not configured yet.') %></p>
+            <p class="mt-1"><%= t('Set up the SMTP server and sender address before sending emails.') %></p>
+            <% if (canConfigure) { %>
+              <a href="/settings/email" class="link mt-1 inline-block"><%= t('Open email settings') %> →</a>
+            <% } else { %>
+              <p class="mt-1"><%= t('Ask an administrator to configure email settings.') %></p>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please fix the following:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="xl:col-span-2">
+          <form method="POST" action="/emails/send" class="card">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="document_type" value="<%= email.type %>">
+            <input type="hidden" name="document_id" value="<%= email.data.row ? email.data.row.id : email.data.payment ? email.data.payment.id : email.data.delivery.id %>">
+
+            <div class="card-header flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="card-title"><%= t('Compose email') %></h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('The email includes the full document details, ready to forward or print.') %></p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                <%- include('/partials/icon', { name: 'mail', className: 'h-4 w-4' }) %>
+                <%= fromAddress || t('Not configured') %>
+              </span>
+            </div>
+
+            <div class="space-y-5 p-5 md:p-6">
+              <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div>
+                  <label for="to" class="form-label"><%= t('Email to') %> <span class="text-error-500">*</span></label>
+                  <input id="to" name="to" type="text" value="<%= values.to || '' %>" class="form-input <%= errors.to ? 'form-input-error' : '' %>" placeholder="name@company.com" required>
+                  <% if (errors.to) { %><p class="form-error"><%= errors.to %></p><% } %>
+                  <p class="form-help"><%= t('Separate multiple addresses with commas.') %></p>
+                </div>
+                <div>
+                  <label for="cc" class="form-label"><%= t('CC') %></label>
+                  <input id="cc" name="cc" type="text" value="<%= values.cc || '' %>" class="form-input <%= errors.cc ? 'form-input-error' : '' %>" placeholder="<%= t('Optional') %>">
+                  <% if (errors.cc) { %><p class="form-error"><%= errors.cc %></p><% } %>
+                </div>
+              </div>
+
+              <div>
+                <label for="subject" class="form-label"><%= t('Subject') %> <span class="text-error-500">*</span></label>
+                <input id="subject" name="subject" type="text" value="<%= values.subject || '' %>" class="form-input <%= errors.subject ? 'form-input-error' : '' %>" maxlength="255" required>
+                <% if (errors.subject) { %><p class="form-error"><%= errors.subject %></p><% } %>
+              </div>
+
+              <div>
+                <label for="message" class="form-label"><%= t('Message') %></label>
+                <textarea id="message" name="message" rows="10" class="form-textarea <%= errors.message ? 'form-input-error' : '' %>"><%= values.message || '' %></textarea>
+                <% if (errors.message) { %><p class="form-error"><%= errors.message %></p><% } %>
+                <p class="form-help"><%= t('Your signature is added automatically below the document details.') %></p>
+              </div>
+
+              <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-400">
+                <p class="font-medium text-gray-700 dark:text-gray-300"><%= t('Signature') %></p>
+                <p class="mt-1 whitespace-pre-line"><%= email.signature %></p>
+              </div>
+            </div>
+
+            <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+              <a href="<%= email.showPath %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+              <button type="submit" class="btn btn-primary">
+                <%- include('/partials/icon', { name: 'paper-airplane', className: 'h-4 w-4' }) %>
+                <%= t('Send email') %>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Document') %></h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Number') %></dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= email.number %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Type') %></dt><dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= email.title %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Party') %></dt><dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= email.partyName %></dd></div>
+              <% if (email.partyEmail) { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Email') %></dt><dd class="text-right text-gray-700 dark:text-gray-300"><%= email.partyEmail %></dd></div>
+              <% } %>
+            </dl>
+            <a href="<%= email.showPath %>" class="btn btn-secondary btn-sm mt-4 w-full"><%= t('Open document') %></a>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="card-title"><%= t('Recent emails') %></h2>
+              <a href="/emails?q=<%= encodeURIComponent(email.number) %>" class="link text-xs"><%= t('View all') %></a>
+            </div>
+            <div class="mt-4 space-y-3">
+              <% (history || []).forEach((entry) => { %>
+                <div class="rounded-lg border border-gray-100 px-3 py-2.5 dark:border-gray-800">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="truncate text-xs font-medium text-gray-700 dark:text-gray-300"><%= entry.to_email %></p>
+                    <span class="badge <%= entry.status === 'sent' ? 'bg-success-50 text-success-700 ring-success-100 dark:bg-success-500/15 dark:text-success-300 dark:ring-success-500/20' : 'bg-error-50 text-error-700 ring-error-100 dark:bg-error-500/15 dark:text-error-300 dark:ring-error-500/20' %>"><%= entry.status === 'sent' ? t('Sent') : t('Failed') %></span>
+                  </div>
+                  <p class="mt-1 text-[11px] text-gray-400"><%= h.formatDateTime(entry.created_at) %><% if (entry.sent_by_name) { %> · <%= entry.sent_by_name %><% } %></p>
+                  <% if (entry.error_text) { %><p class="mt-1 line-clamp-2 text-[11px] text-error-500"><%= entry.error_text %></p><% } %>
+                </div>
+              <% }) %>
+              <% if (!history || !history.length) { %>
+                <p class="text-sm text-gray-400"><%= t('No emails sent for this document yet.') %></p>
+              <% } %>
+            </div>
+          </div>
+
+          <% if (canConfigure) { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Email settings') %></h2>
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400"><%= t('Change the SMTP server, sender address and signature.') %></p>
+              <a href="/settings/email" class="btn btn-secondary btn-sm mt-4 w-full"><%= t('Open email settings') %></a>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -1,0 +1,197 @@
+<%
+  const balance = Number(row.total) - Number(row.amount_paid || 0);
+  const companyName = settings.company_name || 'WerpWeb';
+  const companyInitial = String(companyName).charAt(0).toUpperCase();
+  const customerOrder = doc.customerOrder
+    ? row
+    : (linkedOrder && linkedOrder.customer_order_no !== undefined ? linkedOrder : null);
+  const hasCustomerOrderDetails = Boolean(customerOrder && (
+    customerOrder.customer_order_no || customerOrder.warehouse_name ||
+    customerOrder.docking_station || customerOrder.reception_at
+  ));
+%>
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> <%= number %></title>
+</head>
+<body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#1d2939;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f4f7;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:720px;background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:22px 26px;background:#101828;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="width:38px;height:38px;background:#465fff;border-radius:10px;color:#ffffff;font-size:16px;font-weight:bold;text-align:center;vertical-align:middle;"><%= companyInitial %></td>
+                        <td style="padding-left:12px;vertical-align:middle;">
+                          <div style="font-size:15px;font-weight:bold;color:#ffffff;"><%= companyName %></div>
+                          <div style="font-size:12px;color:#98a2b3;"><%= settings.company_email || '' %></div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td style="text-align:right;vertical-align:middle;">
+                    <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#98a2b3;"><%= title %></div>
+                    <div style="font-size:20px;font-weight:bold;color:#ffffff;margin-top:2px;"><%= number %></div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 26px 8px;">
+              <p style="margin:0 0 10px;font-size:15px;line-height:1.7;white-space:pre-line;"><%= message %></p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:8px 26px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #eaecf0;">
+                <tr>
+                  <td style="padding-top:18px;vertical-align:top;width:58%;">
+                    <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#98a2b3;font-weight:bold;"><%= doc.party.label %></div>
+                    <div style="font-size:14px;font-weight:bold;color:#1d2939;margin-top:6px;"><%= row.party_name %></div>
+                    <% if (row.party_contact) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= row.party_contact %></div><% } %>
+                    <% if (row.party_address) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= row.party_address %></div><% } %>
+                    <% if (row.party_city) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= row.party_city %><%= row.party_state ? ', ' + row.party_state : '' %> <%= row.party_postal || '' %></div><% } %>
+                    <% if (row.party_email) { %><div style="font-size:13px;color:#465fff;line-height:1.6;"><%= row.party_email %></div><% } %>
+                    <% if (row.party_tax_id) { %><div style="font-size:12px;color:#667085;margin-top:4px;"><%= t('Tax ID:') %> <%= row.party_tax_id %></div><% } %>
+                  </td>
+                  <td style="padding-top:18px;vertical-align:top;text-align:right;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-left:auto;">
+                      <tr>
+                        <td style="font-size:12px;color:#667085;padding:2px 0;"><%= doc.dateLabel %>:</td>
+                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatDate(row[doc.dateField]) %></td>
+                      </tr>
+                      <% if (row[doc.dueField]) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= doc.dueLabel %>:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatDate(row[doc.dueField]) %></td>
+                        </tr>
+                      <% } %>
+                      <tr>
+                        <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Status') %>:</td>
+                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.statusInfo(row.status).label %></td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <% if (linkedOrder || hasCustomerOrderDetails) { %>
+            <tr>
+              <td style="padding:0 26px 16px;">
+                <div style="border-top:1px solid #eaecf0;padding-top:12px;font-size:12px;line-height:1.7;color:#475467;">
+                  <% if (linkedOrder) { %><div><span style="font-weight:bold;color:#1d2939;"><%= t('Linked order:') %></span> <%= linkedOrder.order_no %></div><% } %>
+                  <% if (customerOrder) { %>
+                    <% if (customerOrder.customer_order_no) { %><div><span style="font-weight:bold;color:#1d2939;"><%= t('Customer order no.') %>:</span> <%= customerOrder.customer_order_no %></div><% } %>
+                    <% if (customerOrder.warehouse_name) { %><div><span style="font-weight:bold;color:#1d2939;"><%= t('Destination warehouse') %>:</span> <%= customerOrder.warehouse_name %><%= customerOrder.warehouse_code ? ` (${customerOrder.warehouse_code})` : '' %></div><% } %>
+                    <% if (customerOrder.warehouse_address) { %><div><%= customerOrder.warehouse_address %><%= customerOrder.warehouse_city ? `, ${customerOrder.warehouse_city}` : '' %><%= customerOrder.warehouse_state ? `, ${customerOrder.warehouse_state}` : '' %> <%= customerOrder.warehouse_postal || '' %></div><% } %>
+                    <% if (customerOrder.docking_station) { %><div><span style="font-weight:bold;color:#1d2939;"><%= t('Docking station') %>:</span> <%= customerOrder.docking_station %></div><% } %>
+                    <% if (customerOrder.reception_at) { %><div><span style="font-weight:bold;color:#1d2939;"><%= t('Reception date & time') %>:</span> <%= h.formatDateTime(customerOrder.reception_at) %></div><% } %>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% } %>
+
+          <tr>
+            <td style="padding:0 26px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#f9fafb;">
+                    <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Item') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Qty') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Unit price') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('VAT') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Amount') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% items.forEach((item) => { %>
+                    <tr>
+                      <td style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;vertical-align:top;">
+                        <div style="font-weight:bold;"><%= item.name %></div>
+                        <div style="font-size:11px;color:#98a2b3;"><%= item.sku %><%= item.customer_code ? ' · ' + t('Customer code') + ': ' + item.customer_code : '' %><%= item.description ? ' · ' + item.description : '' %></div>
+                      </td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= h.formatQty(item.quantity) %> <span style="font-size:11px;color:#98a2b3;"><%= item.unit || '' %></span></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= money(item.unit_price) %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;vertical-align:top;"><%= money(item.line_total) %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:18px 26px 6px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="right" style="min-width:280px;">
+                <tr>
+                  <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Subtotal (incl. VAT)') %></td>
+                  <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.subtotal) %></td>
+                </tr>
+                <% if (Number(row.discount_total) > 0) { %>
+                  <tr>
+                    <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Discount') %></td>
+                    <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;">− <%= money(row.discount_total) %></td>
+                  </tr>
+                <% } %>
+                <tr>
+                  <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('VAT included') %></td>
+                  <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.tax_total) %></td>
+                </tr>
+                <tr>
+                  <td style="font-size:15px;color:#1d2939;font-weight:bold;padding:9px 0 3px;border-top:1px solid #eaecf0;"><%= t('Total') %></td>
+                  <td align="right" style="font-size:18px;color:#1d2939;font-weight:bold;padding:9px 0 3px 24px;border-top:1px solid #eaecf0;"><%= money(row.total) %></td>
+                </tr>
+                <% if (doc.hasAmountPaid) { %>
+                  <tr>
+                    <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Paid') %></td>
+                    <td align="right" style="font-size:13px;color:#12b76a;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.amount_paid) %></td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Balance due') %></td>
+                    <td align="right" style="font-size:14px;color:<%= balance > 0.005 ? '#f79009' : '#12b76a' %>;font-weight:bold;padding:3px 0 3px 24px;"><%= money(balance) %></td>
+                  </tr>
+                <% } %>
+              </table>
+            </td>
+          </tr>
+
+          <% if (row.notes) { %>
+            <tr>
+              <td style="padding:16px 26px 0;">
+                <div style="border-top:1px solid #eaecf0;padding-top:12px;font-size:12px;line-height:1.6;color:#475467;">
+                  <span style="font-weight:bold;color:#1d2939;"><%= t('Notes') %>:</span>
+                  <span style="white-space:pre-line;"><%= row.notes %></span>
+                </div>
+              </td>
+            </tr>
+          <% } %>
+
+          <tr>
+            <td style="padding:24px 26px 28px;">
+              <div style="border-top:1px solid #eaecf0;padding-top:16px;font-size:13px;line-height:1.7;color:#475467;white-space:pre-line;"><%= signature %></div>
+              <% if (settings.invoice_footer) { %>
+                <div style="margin-top:18px;font-size:11px;line-height:1.6;color:#98a2b3;white-space:pre-line;"><%= settings.invoice_footer %></div>
+              <% } %>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

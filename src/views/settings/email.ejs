@@ -1,0 +1,189 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <%
+        const canEdit = ['admin', 'manager'].includes(currentUser.role);
+        const errorList = Object.values(errors || {});
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Email settings') %></h1>
+          <p class="page-subtitle"><%= t('Configure the outgoing SMTP server used to send orders, invoices and payment orders.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/settings" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Company settings') %>
+          </a>
+          <a href="/emails" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'list', className: 'h-4 w-4' }) %> <%= t('Email log') %>
+          </a>
+        </div>
+      </div>
+
+      <% if (!canEdit) { %>
+        <div class="mb-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+          <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+          <p><%= t('You can view email settings, but only administrators and managers can change them.') %></p>
+        </div>
+      <% } %>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please fix the following:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-2">
+          <form method="POST" action="/settings/email" class="card">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+            <div class="card-header flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="card-title"><%= t('SMTP server') %></h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Use the connection details provided by your email provider.') %></p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 rounded-full <%= emailConfigured ? 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-300' : 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-300' %> px-3 py-1.5 text-xs font-medium">
+                <span class="h-1.5 w-1.5 rounded-full <%= emailConfigured ? 'bg-success-500' : 'bg-warning-500' %>"></span>
+                <%= emailConfigured ? t('Configured') : t('Not configured') %>
+              </span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div class="md:col-span-2">
+                <label for="smtp_host" class="form-label"><%= t('SMTP host') %></label>
+                <input id="smtp_host" name="smtp_host" type="text" value="<%= values.smtp_host || '' %>" class="form-input <%= errors.smtp_host ? 'form-input-error' : '' %>" placeholder="smtp.example.com" <%= canEdit ? '' : 'readonly' %>>
+                <% if (errors.smtp_host) { %><p class="form-error"><%= errors.smtp_host %></p><% } %>
+                <p class="form-help"><%= t('For example smtp.gmail.com, smtp.office365.com or your hosting provider SMTP server.') %></p>
+              </div>
+              <div>
+                <label for="smtp_port" class="form-label"><%= t('Port') %></label>
+                <input id="smtp_port" name="smtp_port" type="number" min="1" max="65535" value="<%= values.smtp_port || '587' %>" class="form-input <%= errors.smtp_port ? 'form-input-error' : '' %>" <%= canEdit ? '' : 'readonly' %>>
+                <% if (errors.smtp_port) { %><p class="form-error"><%= errors.smtp_port %></p><% } %>
+                <p class="form-help"><%= t('587 is common for STARTTLS; 465 is common for implicit TLS.') %></p>
+              </div>
+              <div>
+                <label for="smtp_secure" class="form-label"><%= t('Connection security') %></label>
+                <select id="smtp_secure" name="smtp_secure" class="form-select" <%= canEdit ? '' : 'disabled' %>>
+                  <option value="0" <%= String(values.smtp_secure || '0') === '0' ? 'selected' : '' %>><%= t('STARTTLS / automatic') %></option>
+                  <option value="1" <%= String(values.smtp_secure || '0') === '1' ? 'selected' : '' %>><%= t('Implicit TLS (SSL)') %></option>
+                </select>
+                <p class="form-help"><%= t('Port 465 usually requires implicit TLS. Port 587 usually uses STARTTLS.') %></p>
+              </div>
+              <div>
+                <label for="smtp_user" class="form-label"><%= t('SMTP username') %></label>
+                <input id="smtp_user" name="smtp_user" type="text" value="<%= values.smtp_user || '' %>" class="form-input" autocomplete="username" <%= canEdit ? '' : 'readonly' %>>
+                <p class="form-help"><%= t('Leave blank if the server does not require authentication.') %></p>
+              </div>
+              <div>
+                <label for="smtp_password" class="form-label"><%= t('SMTP password') %></label>
+                <input id="smtp_password" name="smtp_password" type="password" value="" class="form-input" autocomplete="new-password" <%= canEdit ? '' : 'readonly' %>>
+                <p class="form-help"><%= hasSmtpPassword ? t('A password is stored. Leave blank to keep it.') : t('No password is stored yet.') %></p>
+                <% if (canEdit && hasSmtpPassword) { %>
+                  <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <input type="checkbox" name="clear_password" value="1" class="form-checkbox">
+                    <%= t('Remove the stored password') %>
+                  </label>
+                <% } %>
+              </div>
+              <div>
+                <label for="smtp_from_name" class="form-label"><%= t('Sender name') %></label>
+                <input id="smtp_from_name" name="smtp_from_name" type="text" value="<%= values.smtp_from_name || '' %>" class="form-input" placeholder="<%= settings.company_name %>" <%= canEdit ? '' : 'readonly' %>>
+                <p class="form-help"><%= t('Shown as the sender name in the recipient inbox.') %></p>
+              </div>
+              <div>
+                <label for="smtp_from_email" class="form-label"><%= t('Sender email address') %></label>
+                <input id="smtp_from_email" name="smtp_from_email" type="email" value="<%= values.smtp_from_email || '' %>" class="form-input <%= errors.smtp_from_email ? 'form-input-error' : '' %>" placeholder="orders@example.com" <%= canEdit ? '' : 'readonly' %>>
+                <% if (errors.smtp_from_email) { %><p class="form-error"><%= errors.smtp_from_email %></p><% } %>
+              </div>
+              <div>
+                <label for="smtp_reply_to" class="form-label"><%= t('Reply-to address') %></label>
+                <input id="smtp_reply_to" name="smtp_reply_to" type="email" value="<%= values.smtp_reply_to || '' %>" class="form-input <%= errors.smtp_reply_to ? 'form-input-error' : '' %>" placeholder="<%= t('Optional') %>" <%= canEdit ? '' : 'readonly' %>>
+                <% if (errors.smtp_reply_to) { %><p class="form-error"><%= errors.smtp_reply_to %></p><% } %>
+              </div>
+              <div class="md:col-span-2">
+                <label for="email_signature" class="form-label"><%= t('Email signature') %></label>
+                <textarea id="email_signature" name="email_signature" rows="4" class="form-textarea" placeholder="<%= t('Best regards,') %>&#10;<%= settings.company_name %>" <%= canEdit ? '' : 'readonly' %>><%= values.email_signature || '' %></textarea>
+                <p class="form-help"><%= t('Added to the bottom of every outgoing email. Leave blank to use the company name.') %></p>
+              </div>
+            </div>
+
+            <% if (canEdit) { %>
+              <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+                <a href="/settings" class="btn btn-secondary"><%= t('Cancel') %></a>
+                <button type="submit" class="btn btn-primary">
+                  <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                  <%= t('Save email settings') %>
+                </button>
+              </div>
+            <% } %>
+          </form>
+
+          <% if (canEdit) { %>
+            <form method="POST" action="/settings/email/test" class="card">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <div class="card-header">
+                <h2 class="card-title"><%= t('Send a test email') %></h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Save the settings above first, then send a test message to confirm the connection.') %></p>
+              </div>
+              <div class="flex flex-col gap-3 p-5 dark:border-gray-800 sm:flex-row sm:items-end md:p-6">
+                <div class="flex-1">
+                  <label for="test_email" class="form-label"><%= t('Recipient') %></label>
+                  <input id="test_email" name="to" type="email" value="<%= settings.company_email || currentUser.email %>" class="form-input" required>
+                </div>
+                <button type="submit" class="btn btn-secondary" <%= emailConfigured ? '' : 'disabled' %>>
+                  <%- include('/partials/icon', { name: 'paper-airplane', className: 'h-4 w-4' }) %>
+                  <%= t('Send test') %>
+                </button>
+              </div>
+            </form>
+          <% } %>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Current configuration') %></h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Status') %></dt><dd class="font-medium <%= emailConfigured ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400' %>"><%= emailConfigured ? t('Ready to send') : t('Needs setup') %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('From') %></dt><dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= fromAddress || '—' %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('SMTP host') %></dt><dd class="text-right font-mono text-xs text-gray-700 dark:text-gray-300"><%= values.smtp_host || '—' %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Port') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= values.smtp_port || '—' %></dd></div>
+            </dl>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Documents you can email') %></h2>
+            <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+              <li><%= t('Purchase orders') %></li>
+              <li><%= t('Purchase invoices') %></li>
+              <li><%= t('Supplier payment orders') %></li>
+              <li><%= t('Sales orders') %></li>
+              <li><%= t('Sales invoices') %></li>
+              <li><%= t('Customer payment receipts') %></li>
+              <li><%= t('Delivery notes') %></li>
+            </ul>
+            <a href="/emails" class="btn btn-secondary btn-sm mt-4 w-full"><%= t('View email log') %></a>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Security note') %></h2>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400"><%= t('The SMTP password is stored in the database and is never displayed in the browser. Use an app-specific password when your provider supports it.') %></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -33,6 +33,9 @@
           <a href="/payments/<%= payment.id %>/print" class="btn btn-primary btn-sm">
             <%- include('/partials/icon', { name: 'printer', className: 'h-4 w-4' }) %> <%= t('Print / PDF') %>
           </a>
+          <a href="/emails/compose?type=<%= typeKey %>_payment&amp;id=<%= payment.id %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'mail', className: 'h-4 w-4' }) %> <%= t('Email') %>
+          </a>
           <form method="POST" action="/payments/<%= payment.id %>/delete" data-confirm="<%= t('Reverse {number}? Invoice allocations will be removed.', { number: payment.payment_no }) %>">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button type="submit" class="btn btn-danger btn-sm">

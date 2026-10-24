@@ -30,6 +30,7 @@ const checkRoutes = require('./routes/checks');
 const deliveryRoutes = require('./routes/deliveries');
 const manufacturingRoutes = require('./routes/manufacturing');
 const posRoutes = require('./routes/pos');
+const emailRoutes = require('./routes/emails');
 const settingsRoutes = require('./routes/settings');
 
 async function createApp() {
@@ -128,6 +129,7 @@ async function createApp() {
   app.use('/deliveries', deliveryRoutes);
   app.use('/manufacturing', manufacturingRoutes);
   app.use('/pos', posRoutes);
+  app.use('/emails', emailRoutes);
   app.use('/', settingsRoutes);
 
   app.use((req, res) => {

@@ -1,0 +1,161 @@
+<%
+  const companyName = settings.company_name || 'WerpWeb';
+  const companyInitial = String(companyName).charAt(0).toUpperCase();
+  const totalQty = items.reduce((sum, item) => sum + Number(item.quantity), 0);
+%>
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> <%= number %></title>
+</head>
+<body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#1d2939;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f4f7;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:720px;background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:22px 26px;background:#101828;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="width:38px;height:38px;background:#12b76a;border-radius:10px;color:#ffffff;font-size:16px;font-weight:bold;text-align:center;vertical-align:middle;"><%= companyInitial %></td>
+                        <td style="padding-left:12px;vertical-align:middle;">
+                          <div style="font-size:15px;font-weight:bold;color:#ffffff;"><%= companyName %></div>
+                          <div style="font-size:12px;color:#98a2b3;"><%= settings.company_email || '' %></div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td style="text-align:right;vertical-align:middle;">
+                    <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#98a2b3;"><%= title %></div>
+                    <div style="font-size:20px;font-weight:bold;color:#ffffff;margin-top:2px;"><%= number %></div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 26px 8px;">
+              <p style="margin:0 0 10px;font-size:15px;line-height:1.7;white-space:pre-line;"><%= message %></p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:8px 26px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #eaecf0;">
+                <tr>
+                  <td style="padding-top:18px;vertical-align:top;width:58%;">
+                    <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#98a2b3;font-weight:bold;"><%= t('Ship to') %></div>
+                    <div style="font-size:14px;font-weight:bold;color:#1d2939;margin-top:6px;"><%= delivery.customer_name %></div>
+                    <% if (delivery.warehouse_name) { %>
+                      <div style="font-size:13px;color:#465fff;line-height:1.6;"><%= delivery.warehouse_name %><%= delivery.warehouse_code ? ' · ' + delivery.warehouse_code : '' %></div>
+                      <% if (delivery.warehouse_contact) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= delivery.warehouse_contact %></div><% } %>
+                      <% if (delivery.warehouse_address) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= delivery.warehouse_address %></div><% } %>
+                      <% if (delivery.warehouse_city) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= delivery.warehouse_city %><%= delivery.warehouse_state ? ', ' + delivery.warehouse_state : '' %> <%= delivery.warehouse_postal || '' %></div><% } %>
+                    <% } else { %>
+                      <% if (delivery.customer_contact) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= delivery.customer_contact %></div><% } %>
+                      <% if (delivery.customer_address) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= delivery.customer_address %></div><% } %>
+                      <% if (delivery.customer_city) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= delivery.customer_city %><%= delivery.customer_state ? ', ' + delivery.customer_state : '' %> <%= delivery.customer_postal || '' %></div><% } %>
+                    <% } %>
+                    <% if (delivery.customer_email) { %><div style="font-size:13px;color:#465fff;line-height:1.6;"><%= delivery.customer_email %></div><% } %>
+                  </td>
+                  <td style="padding-top:18px;vertical-align:top;text-align:right;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-left:auto;">
+                      <tr>
+                        <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Delivery date:') %></td>
+                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatDate(delivery.delivery_date) %></td>
+                      </tr>
+                      <% if (delivery.order_no) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Sales order') %>:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= delivery.order_no %></td>
+                        </tr>
+                      <% } %>
+                      <% if (delivery.carrier) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Carrier:') %></td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= delivery.carrier %></td>
+                        </tr>
+                      <% } %>
+                      <% if (delivery.tracking_number) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Tracking:') %></td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= delivery.tracking_number %></td>
+                        </tr>
+                      <% } %>
+                      <tr>
+                        <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Total units') %>:</td>
+                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatQty(totalQty) %></td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:0 26px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#f9fafb;">
+                    <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Item') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Ordered') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Shipped') %></th>
+                    <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Unit') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% items.forEach((item) => { %>
+                    <tr>
+                      <td style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;vertical-align:top;">
+                        <div style="font-weight:bold;"><%= item.name %></div>
+                        <div style="font-size:11px;color:#98a2b3;"><%= item.sku %><%= item.customer_code ? ' · ' + t('Customer code') + ': ' + item.customer_code : '' %></div>
+                      </td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#667085;white-space:nowrap;"><%= item.ordered_qty !== null && item.ordered_qty !== undefined ? h.formatQty(item.ordered_qty) : '—' %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;"><%= h.formatQty(item.quantity) %></td>
+                      <td style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;"><%= item.unit || '' %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:18px 26px 0;">
+              <div style="font-size:11px;color:#98a2b3;line-height:1.7;"><%= t('Received by (name & signature)') %></div>
+              <div style="margin-top:32px;border-top:1px solid #d0d5dd;width:280px;"></div>
+            </td>
+          </tr>
+
+          <% if (delivery.notes) { %>
+            <tr>
+              <td style="padding:18px 26px 0;">
+                <div style="border-top:1px solid #eaecf0;padding-top:12px;font-size:12px;line-height:1.6;color:#475467;">
+                  <span style="font-weight:bold;color:#1d2939;"><%= t('Notes') %>:</span>
+                  <span style="white-space:pre-line;"><%= delivery.notes %></span>
+                </div>
+              </td>
+            </tr>
+          <% } %>
+
+          <tr>
+            <td style="padding:24px 26px 28px;">
+              <div style="border-top:1px solid #eaecf0;padding-top:16px;font-size:13px;line-height:1.7;color:#475467;white-space:pre-line;"><%= signature %></div>
+              <% if (settings.invoice_footer) { %>
+                <div style="margin-top:18px;font-size:11px;line-height:1.6;color:#98a2b3;white-space:pre-line;"><%= settings.invoice_footer %></div>
+              <% } %>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

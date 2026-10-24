@@ -3,10 +3,52 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { query, one, scalar } = require('../db');
-const { updateSettings } = require('../lib/settings');
+const { getSettings, updateSettings } = require('../lib/settings');
 const { requireRole } = require('../middleware/web');
+const {
+  isEmailConfigured,
+  fromEmail,
+  validateEmailSettings,
+  validateEmailAddress,
+  sendTestEmail,
+} = require('../lib/email');
 
 const router = express.Router();
+
+function readEmailSettings(body) {
+  return {
+    smtp_host: String(body.smtp_host || '').trim().slice(0, 190),
+    smtp_port: String(body.smtp_port || '587').trim().slice(0, 10),
+    smtp_secure: String(body.smtp_secure || '0') === '1' ? '1' : '0',
+    smtp_user: String(body.smtp_user || '').trim().slice(0, 190),
+    smtp_from_name: String(body.smtp_from_name || '').trim().slice(0, 180),
+    smtp_from_email: String(body.smtp_from_email || '').trim().toLowerCase().slice(0, 190),
+    smtp_reply_to: String(body.smtp_reply_to || '').trim().toLowerCase().slice(0, 190),
+    email_signature: String(body.email_signature || '').trim().slice(0, 2000),
+  };
+}
+
+async function renderEmailSettings(req, res, status, values, errors) {
+  const current = await getSettings(true);
+  const password = Object.prototype.hasOwnProperty.call(values, 'smtp_password')
+    ? values.smtp_password
+    : current.smtp_password;
+  const safeValues = { ...values };
+  delete safeValues.smtp_password;
+  const settingsForStatus = { ...current, ...safeValues, smtp_password: password };
+  const canEdit = ['admin', 'manager'].includes(req.session.user.role);
+  return res.status(status).render('settings/email', {
+    title: req.t('Email settings'),
+    active: 'settings',
+    breadcrumbs: [{ label: req.t('Settings'), href: '/settings' }, { label: req.t('Email') }],
+    values: safeValues,
+    hasSmtpPassword: Boolean(password),
+    emailConfigured: isEmailConfigured(settingsForStatus),
+    fromAddress: fromEmail(settingsForStatus),
+    canEdit,
+    errors,
+  });
+}
 
 router.get('/settings', async (req, res, next) => {
   try {
@@ -57,6 +99,65 @@ router.post('/settings', requireRole('admin', 'manager'), async (req, res, next)
     res.redirect('/settings');
   } catch (err) {
     next(err);
+  }
+});
+
+// ------------------------------------------------------------------- email
+router.get('/settings/email', async (req, res, next) => {
+  try {
+    const current = await getSettings(true);
+    const values = { ...current };
+    delete values.smtp_password;
+    return await renderEmailSettings(req, res, 200, values, {});
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/email', requireRole('admin', 'manager'), async (req, res, next) => {
+  try {
+    const current = await getSettings(true);
+    const values = readEmailSettings(req.body);
+    let password = current.smtp_password || '';
+    if (req.body.clear_password === '1') {
+      password = '';
+    } else if (String(req.body.smtp_password || '').length) {
+      password = String(req.body.smtp_password).slice(0, 500);
+    }
+
+    const errors = {};
+    const rawErrors = validateEmailSettings({ ...values, smtp_password: password });
+    for (const [key, message] of Object.entries(rawErrors)) errors[key] = req.t(message);
+    if (Object.keys(errors).length) {
+      return renderEmailSettings(req, res, 422, { ...values, smtp_password: password }, errors);
+    }
+
+    await updateSettings({ ...values, smtp_password: password });
+    req.flash('success', 'Email settings saved.');
+    return res.redirect('/settings/email');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/email/test', requireRole('admin', 'manager'), async (req, res, next) => {
+  try {
+    const to = String(req.body.to || '').trim();
+    if (!validateEmailAddress(to)) {
+      req.flash('error', 'Enter a valid recipient email address.');
+      return res.redirect('/settings/email');
+    }
+    const current = await getSettings(true);
+    if (!isEmailConfigured(current)) {
+      req.flash('error', 'Save a valid SMTP host and sender address before sending a test email.');
+      return res.redirect('/settings/email');
+    }
+    await sendTestEmail(to);
+    req.flash('success', 'Test email sent to {email}.', { email: to });
+    return res.redirect('/settings/email');
+  } catch (err) {
+    req.flash('error', 'Could not send the test email: {message}', { message: err.message });
+    return res.redirect('/settings/email');
   }
 });
 

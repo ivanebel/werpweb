@@ -49,7 +49,11 @@ async function webLocals(req, res, next) {
     const settings = await getSettings();
     const currency = settings.currency || 'USD';
     const h = helpers.forLocale(req.locale);
-    res.locals.settings = settings;
+    // Credentials are only for server-side email code. Never expose the SMTP
+    // password to EJS templates or client-side scripts.
+    const publicSettings = { ...settings };
+    delete publicSettings.smtp_password;
+    res.locals.settings = publicSettings;
     res.locals.currency = currency;
     res.locals.currentUser = req.session.user || null;
     res.locals.currentPath = req.path;

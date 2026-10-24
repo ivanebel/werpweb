@@ -53,6 +53,22 @@ async function loadDelivery(id) {
   );
 }
 
+async function loadDeliveryItems(delivery, withOrderedQty = false) {
+  const orderedSelect = withOrderedQty ? ', si.quantity AS ordered_qty' : '';
+  const orderedJoin = withOrderedQty
+    ? 'LEFT JOIN sales_order_items si ON si.id = di.sales_order_item_id'
+    : '';
+  return query(
+    `SELECT di.*, p.sku, p.name, p.unit, cpc.code AS customer_code${orderedSelect}
+       FROM delivery_items di
+       JOIN products p ON p.id = di.product_id
+       ${orderedJoin}
+       LEFT JOIN customer_product_codes cpc ON cpc.customer_id = ? AND cpc.product_id = di.product_id
+      WHERE di.delivery_id = ? ORDER BY di.id`,
+    [delivery.customer_id, delivery.id],
+  );
+}
+
 async function loadOrderWithWarehouse(orderId) {
   return one(
     `SELECT so.*, c.company_name AS customer_name,
@@ -310,15 +326,7 @@ router.get('/:id(\\d+)', async (req, res, next) => {
   try {
     const delivery = await loadDelivery(req.params.id);
     if (!delivery) { return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 })); }
-    const items = await query(
-      `SELECT di.*, p.sku, p.name, p.unit, si.quantity AS ordered_qty, cpc.code AS customer_code
-         FROM delivery_items di
-         JOIN products p ON p.id = di.product_id
-         LEFT JOIN sales_order_items si ON si.id = di.sales_order_item_id
-         LEFT JOIN customer_product_codes cpc ON cpc.customer_id = ? AND cpc.product_id = di.product_id
-        WHERE di.delivery_id = ? ORDER BY di.id`,
-      [delivery.customer_id, delivery.id],
-    );
+    const items = await loadDeliveryItems(delivery, true);
     const actions = [];
     if (delivery.status === 'pending') {
       actions.push({ action: 'status', value: 'shipped', label: req.t('Mark as shipped'), tone: 'primary', confirm: true });
@@ -329,6 +337,7 @@ router.get('/:id(\\d+)', async (req, res, next) => {
       actions.push({ action: 'status', value: 'cancelled', label: req.t('Cancel & restock'), tone: 'danger', confirm: true });
     }
     actions.push({ href: `${basePath}/${delivery.id}/print`, label: req.t('Print packing slip'), tone: 'secondary' });
+    actions.push({ href: `/emails/compose?type=delivery&id=${delivery.id}`, label: req.t('Email'), tone: 'secondary' });
 
     res.render('deliveries/show', {
       title: delivery.delivery_no,
@@ -567,14 +576,7 @@ router.get('/:id(\\d+)/print', async (req, res, next) => {
     if (!delivery) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
     }
-    const items = await query(
-      `SELECT di.*, p.sku, p.name, p.unit, cpc.code AS customer_code
-         FROM delivery_items di
-         JOIN products p ON p.id = di.product_id
-         LEFT JOIN customer_product_codes cpc ON cpc.customer_id = ? AND cpc.product_id = di.product_id
-        WHERE di.delivery_id = ? ORDER BY di.id`,
-      [delivery.customer_id, delivery.id],
-    );
+    const items = await loadDeliveryItems(delivery, false);
     const settings = await require('../lib/settings').getSettings();
     res.render('deliveries/print', {
       layout: false,
@@ -591,3 +593,5 @@ router.get('/:id(\\d+)/print', async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.loadDelivery = loadDelivery;
+module.exports.loadDeliveryItems = loadDeliveryItems;

@@ -13,6 +13,17 @@ const DEFAULTS = {
   invoice_footer: '',
   fiscal_year_start: '01-01',
   date_format: 'MMM d, yyyy',
+  // Outgoing email (SMTP). The password is kept in this table but is stripped
+  // from res.locals.settings so it is never sent to a browser.
+  smtp_host: '',
+  smtp_port: '587',
+  smtp_secure: '0',
+  smtp_user: '',
+  smtp_password: '',
+  smtp_from_name: '',
+  smtp_from_email: '',
+  smtp_reply_to: '',
+  email_signature: '',
 };
 
 let cache = { data: null, loadedAt: 0 };

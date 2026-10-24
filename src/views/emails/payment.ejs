@@ -1,0 +1,189 @@
+<%
+  const companyName = settings.company_name || 'WerpWeb';
+  const companyInitial = String(companyName).charAt(0).toUpperCase();
+  const isCustomer = typeKey === 'customer';
+%>
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> <%= number %></title>
+</head>
+<body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#1d2939;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f4f7;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:720px;background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden;">
+          <tr>
+            <td style="padding:22px 26px;background:#101828;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="width:38px;height:38px;background:#7f56d9;border-radius:10px;color:#ffffff;font-size:16px;font-weight:bold;text-align:center;vertical-align:middle;"><%= companyInitial %></td>
+                        <td style="padding-left:12px;vertical-align:middle;">
+                          <div style="font-size:15px;font-weight:bold;color:#ffffff;"><%= companyName %></div>
+                          <div style="font-size:12px;color:#98a2b3;"><%= settings.company_email || '' %></div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td style="text-align:right;vertical-align:middle;">
+                    <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#98a2b3;"><%= title %></div>
+                    <div style="font-size:20px;font-weight:bold;color:#ffffff;margin-top:2px;"><%= number %></div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 26px 8px;">
+              <p style="margin:0 0 10px;font-size:15px;line-height:1.7;white-space:pre-line;"><%= message %></p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:8px 26px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #eaecf0;">
+                <tr>
+                  <td style="padding-top:18px;vertical-align:top;width:58%;">
+                    <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#98a2b3;font-weight:bold;"><%= isCustomer ? t('Received from') : t('Paid to') %></div>
+                    <div style="font-size:14px;font-weight:bold;color:#1d2939;margin-top:6px;"><%= payment.party_name %></div>
+                    <% if (payment.party_no) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= payment.party_no %></div><% } %>
+                    <% if (payment.party_contact) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= payment.party_contact %></div><% } %>
+                    <% if (payment.party_address) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= payment.party_address %></div><% } %>
+                    <% if (payment.party_city) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= payment.party_city %><%= payment.party_state ? ', ' + payment.party_state : '' %> <%= payment.party_postal || '' %></div><% } %>
+                    <% if (payment.party_email) { %><div style="font-size:13px;color:#465fff;line-height:1.6;"><%= payment.party_email %></div><% } %>
+                  </td>
+                  <td style="padding-top:18px;vertical-align:top;text-align:right;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-left:auto;">
+                      <tr>
+                        <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Payment date') %>:</td>
+                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatDate(payment.payment_date) %></td>
+                      </tr>
+                      <% if (payment.reference) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Reference') %>:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= payment.reference %></td>
+                        </tr>
+                      <% } %>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:0 26px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <tr>
+                  <td width="33%" style="padding:14px;background:#f9fafb;border:1px solid #eaecf0;border-radius:8px 0 0 8px;">
+                    <div style="font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;"><%= t('Total sources') %></div>
+                    <div style="font-size:17px;font-weight:bold;color:#1d2939;margin-top:4px;"><%= money(payment.total_amount) %></div>
+                  </td>
+                  <td width="34%" style="padding:14px;background:#ecfdf3;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;">
+                    <div style="font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:#027a48;"><%= t('Applied to invoices') %></div>
+                    <div style="font-size:17px;font-weight:bold;color:#027a48;margin-top:4px;"><%= money(payment.applied_amount) %></div>
+                  </td>
+                  <td width="33%" style="padding:14px;background:#fffaeb;border:1px solid #eaecf0;border-radius:0 8px 8px 0;">
+                    <div style="font-size:10px;letter-spacing:0.6px;text-transform:uppercase;color:#b54708;"><%= t('Unapplied credit') %></div>
+                    <div style="font-size:17px;font-weight:bold;color:#b54708;margin-top:4px;"><%= money(payment.unapplied_amount) %></div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:24px 26px 0;">
+              <div style="font-size:12px;font-weight:bold;color:#1d2939;margin-bottom:8px;"><%= t('Payment methods') %></div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#f9fafb;">
+                    <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:9px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Method') %></th>
+                    <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:9px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Reference') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:9px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Amount') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% payment.methods.forEach((method) => { %>
+                    <tr>
+                      <td style="padding:9px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;"><%= methodLabels[method.method] || method.method %></td>
+                      <td style="padding:9px 8px;border-bottom:1px solid #f2f4f7;font-size:12px;color:#667085;"><%= method.reference || '—' %></td>
+                      <td align="right" style="padding:9px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;"><%= money(method.amount) %></td>
+                    </tr>
+                  <% }) %>
+                  <% if (!payment.methods.length) { %>
+                    <tr><td colspan="3" style="padding:14px 8px;border-bottom:1px solid #f2f4f7;font-size:12px;color:#98a2b3;"><%= t('No cash or bank movement. The payment was settled with adjustments.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <% if (payment.adjustments && payment.adjustments.length) { %>
+            <tr>
+              <td style="padding:20px 26px 0;">
+                <div style="font-size:12px;font-weight:bold;color:#1d2939;margin-bottom:8px;"><%= t('Adjustments') %></div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                  <tbody>
+                    <% payment.adjustments.forEach((adjustment) => { %>
+                      <tr>
+                        <td style="padding:8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;"><%= adjustmentLabels[adjustment.kind] || adjustment.kind %><% if (adjustment.reference) { %> <span style="font-size:11px;color:#98a2b3;">(<%= adjustment.reference %>)</span><% } %></td>
+                        <td align="right" style="padding:8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;"><%= money(adjustment.amount) %></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          <% } %>
+
+          <tr>
+            <td style="padding:20px 26px 0;">
+              <div style="font-size:12px;font-weight:bold;color:#1d2939;margin-bottom:8px;"><%= t('Invoice allocations') %></div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <tbody>
+                  <% payment.allocations.forEach((allocation) => { %>
+                    <tr>
+                      <td style="padding:8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;"><%= allocation.invoice_no %></td>
+                      <td align="right" style="padding:8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;"><%= money(allocation.amount) %></td>
+                    </tr>
+                  <% }) %>
+                  <% if (!payment.allocations.length) { %>
+                    <tr><td colspan="2" style="padding:12px 8px;border-bottom:1px solid #f2f4f7;font-size:12px;color:#98a2b3;"><%= t('No invoices were allocated. The full amount remains as credit.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <% if (payment.notes) { %>
+            <tr>
+              <td style="padding:18px 26px 0;">
+                <div style="border-top:1px solid #eaecf0;padding-top:12px;font-size:12px;line-height:1.6;color:#475467;">
+                  <span style="font-weight:bold;color:#1d2939;"><%= t('Notes') %>:</span>
+                  <span style="white-space:pre-line;"><%= payment.notes %></span>
+                </div>
+              </td>
+            </tr>
+          <% } %>
+
+          <tr>
+            <td style="padding:24px 26px 28px;">
+              <div style="border-top:1px solid #eaecf0;padding-top:16px;font-size:13px;line-height:1.7;color:#475467;white-space:pre-line;"><%= signature %></div>
+              <% if (settings.invoice_footer) { %>
+                <div style="margin-top:18px;font-size:11px;line-height:1.6;color:#98a2b3;white-space:pre-line;"><%= settings.invoice_footer %></div>
+              <% } %>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

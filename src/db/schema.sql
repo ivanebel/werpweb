@@ -766,3 +766,29 @@ CREATE TABLE IF NOT EXISTS pos_sale_items (
   CONSTRAINT fk_pos_sale_items_product FOREIGN KEY (product_id)
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Outgoing email audit trail
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS email_log (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  document_type VARCHAR(40) NOT NULL,
+  document_id   INT UNSIGNED NULL,
+  document_no   VARCHAR(80) NOT NULL,
+  party_name    VARCHAR(180) NULL,
+  to_email      VARCHAR(500) NOT NULL,
+  cc_email      VARCHAR(500) NULL,
+  subject       VARCHAR(255) NOT NULL,
+  message       TEXT NULL,
+  status        ENUM('sent','failed') NOT NULL DEFAULT 'sent',
+  error_text    TEXT NULL,
+  message_id    VARCHAR(255) NULL,
+  sent_by       INT UNSIGNED NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_email_log_document (document_type, document_id),
+  KEY idx_email_log_created (created_at),
+  KEY idx_email_log_status (status),
+  CONSTRAINT fk_email_log_user FOREIGN KEY (sent_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

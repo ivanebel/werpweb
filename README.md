@@ -18,9 +18,10 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Point of Sale (Unit #2)** — manage several shops as distinct points of sale, record completed POS sales with ticket type, ticket number and shop, and analyse revenue, average ticket, units, product rankings and category performance. POS sales are reporting records only: they do not create stock movements or change Unit #1 inventory.
 - **Manufacturing** — bills of materials with component quantities and scrap, plus production orders that snapshot the BOM, check material availability, consume components and add finished goods to stock when completed.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
+- **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
 - **Auth and roles** — session login, CSRF protection, flash messages and `admin` / `manager` / `staff` permissions.
-- **Settings** — company profile, currency, default tax rate, document footer and user management.
+- **Settings** — company profile, currency, default tax rate, document footer, SMTP/email settings and user management.
 - **Dark mode**, responsive sidebar and mobile layout.
 
 ---
@@ -134,6 +135,19 @@ npm run db:setup      # migrate + seed
 
 The schema is in `src/db/schema.sql`. Money is stored as `DECIMAL(14,2)`, quantities as `DECIMAL(14,3)`. Document numbers are generated per year, e.g. `SO-2026-0001`, `INV-2026-0001`, `PO-2026-0001`, `BILL-2026-0001`, `DLV-2026-0001`, `PRD-2026-0001`, `RCP-2026-0001` for customer receipts, `PMT-2026-0001` for supplier payments and `CHK-2026-0001` for checks.
 
+## Outgoing email
+
+Email is configured from **Company settings → Email settings** (or **System → Email settings**). Administrators and managers can change it; staff can view the configuration and email log.
+
+1. Enter the SMTP host and port. Port `587` normally uses STARTTLS, while port `465` normally uses implicit TLS.
+2. Enter the sender name and sender email address. If the SMTP server requires authentication, add the username and password. Leave the password blank when editing to keep the stored one.
+3. Add an optional email signature. When it is blank, the company name is used.
+4. Save the settings, then use **Send a test email** to confirm the connection.
+
+The SMTP password is stored in the `settings` table and is never rendered in the browser. Use an app-specific password when your provider supports it. Sending uses `nodemailer`; the database schema adds an `email_log` table that records successful and failed attempts, the recipients, subject, message and the user who sent it.
+
+Open an order, invoice, payment or delivery and choose **Email** to compose a message. The recipient defaults to the party email address, and the message includes the document details, totals and signature as inline HTML. Attachments are not generated.
+
 ## Checks integration test
 
 Start the app with `npm run dev` (or `npm start`) and, in another terminal, run:
@@ -177,6 +191,13 @@ The test logs in with the seeded admin account, creates its own customer, suppli
 4. Add customer **credit notes** or **tax withholdings** when they reduce the amount collected. For supplier payments, add **credit notes** that reduce the amount paid or **debit notes** that add an amount due.
 5. The summary shows total sources, the amount applied to invoices and any **unapplied credit**. A receipt larger than the invoice balance leaves the difference as customer credit; a payment larger than the supplier balance leaves supplier credit.
 6. Open the receipt and choose **Print / PDF** for a customer payment order. Payments are immutable: use **Reverse** to remove a payment and restore the invoice balances and statuses.
+
+### Email a document
+
+1. Configure SMTP under **Company settings → Email settings** and send a test message.
+2. Open an order, invoice, payment or delivery and choose **Email**.
+3. Check the recipient, optional CC, subject and message. The document body and signature are added automatically.
+4. Send the message. The result appears in **System → Email log**, and recent sends for the same document are shown on the compose page.
 
 ### Check portfolio
 
@@ -237,6 +258,9 @@ src/
     sequences.js         Per-year document numbering
     production.js        BOM snapshots and production completion
     checks.js            Check statuses, history, payment links and reversal
+    documentTypes.js     Shared order/invoice definitions
+    email.js             SMTP transport, validation and email rendering
+    emailDocuments.js    Document loaders and email content builders
   middleware/web.js      Sessions, CSRF, locals, auth and role guards
   routes/                One router per module
   views/                 EJS layouts, pages and partials
