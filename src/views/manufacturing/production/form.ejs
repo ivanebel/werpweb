@@ -1,0 +1,156 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <%
+        const backUrl = mode === 'edit' ? `/manufacturing/production-orders/${row.id}` : '/manufacturing/production-orders';
+        const errorList = Object.values(errors || {});
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New production order') : t('Edit {number}', { number: row.production_no }) %></h1>
+          <p class="page-subtitle"><%= mode === 'create' ? t('Pick an active BOM and quantity. Materials are snapshotted from the BOM.') : t('Update the schedule or quantity while the order is still planned.') %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please review the production order:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <h2 class="card-title">Order details</h2>
+              <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? row.production_no : 'Number assigned on save' %></span>
+            </div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div class="md:col-span-2">
+                <label for="bom_id" class="form-label">Bill of materials <span class="text-error-500">*</span></label>
+                <select id="bom_id" name="bom_id" class="form-select <%= errors.bom_id ? 'form-input-error' : '' %>" required>
+                  <option value="">Select an active BOM…</option>
+                  <% boms.forEach(opt => { %>
+                    <option
+                      value="<%= opt.id %>"
+                      data-product="<%= opt.product_name %>"
+                      data-sku="<%= opt.sku %>"
+                      data-unit="<%= opt.unit %>"
+                      data-output="<%= opt.output_qty %>"
+                      data-version="<%= opt.version %>"
+                      <%= String(row.bom_id || '') === String(opt.id) ? 'selected' : '' %>
+                    ><%= opt.product_name %> — <%= opt.name %> (<%= opt.version %>)</option>
+                  <% }) %>
+                </select>
+                <% if (errors.bom_id) { %><p class="form-error"><%= errors.bom_id %></p><% } %>
+                <p class="form-help">Only active BOMs are available. Manage them under Bills of materials.</p>
+              </div>
+              <div>
+                <label for="quantity" class="form-label">Quantity to produce <span class="text-error-500">*</span></label>
+                <input id="quantity" name="quantity" type="number" min="0.001" step="0.001" value="<%= row.quantity !== undefined ? row.quantity : 1 %>" class="form-input <%= errors.quantity ? 'form-input-error' : '' %>" required>
+                <% if (errors.quantity) { %><p class="form-error"><%= errors.quantity %></p><% } %>
+                <p class="form-help"><%= t('Output units') %><span id="quantity-unit"></span>.</p>
+              </div>
+              <div>
+                <label for="sales_order_id" class="form-label">Sales order</label>
+                <select id="sales_order_id" name="sales_order_id" class="form-select">
+                  <option value="">No linked sales order</option>
+                  <% salesOrders.forEach(opt => { %>
+                    <option value="<%= opt.id %>" <%= String(row.sales_order_id || '') === String(opt.id) ? 'selected' : '' %>><%= opt.order_no %> · <%= opt.company_name %></option>
+                  <% }) %>
+                </select>
+                <p class="form-help">Optional link for traceability.</p>
+              </div>
+              <div>
+                <label for="start_date" class="form-label">Start date <span class="text-error-500">*</span></label>
+                <input id="start_date" name="start_date" type="date" value="<%= String(row.start_date || '').slice(0, 10) %>" class="form-input <%= errors.start_date ? 'form-input-error' : '' %>" required>
+                <% if (errors.start_date) { %><p class="form-error"><%= errors.start_date %></p><% } %>
+              </div>
+              <div>
+                <label for="due_date" class="form-label">Due date</label>
+                <input id="due_date" name="due_date" type="date" value="<%= String(row.due_date || '').slice(0, 10) %>" class="form-input">
+              </div>
+              <div class="md:col-span-2">
+                <label for="notes" class="form-label">Notes</label>
+                <textarea id="notes" name="notes" rows="3" class="form-textarea" placeholder="Work centre, shift, special instructions…"><%= row.notes || '' %></textarea>
+              </div>
+            </div>
+            <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+              <a href="<%= backUrl %>" class="btn btn-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary">
+                <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                <%= mode === 'create' ? t('Create production order') : t('Save changes') %>
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Selected BOM</h2>
+              <p id="bom-empty" class="mt-3 text-sm text-gray-400">Choose a BOM to see its output details.</p>
+              <dl id="bom-info" class="mt-4 hidden space-y-3 text-sm">
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Product</dt><dd id="bom-product" class="text-right font-medium text-gray-700 dark:text-gray-300"></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">SKU</dt><dd id="bom-sku" class="font-mono text-xs text-gray-700 dark:text-gray-300"></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Version</dt><dd id="bom-version" class="font-medium text-gray-700 dark:text-gray-300"></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">BOM output</dt><dd id="bom-output" class="font-medium text-gray-700 dark:text-gray-300"></dd></div>
+              </dl>
+            </div>
+
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">How it works</h2>
+              <ol class="mt-3 space-y-2 text-sm text-gray-500 dark:text-gray-400">
+                <li class="flex gap-2"><span class="font-semibold text-gray-400">1.</span> Plan the order and review material availability.</li>
+                <li class="flex gap-2"><span class="font-semibold text-gray-400">2.</span> Release it, then start production.</li>
+                <li class="flex gap-2"><span class="font-semibold text-gray-400">3.</span> Completing consumes component stock and adds finished goods.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script>
+    (function () {
+      const select = document.getElementById('bom_id');
+      if (!select) return;
+      const info = document.getElementById('bom-info');
+      const empty = document.getElementById('bom-empty');
+      function update() {
+        const opt = select.selectedOptions[0];
+        const unitEl = document.getElementById('quantity-unit');
+        if (!opt || !opt.value) {
+          info.classList.add('hidden');
+          empty.classList.remove('hidden');
+          if (unitEl) unitEl.textContent = '';
+          return;
+        }
+        info.classList.remove('hidden');
+        empty.classList.add('hidden');
+        document.getElementById('bom-product').textContent = opt.dataset.product || '—';
+        document.getElementById('bom-sku').textContent = opt.dataset.sku || '—';
+        document.getElementById('bom-version').textContent = opt.dataset.version || '—';
+        document.getElementById('bom-output').textContent = `${opt.dataset.output || 1} ${opt.dataset.unit || ''}`.trim();
+        if (unitEl) unitEl.textContent = opt.dataset.unit ? ` (${opt.dataset.unit})` : '';
+      }
+      select.addEventListener('change', update);
+      update();
+    })();
+  </script>
+  <%- include('/layouts/footer') %>

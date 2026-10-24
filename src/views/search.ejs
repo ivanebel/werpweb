@@ -1,0 +1,107 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+
+      <div class="mb-6">
+        <h1 class="page-title">Search</h1>
+        <p class="page-subtitle">Find customers, suppliers, products, POS sales and documents across the ERP.</p>
+      </div>
+
+      <div class="card mb-5 p-5 md:p-6">
+        <form method="GET" action="/search" class="flex flex-col gap-3 sm:flex-row">
+          <div class="relative flex-1">
+            <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+              <%- include('/partials/icon', { name: 'search', className: 'h-5 w-5' }) %>
+            </span>
+            <input type="search" name="q" value="<%= q %>" class="form-input h-12 pl-12 text-base" placeholder="Search by name, number, ticket, email or SKU…" autofocus>
+          </div>
+          <button type="submit" class="btn btn-primary h-12 px-6">Search</button>
+        </form>
+      </div>
+
+      <% if (!results) { %>
+        <div class="card px-6 py-16 text-center">
+          <span class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+            <%- include('/partials/icon', { name: 'search', className: 'h-7 w-7' }) %>
+          </span>
+          <p class="text-base font-semibold text-gray-800 dark:text-gray-200">Search your workspace</p>
+          <p class="mx-auto mt-1 max-w-md text-sm text-gray-500 dark:text-gray-400">Try a customer name, an order number like SO-2026-0001, a product SKU or an email address.</p>
+          <div class="mx-auto mt-6 flex flex-wrap justify-center gap-2">
+            <% [
+              ['customers', t('Customers')],
+              ['suppliers', t('Suppliers')],
+              ['products', t('Products')],
+              ['sales-orders', t('Sales orders')],
+              ['purchase-orders', t('Purchase orders')],
+              ['sales', t('Sales invoices')],
+              ['purchases', t('Purchase invoices')],
+              ['pos/sales', t('POS sales')]
+            ].forEach(([link, label]) => { %>
+              <a href="/<%= link %>" class="btn btn-secondary btn-sm"><%= label %></a>
+            <% }) %>
+          </div>
+        </div>
+      <% } else {
+        const sections = [
+          { label: t('Customers'), icon: 'users', items: results.customers.map(r => ({ href: `/customers/${r.id}`, title: r.title, meta: [r.ref, r.meta].filter(Boolean).join(' · '), extra: '' })) },
+          { label: t('Suppliers'), icon: 'truck', items: results.suppliers.map(r => ({ href: `/suppliers/${r.id}`, title: r.title, meta: [r.ref, r.meta].filter(Boolean).join(' · '), extra: '' })) },
+          { label: t('Products'), icon: 'cube', items: results.products.map(r => ({ href: `/products/${r.id}`, title: r.title, meta: [r.ref, h.statusInfo(r.meta).label].filter(Boolean).join(' · '), extra: '' })) },
+          { label: t('Sales orders'), icon: 'clipboard-list', items: results.salesOrders.map(r => ({ href: `/sales-orders/${r.id}`, title: r.title, meta: r.meta, extra: money(r.total) })) },
+          { label: t('Purchase orders'), icon: 'clipboard', items: results.purchaseOrders.map(r => ({ href: `/purchase-orders/${r.id}`, title: r.title, meta: r.meta, extra: money(r.total) })) },
+          { label: t('Sales invoices'), icon: 'receipt', items: results.invoices.map(r => ({ href: `/sales/${r.id}`, title: r.title, meta: r.meta, extra: money(r.total) })) },
+          { label: t('POS sales'), icon: 'building', items: results.posSales.map(r => ({ href: `/pos/sales/${r.id}`, title: r.title, meta: [r.pos_code, r.pos_name, t(r.ticket_type), h.formatDate(r.sale_date)].filter(Boolean).join(' · '), extra: money(r.total) })) }
+        ];
+        const total = sections.reduce((sum, section) => sum + section.items.length, 0);
+      %>
+        <div class="mb-4 flex items-center justify-between">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            <span class="font-semibold text-gray-700 dark:text-gray-300"><%= h.formatNumber(total, 0) %></span>
+            <%= t(total === 1 ? 'result for' : 'results for') %> <span class="font-medium text-gray-700 dark:text-gray-300">“<%= q %>”</span>
+          </p>
+          <a href="/search" class="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">Clear search</a>
+        </div>
+
+        <% if (!total) { %>
+          <div class="card px-6 py-16 text-center">
+            <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+              <%- include('/partials/icon', { name: 'search', className: 'h-6 w-6' }) %>
+            </span>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('Nothing matched “{query}”', { query: q }) %></p>
+            <p class="mt-1 text-sm text-gray-400">Try a shorter term or check the spelling.</p>
+          </div>
+        <% } else { %>
+          <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <% sections.filter(section => section.items.length).forEach(section => { %>
+              <div class="card overflow-hidden">
+                <div class="card-header">
+                  <h2 class="card-title flex items-center gap-2">
+                    <%- include('/partials/icon', { name: section.icon, className: 'h-4 w-4 text-gray-400' }) %>
+                    <%= section.label %>
+                  </h2>
+                  <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= section.items.length %></span>
+                </div>
+                <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <% section.items.forEach(item => { %>
+                    <a href="<%= item.href %>" class="flex items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-gray-800 dark:text-gray-200"><%= item.title %></p>
+                        <% if (item.meta) { %><p class="truncate text-xs text-gray-400"><%= item.meta %></p><% } %>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-2">
+                        <% if (item.extra) { %><span class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= item.extra %></span><% } %>
+                        <span class="text-gray-300 dark:text-gray-600"><%- include('/partials/icon', { name: 'chevron-right', className: 'h-4 w-4' }) %></span>
+                      </div>
+                    </a>
+                  <% }) %>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

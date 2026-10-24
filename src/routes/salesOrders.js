@@ -1,0 +1,43 @@
+'use strict';
+
+const { makeDocumentRouter } = require('./documents');
+
+module.exports = makeDocumentRouter({
+  kind: 'sales_order',
+  key: 'sales-orders',
+  basePath: '/sales-orders',
+  title: 'Sales Orders',
+  singular: 'Sales Order',
+  active: 'sales-orders',
+  table: 'sales_orders',
+  itemTable: 'sales_order_items',
+  itemFk: 'order_id',
+  numberField: 'order_no',
+  numberPrefix: 'SO',
+  party: { field: 'customer_id', table: 'customers', label: 'Customer' },
+  partyBase: '/customers',
+  dateField: 'order_date',
+  dateLabel: 'Order date',
+  dueField: 'expected_date',
+  dueLabel: 'Expected delivery',
+  defaultDueDays: 14,
+  statuses: ['draft', 'confirmed', 'partially_delivered', 'delivered', 'cancelled'],
+  defaultStatus: 'draft',
+  productWhere: "is_sellable = 1 AND status = 'active'",
+  priceField: 'sale_price',
+  openStatuses: ['draft', 'confirmed', 'partially_delivered'],
+  lockedStatuses: ['partially_delivered', 'delivered', 'cancelled'],
+  showDelivered: true,
+  qtyLabel: 'Delivered',
+  qtyKey: 'delivered_qty',
+  customerOrder: {
+    orderNoField: 'customer_order_no',
+    warehouseField: 'customer_warehouse_id',
+    dockingField: 'docking_station',
+    receptionField: 'reception_at',
+    orderNoLabel: 'Customer order no.',
+    warehouseLabel: 'Destination warehouse',
+    dockingLabel: 'Docking station',
+    receptionLabel: 'Reception date & time',
+  },
+});

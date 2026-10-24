@@ -1,0 +1,102 @@
+<%
+  const groups = [
+    { label: null, items: [ { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: 'dashboard' } ] },
+    { label: 'Contacts', items: [
+      { key: 'customers', label: 'Customers', href: '/customers', icon: 'users' },
+      { key: 'suppliers', label: 'Suppliers', href: '/suppliers', icon: 'truck' },
+      { key: 'employees', label: 'Employees', href: '/employees', icon: 'user-group' }
+    ] },
+    { label: 'Inventory', items: [
+      { key: 'products', label: 'Products', href: '/products', icon: 'cube' },
+      { key: 'brands', label: 'Brands', href: '/brands', icon: 'tag' },
+      { key: 'product-categories', label: 'Categories', href: '/product-categories', icon: 'tag' }
+    ] },
+    { label: 'Sales', items: [
+      { key: 'sales-orders', label: 'Sales orders', href: '/sales-orders', icon: 'clipboard-list' },
+      { key: 'sales', label: 'Sales invoices', href: '/sales', icon: 'receipt' },
+      { key: 'payments-customer', label: 'Customer payments', href: '/payments?type=customer', icon: 'banknotes' },
+      { key: 'deliveries', label: 'Deliveries', href: '/deliveries', icon: 'truck' }
+    ] },
+    { label: 'Point of Sale', items: [
+      { key: 'pos-dashboard', label: 'POS dashboard', href: '/pos', icon: 'chart' },
+      { key: 'pos-sales', label: 'POS sales', href: '/pos/sales', icon: 'receipt' },
+      { key: 'pos-performance', label: 'Sales performance', href: '/pos/performance', icon: 'list' },
+      { key: 'pos-locations', label: 'Points of sale', href: '/pos/locations', icon: 'building' }
+    ] },
+    { label: 'Purchasing', items: [
+      { key: 'purchase-orders', label: 'Purchase orders', href: '/purchase-orders', icon: 'clipboard' },
+      { key: 'purchases', label: 'Purchase invoices', href: '/purchases', icon: 'banknotes' },
+      { key: 'payments-supplier', label: 'Supplier payments', href: '/payments?type=supplier', icon: 'banknotes' }
+    ] },
+    { label: 'Manufacturing', items: [
+      { key: 'manufacturing-boms', label: 'Bills of materials', href: '/manufacturing/boms', icon: 'list' },
+      { key: 'manufacturing-production', label: 'Production orders', href: '/manufacturing/production-orders', icon: 'factory' }
+    ] },
+    { label: 'System', items: [
+      { key: 'settings', label: 'Company settings', href: '/settings', icon: 'cog' },
+      { key: 'users', label: 'Users', href: '/settings/users', icon: 'shield', adminOnly: true },
+      { key: 'profile', label: 'My profile', href: '/profile', icon: 'user-circle' }
+    ] }
+  ];
+%>
+<%- include('/partials/flash') %>
+<div id="sidebar-overlay" class="fixed inset-0 z-40 hidden bg-gray-900/50 backdrop-blur-sm lg:hidden"></div>
+<aside id="app-sidebar" class="fixed inset-y-0 left-0 z-50 flex w-[290px] -translate-x-full flex-col border-r border-gray-200 bg-white transition-transform duration-300 dark:border-gray-800 dark:bg-gray-900 lg:translate-x-0">
+  <div class="flex h-[72px] shrink-0 items-center justify-between px-6">
+    <a href="/dashboard" class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-lg font-bold text-white shadow-theme-md">W</span>
+      <span>
+        <span class="block text-lg font-bold leading-tight text-gray-900 dark:text-white">WerpWeb</span>
+        <span class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">ERP Suite</span>
+      </span>
+    </a>
+    <button type="button" data-sidebar-toggle class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 lg:hidden" aria-label="Close sidebar">
+      <%- include('/partials/icon', { name: 'x' }) %>
+    </button>
+  </div>
+
+  <nav class="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
+    <% groups.forEach((group, gi) => { %>
+      <% const visibleItems = group.items.filter(item => !item.adminOnly || (currentUser && currentUser.role === 'admin')); %>
+      <% if (visibleItems.length) { %>
+        <% if (group.label) { %>
+          <p class="menu-group mb-2 mt-6"><%= group.label %></p>
+        <% } else { %>
+          <div class="mt-2"></div>
+        <% } %>
+        <ul class="space-y-1">
+          <% visibleItems.forEach(item => { %>
+            <li>
+              <a href="<%= item.href %>" class="<%= active === item.key ? 'menu-item menu-item-active' : 'menu-item' %>">
+                <%- include('/partials/icon', { name: item.icon, className: 'menu-icon' }) %>
+                <span><%= item.label %></span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    <% }) %>
+  </nav>
+
+  <div class="shrink-0 border-t border-gray-100 p-4 dark:border-gray-800">
+    <div class="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
+      <div class="flex items-center gap-3">
+        <span class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+          <%= h.initials(currentUser ? currentUser.name : 'W') %>
+        </span>
+        <div class="min-w-0">
+          <p class="truncate text-sm font-semibold text-gray-800 dark:text-white/90"><%= currentUser ? currentUser.name : 'Guest' %></p>
+          <p class="truncate text-xs capitalize text-gray-500 dark:text-gray-400"><%= currentUser ? currentUser.role : '' %></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</aside>
+<script>
+  (function () {
+    const activeItem = document.querySelector('#app-sidebar .menu-item-active');
+    if (activeItem && typeof activeItem.scrollIntoView === 'function') {
+      activeItem.scrollIntoView({ block: 'nearest' });
+    }
+  })();
+</script>

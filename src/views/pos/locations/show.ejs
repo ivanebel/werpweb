@@ -1,0 +1,353 @@
+<%- include('/layouts/head', { includeApex: true }) %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+      <%
+        const rangeLabel = `${h.formatDate(range.from)} – ${h.formatDate(range.to)}`;
+        const address = [location.address_line1, location.city, location.state, location.postal_code].filter(Boolean).join(', ');
+        const maxProduct = Math.max(...products.map(p => p.revenue), 1);
+        const maxCategory = Math.max(...categories.map(c => c.revenue), 1);
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= location.name %></h1>
+            <%- statusBadge(location.status) %>
+          </div>
+          <p class="page-subtitle"><span class="font-mono"><%= location.code %></span><%= address ? ` · ${address}` : '' %><%= location.phone ? ` · ${location.phone}` : '' %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/pos/locations" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Points of sale') %>
+          </a>
+          <a href="/pos/locations/<%= location.id %>/edit" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+            <%= t('Edit') %>
+          </a>
+          <form method="POST" action="/pos/locations/<%= location.id %>/delete" class="inline" data-confirm="<%= t('Delete this point of sale? This cannot be undone.') %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-danger btn-sm">
+              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+              <%= t('Delete') %>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <form method="GET" action="/pos/locations/<%= location.id %>" class="card mb-5 p-4 md:p-5">
+        <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-8">
+          <div class="xl:col-span-2">
+            <label for="from" class="form-label"><%= t('From') %></label>
+            <input id="from" type="date" name="from" value="<%= range.from %>" class="form-input">
+          </div>
+          <div class="xl:col-span-2">
+            <label for="to" class="form-label"><%= t('To') %></label>
+            <input id="to" type="date" name="to" value="<%= range.to %>" class="form-input">
+          </div>
+          <div class="flex flex-wrap items-center gap-2 sm:col-span-2 xl:col-span-4">
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'filter', className: 'h-4 w-4' }) %>
+              <%= t('Apply') %>
+            </button>
+            <a href="/pos/locations/<%= location.id %>" class="btn btn-secondary"><%= t('Reset') %></a>
+            <span class="basis-full text-xs text-gray-400 xl:basis-auto"><%= rangeLabel %></span>
+          </div>
+        </div>
+      </form>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="card p-5 md:p-6">
+          <p class="stat-label"><%= t('POS revenue') %></p>
+          <p class="mt-1 stat-value"><%= money(stats.revenue) %></p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><%= t('vs previous period') %></p>
+        </div>
+        <div class="card p-5 md:p-6">
+          <p class="stat-label"><%= t('Tickets') %></p>
+          <p class="mt-1 stat-value"><%= h.formatNumber(stats.tickets, 0) %></p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><%= t('Completed sales in this period') %></p>
+        </div>
+        <div class="card p-5 md:p-6">
+          <p class="stat-label"><%= t('Units sold') %></p>
+          <p class="mt-1 stat-value"><%= h.formatQty(stats.units) %></p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><%= t('{count} products sold', { count: h.formatNumber(stats.products, 0) }) %></p>
+        </div>
+        <div class="card p-5 md:p-6">
+          <p class="stat-label"><%= t('Average ticket') %></p>
+          <p class="mt-1 stat-value"><%= money(stats.avgTicket) %></p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><%= t('Tax included') %></p>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
+        <div class="card xl:col-span-8">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Shop sales trend') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Revenue and tickets, last 6 months') %></p>
+            </div>
+            <a href="/pos/sales?pos=<%= location.id %>" class="btn btn-secondary btn-sm"><%= t('View sales') %></a>
+          </div>
+          <div class="px-2 pb-3 pt-4">
+            <div id="shop-trend-chart" class="min-h-[300px]"></div>
+          </div>
+        </div>
+
+        <div class="card xl:col-span-4">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Category mix') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= rangeLabel %></p>
+            </div>
+          </div>
+          <div class="flex flex-col items-center px-4 py-4">
+            <div id="shop-category-chart" class="w-full"></div>
+            <ul class="mt-2 w-full space-y-2">
+              <% categories.slice(0, 5).forEach((category, i) => { %>
+                <li class="flex items-center justify-between gap-3 text-sm">
+                  <span class="flex min-w-0 items-center gap-2 text-gray-600 dark:text-gray-300">
+                    <span class="h-2.5 w-2.5 shrink-0 rounded-full" data-chart-dot="<%= i %>"></span>
+                    <span class="truncate"><%= category.name %></span>
+                  </span>
+                  <span class="shrink-0 font-medium text-gray-800 dark:text-gray-200"><%= money(category.revenue) %></span>
+                </li>
+              <% }) %>
+              <% if (!categories.length) { %>
+                <li class="py-6 text-center text-sm text-gray-400"><%= t('No category sales in this period.') %></li>
+              <% } %>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
+        <div class="card xl:col-span-6">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Top products') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('By POS revenue, net of sale discounts') %></p>
+            </div>
+          </div>
+          <div class="space-y-4 p-5">
+            <% products.forEach((product, i) => { %>
+              <div>
+                <div class="flex items-center justify-between gap-3">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400"><%= i + 1 %></span>
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-medium text-gray-800 dark:text-gray-200"><%= product.name %></p>
+                      <p class="text-xs text-gray-400"><%= product.sku %> · <%= t('{qty} sold', { qty: h.formatQty(product.qty) }) %></p>
+                    </div>
+                  </div>
+                  <span class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= money(product.revenue) %></span>
+                </div>
+                <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                  <div class="h-full rounded-full bg-brand-500" style="width: <%= Math.max(4, (product.revenue / maxProduct) * 100) %>%"></div>
+                </div>
+              </div>
+            <% }) %>
+            <% if (!products.length) { %>
+              <p class="py-8 text-center text-sm text-gray-400"><%= t('No product sales in this period.') %></p>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="card xl:col-span-6">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Category performance') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Revenue, units and share by category') %></p>
+            </div>
+          </div>
+          <div class="space-y-4 p-5">
+            <% categories.forEach((category, i) => { %>
+              <div>
+                <div class="flex items-center justify-between gap-3">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400"><%= i + 1 %></span>
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-medium text-gray-800 dark:text-gray-200"><%= category.name %></p>
+                      <p class="text-xs text-gray-400"><%= t('{qty} units', { qty: h.formatQty(category.qty) }) %> · <%= t('{count} products', { count: h.formatNumber(category.products, 0) }) %></p>
+                    </div>
+                  </div>
+                  <span class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= money(category.revenue) %></span>
+                </div>
+                <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                  <div class="h-full rounded-full bg-brand-500" style="width: <%= Math.max(4, (category.revenue / maxCategory) * 100) %>%"></div>
+                </div>
+              </div>
+            <% }) %>
+            <% if (!categories.length) { %>
+              <p class="py-8 text-center text-sm text-gray-400"><%= t('No category sales in this period.') %></p>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-12">
+        <div class="card xl:col-span-8">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Recent POS sales') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Latest completed shop sales') %></p>
+            </div>
+            <a href="/pos/sales?pos=<%= location.id %>" class="btn btn-secondary btn-sm"><%= t('View all') %></a>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[680px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Ticket') %></th>
+                  <th class="table-th"><%= t('Date') %></th>
+                  <th class="table-th"><%= t('Type') %></th>
+                  <th class="table-th"><%= t('Payment') %></th>
+                  <th class="table-th text-right"><%= t('Items') %></th>
+                  <th class="table-th text-right"><%= t('Total') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% recent.forEach(sale => { %>
+                  <tr class="table-row">
+                    <td class="table-td font-medium"><a href="/pos/sales/<%= sale.id %>" class="link"><%= sale.ticket_number %></a></td>
+                    <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(sale.sale_date) %></td>
+                    <td class="table-td"><span class="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"><%= t(sale.ticket_type) %></span></td>
+                    <td class="table-td text-gray-500 dark:text-gray-400"><%= t(h.humanize(sale.payment_method)) %></td>
+                    <td class="table-td text-right"><%= h.formatNumber(sale.item_count, 0) %></td>
+                    <td class="table-td text-right font-medium"><%= money(sale.total) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!recent.length) { %>
+                  <tr><td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No POS sales in this period.') %></td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card xl:col-span-4">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Shop details') %></h2>
+            </div>
+          </div>
+          <div class="space-y-4 p-5 text-sm">
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Address') %></p>
+              <p class="mt-1 text-gray-700 dark:text-gray-300"><%= address || '—' %></p>
+            </div>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Phone') %></p>
+              <p class="mt-1 text-gray-700 dark:text-gray-300"><%= location.phone || '—' %></p>
+            </div>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Status') %></p>
+              <div class="mt-1"><%- statusBadge(location.status) %></div>
+            </div>
+            <% if (location.notes) { %>
+              <div>
+                <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Notes') %></p>
+                <p class="mt-1 whitespace-pre-line text-gray-700 dark:text-gray-300"><%= location.notes %></p>
+              </div>
+            <% } %>
+          </div>
+          <div class="border-t border-gray-100 p-5 dark:border-gray-800">
+            <p class="rounded-xl bg-gray-50 px-4 py-3 text-xs leading-5 text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">
+              <%= t('POS sales are reporting records. They do not post stock movements or change Unit #1 inventory.') %>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+<script>
+(function () {
+  const currency = <%- JSON.stringify(currency) %>;
+  const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
+  const messages = <%- JSON.stringify(jsMessages || {}) %>;
+  const charts = <%- JSON.stringify(charts) %>;
+  const isDark = () => document.documentElement.classList.contains('dark');
+  const palette = ['#465FFF', '#12B76A', '#F79009', '#0BA5EC', '#7A5AF8', '#F04438', '#EE46BC', '#84CC16'];
+  function money(v) {
+    try { return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(v || 0)); }
+    catch (e) { return currency + ' ' + Number(v || 0).toFixed(0); }
+  }
+  function number(v) {
+    try { return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(Number(v || 0)); }
+    catch (e) { return String(Number(v || 0)); }
+  }
+  function themeAxis() {
+    return {
+      foreColor: isDark() ? '#98A2B3' : '#667085',
+      grid: isDark() ? '#1F2937' : '#F2F4F7',
+      tooltipTheme: isDark() ? 'dark' : 'light'
+    };
+  }
+
+  document.querySelectorAll('[data-chart-dot]').forEach((dot, i) => {
+    dot.style.backgroundColor = palette[i % palette.length];
+  });
+
+  const trendEl = document.querySelector('#shop-trend-chart');
+  if (trendEl) {
+    const t = themeAxis();
+    const chart = new ApexCharts(trendEl, {
+      chart: { type: 'area', height: 300, toolbar: { show: false }, fontFamily: 'Outfit, sans-serif', foreColor: t.foreColor },
+      series: [
+        { name: messages.revenue || 'Revenue', data: charts.trend.revenue },
+        { name: messages.tickets || 'Tickets', data: charts.trend.tickets }
+      ],
+      colors: ['#465FFF', '#12B76A'],
+      stroke: { curve: 'smooth', width: [3, 2] },
+      fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.25, opacityTo: 0.02, stops: [0, 95] }, opacity: [1, 0] },
+      dataLabels: { enabled: false },
+      grid: { borderColor: t.grid, strokeDashArray: 4, padding: { left: 8, right: 8 } },
+      xaxis: { categories: charts.trend.labels, axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: [
+        { labels: { formatter: money } },
+        { opposite: true, labels: { formatter: number } }
+      ],
+      tooltip: { theme: t.tooltipTheme, y: { formatter: (v, opts) => opts.seriesIndex === 0 ? money(v) : number(v) } },
+      legend: { position: 'top', horizontalAlign: 'right', markers: { radius: 4 }, itemMargin: { horizontal: 10 } },
+      markers: { size: 0, hover: { size: 5 } }
+    });
+    chart.render();
+    document.addEventListener('werp:theme', () => {
+      const nt = themeAxis();
+      chart.updateOptions({ chart: { foreColor: nt.foreColor }, grid: { borderColor: nt.grid }, tooltip: { theme: nt.tooltipTheme } });
+    });
+  }
+
+  const categoryEl = document.querySelector('#shop-category-chart');
+  if (categoryEl) {
+    const values = charts.categories.map(c => c.revenue);
+    const labels = charts.categories.map(c => c.name);
+    const hasData = values.some(v => v > 0);
+    const chart = new ApexCharts(categoryEl, {
+      chart: { type: 'donut', height: 225, fontFamily: 'Outfit, sans-serif', foreColor: themeAxis().foreColor },
+      series: hasData ? values : [1],
+      labels: hasData ? labels : [messages.noData || 'No data'],
+      colors: hasData ? palette : ['#E4E7EC'],
+      stroke: { width: 0 },
+      legend: { show: false },
+      dataLabels: { enabled: false },
+      plotOptions: { pie: { donut: { size: '72%', labels: {
+        show: true,
+        name: { show: false },
+        value: { show: true, fontSize: '20px', fontWeight: 600, color: isDark() ? '#F9FAFB' : '#1D2939', formatter: money },
+        total: { show: true, showAlways: true, label: messages.revenue || 'Revenue', fontSize: '12px', color: '#98A2B3', formatter: () => money(values.reduce((a, b) => a + b, 0)) }
+      } } } },
+      tooltip: { theme: themeAxis().tooltipTheme, y: { formatter: money } }
+    });
+    chart.render();
+    document.addEventListener('werp:theme', () => {
+      const nt = themeAxis();
+      chart.updateOptions({ chart: { foreColor: nt.foreColor }, tooltip: { theme: nt.tooltipTheme } });
+    });
+  }
+})();
+</script>

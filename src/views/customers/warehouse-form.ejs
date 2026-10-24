@@ -1,0 +1,130 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New warehouse') : t('Edit warehouse') %></h1>
+          <p class="page-subtitle">
+            <a href="/customers/<%= customer.id %>" class="link"><%= customer.company_name %></a>
+            · <%= t('Delivery destination for this customer') %>
+          </p>
+        </div>
+        <a href="/customers/<%= customer.id %>/warehouses" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back to warehouses') %>
+        </a>
+      </div>
+
+      <% if (Object.keys(errors || {}).length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please fix the following:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% Object.values(errors).forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Warehouse details') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Identify the destination and the person receiving deliveries there.') %></p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+            <div>
+              <label for="name" class="form-label"><%= t('Warehouse name') %> <span class="text-error-500">*</span></label>
+              <input id="name" name="name" type="text" value="<%= warehouse.name || '' %>" class="form-input <%= errors.name ? 'border-error-500' : '' %>" maxlength="180" required placeholder="<%= t('e.g. North distribution center') %>">
+              <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+            </div>
+            <div>
+              <label for="code" class="form-label"><%= t('Warehouse code') %></label>
+              <input id="code" name="code" type="text" value="<%= warehouse.code || '' %>" class="form-input <%= errors.code ? 'border-error-500' : '' %>" maxlength="30" placeholder="<%= t('Optional internal code') %>">
+              <% if (errors.code) { %><p class="form-error"><%= errors.code %></p><% } %>
+              <p class="form-help"><%= t('Must be unique for this customer.') %></p>
+            </div>
+            <div>
+              <label for="contact_name" class="form-label"><%= t('Contact person') %></label>
+              <input id="contact_name" name="contact_name" type="text" value="<%= warehouse.contact_name || '' %>" class="form-input" maxlength="150">
+            </div>
+            <div>
+              <label for="status" class="form-label"><%= t('Status') %></label>
+              <select id="status" name="status" class="form-select">
+                <option value="active" <%= warehouse.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+                <option value="inactive" <%= warehouse.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+              </select>
+              <p class="form-help"><%= t('Inactive warehouses stay on historical orders but are less prominent when choosing a destination.') %></p>
+            </div>
+            <div>
+              <label for="phone" class="form-label"><%= t('Phone') %></label>
+              <input id="phone" name="phone" type="tel" value="<%= warehouse.phone || '' %>" class="form-input" maxlength="40">
+            </div>
+            <div>
+              <label for="email" class="form-label"><%= t('Email') %></label>
+              <input id="email" name="email" type="email" value="<%= warehouse.email || '' %>" class="form-input <%= errors.email ? 'border-error-500' : '' %>" maxlength="190">
+              <% if (errors.email) { %><p class="form-error"><%= errors.email %></p><% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Warehouse address') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('This address is shown on deliveries and packing slips for sales orders using this warehouse.') %></p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+            <div class="md:col-span-2">
+              <label for="address_line1" class="form-label"><%= t('Address line 1') %></label>
+              <input id="address_line1" name="address_line1" type="text" value="<%= warehouse.address_line1 || '' %>" class="form-input" maxlength="190">
+            </div>
+            <div class="md:col-span-2">
+              <label for="address_line2" class="form-label"><%= t('Address line 2') %></label>
+              <input id="address_line2" name="address_line2" type="text" value="<%= warehouse.address_line2 || '' %>" class="form-input" maxlength="190">
+            </div>
+            <div>
+              <label for="city" class="form-label"><%= t('City') %></label>
+              <input id="city" name="city" type="text" value="<%= warehouse.city || '' %>" class="form-input" maxlength="100">
+            </div>
+            <div>
+              <label for="state" class="form-label"><%= t('State / region') %></label>
+              <input id="state" name="state" type="text" value="<%= warehouse.state || '' %>" class="form-input" maxlength="100">
+            </div>
+            <div>
+              <label for="postal_code" class="form-label"><%= t('Postal code') %></label>
+              <input id="postal_code" name="postal_code" type="text" value="<%= warehouse.postal_code || '' %>" class="form-input" maxlength="20">
+            </div>
+            <div>
+              <label for="country" class="form-label"><%= t('Country') %></label>
+              <input id="country" name="country" type="text" value="<%= warehouse.country || '' %>" class="form-input" maxlength="100">
+            </div>
+            <div class="md:col-span-2">
+              <label for="notes" class="form-label"><%= t('Notes') %></label>
+              <textarea id="notes" name="notes" rows="3" class="form-input" maxlength="5000" placeholder="<%= t('Opening hours, dock instructions, handling notes…') %>"><%= warehouse.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-col-reverse justify-end gap-3 sm:flex-row">
+          <a href="/customers/<%= customer.id %>/warehouses" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= mode === 'create' ? t('Create warehouse') : t('Save changes') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -1,0 +1,87 @@
+<header class="sticky top-0 z-30 flex h-[72px] items-center justify-between gap-3 border-b border-gray-200 bg-white/95 px-4 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95 md:px-6">
+  <div class="flex min-w-0 items-center gap-2">
+    <button type="button" data-sidebar-toggle class="btn-icon lg:hidden" aria-label="Open menu">
+      <%- include('/partials/icon', { name: 'menu' }) %>
+    </button>
+    <nav class="hidden items-center gap-1.5 text-sm sm:flex" aria-label="Breadcrumb">
+      <a href="/dashboard" class="text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200" aria-label="Home">
+        <%- include('/partials/icon', { name: 'dashboard', className: 'h-4 w-4' }) %>
+      </a>
+      <% breadcrumbs.forEach((crumb, i) => { %>
+        <span class="text-gray-300 dark:text-gray-600">/</span>
+        <% if (crumb.href && i < breadcrumbs.length - 1) { %>
+          <a href="<%= crumb.href %>" class="truncate text-gray-500 transition hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"><%= crumb.label %></a>
+        <% } else { %>
+          <span class="truncate font-medium text-gray-700 dark:text-gray-200"><%= crumb.label %></span>
+        <% } %>
+      <% }) %>
+    </nav>
+    <h1 class="truncate text-base font-semibold text-gray-800 dark:text-white/90 sm:hidden"><%= title %></h1>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <form action="/search" method="GET" class="relative hidden md:block">
+      <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+        <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
+      </span>
+      <input
+        id="global-search"
+        type="search"
+        name="q"
+        value="<%= typeof q !== 'undefined' ? q : '' %>"
+        placeholder="Search anything…"
+        autocomplete="off"
+        class="h-10 w-[260px] rounded-lg border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-brand-300 focus:bg-white focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:focus:bg-gray-900 xl:w-[320px]"
+      >
+    </form>
+
+    <button type="button" data-theme-toggle class="btn-icon" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <span class="hidden dark:block"><%- include('/partials/icon', { name: 'sun', className: 'h-5 w-5' }) %></span>
+      <span class="dark:hidden"><%- include('/partials/icon', { name: 'moon', className: 'h-5 w-5' }) %></span>
+    </button>
+
+    <form action="/language" method="POST" class="flex items-center">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="next" value="<%= currentPath %>">
+      <label for="language-select" class="sr-only"><%= t('Language') %></label>
+      <select id="language-select" name="locale" onchange="this.form.submit()" class="h-9 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 outline-none transition hover:bg-gray-50 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+        <% locales.forEach((item) => { %>
+          <option value="<%= item.code %>" <%= locale === item.code ? 'selected' : '' %>><%= item.label %></option>
+        <% }) %>
+      </select>
+    </form>
+
+    <div class="relative">
+      <button type="button" data-dropdown-toggle="profile-menu" class="flex items-center gap-2 rounded-full border border-gray-200 py-1 pl-1 pr-2 transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800 sm:pl-1.5 sm:pr-3" aria-haspopup="true">
+        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+          <%= h.initials(currentUser.name) %>
+        </span>
+        <span class="hidden text-left sm:block">
+          <span class="block max-w-[120px] truncate text-sm font-medium leading-tight text-gray-700 dark:text-gray-200"><%= currentUser.name %></span>
+          <span class="block text-[11px] capitalize leading-tight text-gray-400"><%= currentUser.role %></span>
+        </span>
+        <span class="hidden text-gray-400 sm:block"><%- include('/partials/icon', { name: 'chevron-down', className: 'h-4 w-4' }) %></span>
+      </button>
+      <div id="profile-menu" data-dropdown class="absolute right-0 mt-2 hidden w-64 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-900">
+        <div class="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+          <p class="text-sm font-semibold text-gray-800 dark:text-white/90"><%= currentUser.name %></p>
+          <p class="truncate text-xs text-gray-500 dark:text-gray-400"><%= currentUser.email %></p>
+        </div>
+        <div class="p-2">
+          <a href="/profile" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800">
+            <%- include('/partials/icon', { name: 'user-circle', className: 'h-4 w-4 text-gray-400' }) %> My profile
+          </a>
+          <a href="/settings" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800">
+            <%- include('/partials/icon', { name: 'cog', className: 'h-4 w-4 text-gray-400' }) %> Company settings
+          </a>
+          <form action="/logout" method="POST" class="mt-1 border-t border-gray-100 pt-1 dark:border-gray-800">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-error-600 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10">
+              <%- include('/partials/icon', { name: 'logout', className: 'h-4 w-4' }) %> Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>

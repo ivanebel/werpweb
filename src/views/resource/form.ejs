@@ -1,0 +1,186 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? resource.newLabel : resource.editLabel %></h1>
+          <p class="page-subtitle"><%= mode === 'create' ? t('Add a new record to your workspace.') : t('Update the details below.') %></p>
+        </div>
+        <a href="<%= mode === 'create' ? resource.basePath : resource.basePath + '/' + row.id %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          Back
+        </a>
+      </div>
+
+      <% const errorList = Object.entries(errors); %>
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please fix the following:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(([field, message]) => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="space-y-5">
+          <%
+            const sections = [];
+            const defaultSection = t('General');
+            formFields.forEach(f => {
+              const s = f.section || defaultSection;
+              if (!sections.includes(s)) sections.push(s);
+            });
+          %>
+          <% sections.forEach((section, si) => { %>
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title"><%= section %></h2>
+              </div>
+              <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+                <% formFields.filter(f => (f.section || defaultSection) === section).forEach(f => { %>
+                  <% const value = row[f.name] === null || row[f.name] === undefined ? '' : row[f.name]; %>
+                  <% if (f.type === 'checkbox') { %>
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition hover:border-brand-300 dark:border-gray-700 dark:hover:border-brand-500/50">
+                      <input type="checkbox" name="<%= f.name %>" value="1" class="form-checkbox mt-0.5" <%= Number(value) === 1 ? 'checked' : '' %>>
+                      <span>
+                        <span class="block text-sm font-medium text-gray-800 dark:text-gray-200"><%= f.label %></span>
+                        <% if (f.help) { %><span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400"><%= f.help %></span><% } %>
+                      </span>
+                    </label>
+                  <% } else { %>
+                    <div class="<%= f.full ? 'md:col-span-2' : '' %>">
+                      <label for="field-<%= f.name %>" class="form-label">
+                        <%= f.label %><% if (f.required) { %> <span class="text-error-500">*</span><% } %>
+                      </label>
+                      <% if (f.type === 'textarea') { %>
+                        <textarea id="field-<%= f.name %>" name="<%= f.name %>" rows="4" class="form-textarea <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.readonly ? 'readonly' : '' %>><%= value %></textarea>
+                      <% } else if (f.type === 'select') { %>
+                        <select id="field-<%= f.name %>" name="<%= f.name %>" class="form-select <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.required ? 'required' : '' %>>
+                          <% if (!f.required) { %><option value=""><%= t('— None —') %></option><% } %>
+                          <% (f.options || []).forEach(opt => { %>
+                            <option value="<%= opt.value %>"<% Object.entries(opt.data || {}).forEach(([key, val]) => { %> data-<%= key %>="<%= val %>"<% }) %> <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }) %>
+                        </select>
+                      <% } else if (f.type === 'date') { %>
+                        <input id="field-<%= f.name %>" type="date" name="<%= f.name %>" value="<%= String(value).slice(0, 10) %>" class="form-input <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.readonly ? 'readonly' : '' %>>
+                      <% } else { %>
+                        <input
+                          id="field-<%= f.name %>"
+                          type="<%= f.type === 'decimal' || f.type === 'number' ? 'number' : f.type %>"
+                          name="<%= f.name %>"
+                          value="<%= value %>"
+                          class="form-input <%= errors[f.name] ? 'form-input-error' : '' %>"
+                          <% if (f.type === 'decimal') { %>step="0.01"<% } %>
+                          <% if (f.type === 'number') { %>step="1"<% } %>
+                          <% if (f.min !== undefined) { %>min="<%= f.min %>"<% } %>
+                          <% if (f.max !== undefined) { %>max="<%= f.max %>"<% } %>
+                          <% if (f.maxLength) { %>maxlength="<%= f.maxLength %>"<% } %>
+                          <% if (f.placeholder) { %>placeholder="<%= f.placeholder %>"<% } %>
+                          <%= f.required ? 'required' : '' %>
+                          <%= f.readonly ? 'readonly' : '' %>
+                        >
+                      <% } %>
+                      <% if (errors[f.name]) { %><p class="form-error"><%= errors[f.name] %></p><% } %>
+                      <% if (f.help) { %><p class="form-help"><%= f.help %></p><% } %>
+                    </div>
+                  <% } %>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+
+        <div class="mt-5 flex flex-col-reverse justify-end gap-3 sm:flex-row">
+          <a href="<%= mode === 'create' ? resource.basePath : resource.basePath + '/' + row.id %>" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= mode === 'create' ? t('Create') : t('Save changes') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+<% if (resource.key === 'products') { %>
+<script>
+(function () {
+  const type = document.getElementById('field-type');
+  const sellable = document.getElementById('field-is_sellable');
+  const purchasable = document.getElementById('field-is_purchasable');
+  const manufactured = document.getElementById('field-is_manufactured');
+  const track = document.getElementById('field-track_stock');
+  if (type) {
+    type.addEventListener('change', function () {
+      if (type.value === 'raw_material') {
+        if (sellable) sellable.checked = false;
+        if (purchasable) purchasable.checked = true;
+        if (manufactured) manufactured.checked = false;
+        if (track) track.checked = true;
+      }
+      if (type.value === 'service' && track) track.checked = false;
+      if (type.value === 'finished_good' && sellable) sellable.checked = true;
+    });
+  }
+
+  const field = (name) => document.getElementById('field-' + name);
+  const num = (name) => Number((field(name) || {}).value || 0);
+  const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+  const setValue = (name, value) => {
+    const el = field(name);
+    if (el) el.value = Number(value || 0).toFixed(2);
+  };
+
+  function recalcPricing() {
+    const costGross = num('cost_gross_price');
+    const costVat = num('cost_vat_rate');
+    const costLevy = num('cost_levy_rate');
+    setValue('cost_price', round2(costGross + (costGross * costVat) / 100 + (costGross * costLevy) / 100));
+
+    const saleGross = num('sale_gross_price');
+    const saleVat = num('sale_vat_rate');
+    setValue('sale_price', round2(saleGross + (saleGross * saleVat) / 100));
+  }
+
+  ['cost_gross_price', 'cost_vat_rate', 'cost_levy_rate', 'sale_gross_price', 'sale_vat_rate'].forEach((name) => {
+    const el = field(name);
+    if (el) el.addEventListener('input', recalcPricing);
+  });
+
+  const supplier = field('supplier_id');
+  if (supplier) {
+    supplier.addEventListener('change', function () {
+      const option = supplier.selectedOptions[0];
+      if (!option || !option.value) return;
+      const vat = option.dataset.vat;
+      const levy = option.dataset.levy;
+      if (vat !== undefined && field('cost_vat_rate')) field('cost_vat_rate').value = Number(vat).toFixed(2);
+      if (levy !== undefined && field('cost_levy_rate')) field('cost_levy_rate').value = Number(levy).toFixed(2);
+      recalcPricing();
+    });
+  }
+
+  // New products start with the company default VAT rate; it stays editable
+  // so zero-rated or exempt items can be created as well.
+  const isCreate = <%= mode === 'create' ? 'true' : 'false' %>;
+  const saleVat = field('sale_vat_rate');
+  if (isCreate && saleVat && Number(saleVat.value || 0) === 0) {
+    saleVat.value = Number('<%= Number(settings.default_tax_rate || 0) %>').toFixed(2);
+  }
+
+  recalcPricing();
+})();
+</script>
+<% } %>

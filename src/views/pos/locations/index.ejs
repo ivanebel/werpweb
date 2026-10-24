@@ -1,0 +1,114 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Points of sale') %></h1>
+          <p class="page-subtitle"><%= t('Manage your shops and their reporting details.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/pos" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %>
+            <%= t('POS dashboard') %>
+          </a>
+          <a href="/pos/locations/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= t('New point of sale') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="card p-5">
+          <p class="stat-label"><%= t('Points of sale') %></p>
+          <p class="mt-1 stat-value"><%= h.formatNumber(stats.total, 0) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="stat-label"><%= t('Active shops') %></p>
+          <p class="mt-1 stat-value"><%= h.formatNumber(stats.active, 0) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="stat-label"><%= t('All-time sales') %></p>
+          <p class="mt-1 stat-value"><%= h.formatNumber(stats.sales, 0) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="stat-label"><%= t('All-time revenue') %></p>
+          <p class="mt-1 stat-value"><%= money(stats.revenue) %></p>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="table-wrap">
+          <table class="table-base min-w-[720px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Point of sale') %></th>
+                <th class="table-th hidden xl:table-cell"><%= t('Location') %></th>
+                <th class="table-th hidden 2xl:table-cell"><%= t('Phone') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+                <th class="table-th text-right"><%= t('Sales') %></th>
+                <th class="table-th text-right"><%= t('Units') %></th>
+                <th class="table-th text-right"><%= t('Revenue') %></th>
+                <th class="table-th hidden xl:table-cell"><%= t('Last sale') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% locations.forEach(location => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <a href="/pos/locations/<%= location.id %>" class="link font-medium"><%= location.name %></a>
+                    <p class="mt-0.5 font-mono text-xs text-gray-400"><%= location.code %></p>
+                  </td>
+                  <td class="table-td hidden text-gray-500 dark:text-gray-400 xl:table-cell">
+                    <%= location.address_line1 || '—' %>
+                    <% if (location.city || location.state) { %>
+                      <p class="mt-0.5 text-xs text-gray-400"><%= [location.city, location.state].filter(Boolean).join(', ') %></p>
+                    <% } %>
+                  </td>
+                  <td class="table-td hidden text-gray-500 dark:text-gray-400 2xl:table-cell"><%= location.phone || '—' %></td>
+                  <td class="table-td"><%- statusBadge(location.status) %></td>
+                  <td class="table-td text-right"><%= h.formatNumber(location.sale_count, 0) %></td>
+                  <td class="table-td text-right"><%= h.formatQty(location.units) %></td>
+                  <td class="table-td whitespace-nowrap text-right font-medium"><%= money(location.revenue) %></td>
+                  <td class="table-td hidden whitespace-nowrap text-gray-500 dark:text-gray-400 xl:table-cell"><%= location.last_sale ? h.formatDate(location.last_sale) : '—' %></td>
+                  <td class="table-td whitespace-nowrap">
+                    <div class="flex items-center justify-end gap-1">
+                      <a href="/pos/locations/<%= location.id %>" class="btn-icon" title="<%= t('View') %>">
+                        <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
+                      </a>
+                      <a href="/pos/locations/<%= location.id %>/edit" class="btn-icon" title="<%= t('Edit') %>">
+                        <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                      </a>
+                      <form method="POST" action="/pos/locations/<%= location.id %>/delete" class="inline" data-confirm="<%= t('Delete this point of sale? This cannot be undone.') %>">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete') %>">
+                          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!locations.length) { %>
+                <tr>
+                  <td colspan="9" class="px-5 py-16 text-center">
+                    <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                      <%- include('/partials/icon', { name: 'building', className: 'h-6 w-6' }) %>
+                    </span>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-300"><%= t('No points of sale yet') %></p>
+                    <p class="mt-1 text-sm text-gray-400"><%= t('Create a point of sale to start recording shop sales.') %></p>
+                    <a href="/pos/locations/new" class="btn btn-primary btn-sm mt-4"><%= t('New point of sale') %></a>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

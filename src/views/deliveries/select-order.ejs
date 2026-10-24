@@ -1,0 +1,87 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title">New delivery</h1>
+          <p class="page-subtitle">Choose a confirmed sales order with open quantities to deliver.</p>
+        </div>
+        <a href="/deliveries" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+        </a>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Sales orders ready to ship</h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Only confirmed and partially delivered orders are listed.</p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <%= h.pluralize(orders.length, 'order') %>
+          </span>
+        </div>
+
+        <% if (orders.length) { %>
+          <div class="table-wrap">
+            <table class="table-base">
+              <thead>
+                <tr>
+                  <th class="table-th">Order</th>
+                  <th class="table-th">Customer</th>
+                  <th class="table-th">Order date</th>
+                  <th class="table-th text-right">Open lines</th>
+                  <th class="table-th">Status</th>
+                  <th class="table-th text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% orders.forEach(order => { %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <a href="/sales-orders/<%= order.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= order.order_no %></a>
+                      <% if (order.customer_order_no) { %><span class="mt-0.5 block text-xs text-gray-400"><%= t('Customer order no.') %>: <%= order.customer_order_no %></span><% } %>
+                    </td>
+                    <td class="table-td">
+                      <%= order.customer_name %>
+                      <% if (order.warehouse_name) { %><span class="mt-0.5 block text-xs text-gray-400"><%= order.warehouse_name %><%= order.warehouse_code ? ` · ${order.warehouse_code}` : '' %></span><% } %>
+                    </td>
+                    <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(order.order_date) %></td>
+                    <td class="table-td text-right"><%= h.formatNumber(order.open_lines, 0) %></td>
+                    <td class="table-td"><%- statusBadge(order.status) %></td>
+                    <td class="table-td">
+                      <div class="flex justify-end">
+                        <a href="/deliveries/new?sales_order_id=<%= order.id %>" class="btn btn-primary btn-sm">
+                          Create delivery
+                          <%- include('/partials/icon', { name: 'arrow-right', className: 'h-4 w-4' }) %>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="px-6 py-16 text-center">
+            <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+              <%- include('/partials/icon', { name: 'clipboard-list', className: 'h-6 w-6' }) %>
+            </span>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">No orders waiting to be delivered</p>
+            <p class="mt-1 text-sm text-gray-400">Confirm a sales order first, then come back to create a delivery.</p>
+            <a href="/sales-orders" class="btn btn-secondary btn-sm mt-4">Go to sales orders</a>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="mt-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+        <p>A delivery stays pending until you mark it as shipped. Shipping reduces product stock and updates the sales order fulfilment status.</p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

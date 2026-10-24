@@ -1,0 +1,388 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+      <% const partyText = typeKey === 'customer' ? t('customer') : t('supplier'); %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <h1 class="page-title"><%= paymentType.newLabel %></h1>
+          <p class="page-subtitle"><%= t('Allocate open invoices, add payment methods and record any credit or adjustment.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/payments?type=<%= typeKey %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+          </a>
+          <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
+            <a href="/payments/new?type=customer" class="rounded-md px-3 py-1.5 text-xs font-medium <%= typeKey === 'customer' ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800' %>"><%= t('Customer payment') %></a>
+            <a href="/payments/new?type=supplier" class="rounded-md px-3 py-1.5 text-xs font-medium <%= typeKey === 'supplier' ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800' %>"><%= t('Supplier payment') %></a>
+          </div>
+        </div>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-300"><%= t('The payment could not be recorded.') %></p>
+              <ul class="mt-1 list-disc space-y-1 pl-5 text-sm text-error-700 dark:text-error-300">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>" id="payment-form"
+            data-payment-form
+            data-direction="<%= typeKey %>"
+            data-currency="<%= currency %>"
+            data-locale="<%= locale %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="direction" value="<%= typeKey %>">
+
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="space-y-5 xl:col-span-2">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title"><%= t('Payment details') %></h2>
+              </div>
+              <div class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-3 md:p-6">
+                <div class="sm:col-span-2">
+                  <label for="party_id" class="form-label"><%= paymentType.partyLabel %></label>
+                  <select id="party_id" name="party_id" class="form-select" data-party-select required>
+                    <option value=""><%= t('Select a {party}', { party: partyText }) %></option>
+                    <% partyOptions.forEach(option => { %>
+                      <option value="<%= option.id %>" <%= String(partyId) === String(option.id) ? 'selected' : '' %>>
+                        <%= option.company_name %><%= option.party_no ? ` (${option.party_no})` : '' %>
+                      </option>
+                    <% }) %>
+                  </select>
+                  <% if (errors.party_id) { %><p class="form-error"><%= errors.party_id %></p><% } %>
+                  <p class="form-help"><%= t('Changing the {party} reloads the open invoices for that party.', { party: partyText }) %></p>
+                </div>
+                <div>
+                  <label for="payment_date" class="form-label"><%= t('Payment date') %></label>
+                  <input id="payment_date" type="date" name="payment_date" value="<%= form.payment_date %>" class="form-input" required>
+                  <% if (errors.payment_date) { %><p class="form-error"><%= errors.payment_date %></p><% } %>
+                </div>
+                <div class="sm:col-span-2">
+                  <label for="reference" class="form-label"><%= t('Reference') %></label>
+                  <input id="reference" type="text" name="reference" value="<%= form.reference %>" maxlength="120" class="form-input" placeholder="<%= t('Receipt number, transfer reference or external document') %>">
+                </div>
+                <div class="sm:col-span-3">
+                  <label for="notes" class="form-label"><%= t('Notes') %></label>
+                  <textarea id="notes" name="notes" rows="3" maxlength="5000" class="form-input" placeholder="<%= t('Optional internal notes') %>"><%= form.notes %></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 class="card-title"><%= t('Open invoices') %></h2>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Select the invoices covered by this payment. Leave an amount blank to apply the full outstanding balance.') %></p>
+                </div>
+                <% if (openInvoices.length) { %>
+                  <button type="button" class="btn btn-secondary btn-sm" data-apply-all><%= t('Apply all balances') %></button>
+                <% } %>
+              </div>
+
+              <% if (!partyId) { %>
+                <div class="px-5 py-10 text-center md:px-6">
+                  <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                    <%- include('/partials/icon', { name: 'receipt', className: 'h-6 w-6' }) %>
+                  </span>
+                  <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('Select a {party} to load open invoices.', { party: partyText }) %></p>
+                </div>
+              <% } else if (!openInvoices.length) { %>
+                <div class="px-5 py-10 text-center md:px-6">
+                  <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                    <%- include('/partials/icon', { name: 'check-circle', className: 'h-6 w-6' }) %>
+                  </span>
+                  <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('This {party} has no open invoices.', { party: partyText }) %></p>
+                  <p class="mt-1 text-sm text-gray-400"><%= t('You can still record an advance payment; the unapplied amount becomes a credit.') %></p>
+                </div>
+              <% } else { %>
+                <div class="table-wrap">
+                  <table class="table-base">
+                    <thead>
+                      <tr>
+                        <th class="table-th w-12"><span class="sr-only"><%= t('Select') %></span></th>
+                        <th class="table-th"><%= typeKey === 'customer' ? t('Invoice') : t('Bill') %></th>
+                        <th class="table-th"><%= t('Date') %></th>
+                        <th class="table-th"><%= t('Due date') %></th>
+                        <th class="table-th text-right"><%= t('Total') %></th>
+                        <th class="table-th text-right"><%= t('Outstanding') %></th>
+                        <th class="table-th text-right"><%= t('Amount to apply') %></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% openInvoices.forEach(invoice => {
+                        const selectedAmount = selected[String(invoice.id)];
+                        const isSelected = selectedAmount !== undefined && selectedAmount !== null && selectedAmount !== '';
+                      %>
+                        <tr class="table-row" data-invoice-row>
+                          <td class="table-td">
+                            <input type="checkbox" name="invoice_id" value="<%= invoice.id %>" class="form-checkbox" data-invoice-check <%= isSelected ? 'checked' : '' %>>
+                          </td>
+                          <td class="table-td">
+                            <a href="<%= paymentType.invoiceBase %>/<%= invoice.id %>" target="_blank" rel="noopener" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= invoice.invoice_no %></a>
+                            <span class="mt-0.5 block"><%- statusBadge(invoice.status) %></span>
+                          </td>
+                          <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(invoice.invoice_date) %></td>
+                          <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(invoice.due_date) %></td>
+                          <td class="table-td text-right"><%= money(invoice.total) %></td>
+                          <td class="table-td text-right font-medium text-warning-600 dark:text-warning-400"><%= money(invoice.balance) %></td>
+                          <td class="table-td text-right">
+                            <input type="number" step="0.01" min="0" max="<%= invoice.balance %>"
+                                   name="invoice_amount[<%= invoice.id %>]"
+                                   value="<%= isSelected ? selectedAmount : '' %>"
+                                   class="form-input w-32 text-right"
+                                   data-invoice-amount
+                                   data-balance="<%= invoice.balance %>"
+                                   <%= isSelected ? '' : 'disabled' %>>
+                          </td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+                <% if (errors.allocations) { %><div class="border-t border-error-100 px-5 py-3 text-sm text-error-600 dark:border-error-500/20 dark:text-error-400 md:px-6"><%= errors.allocations %></div><% } %>
+              <% } %>
+            </div>
+
+            <div class="card">
+              <div class="card-header flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 class="card-title"><%= t('Payment methods') %></h2>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Use one or more methods. Cash, transfers and checks can be mixed in the same payment.') %></p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" data-add-method>
+                  <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('Add method') %>
+                </button>
+              </div>
+              <div class="space-y-3 p-5 md:p-6" data-method-rows>
+                <% methods.forEach((method, index) => { %>
+                  <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800" data-method-row>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                      <div class="sm:col-span-3">
+                        <label class="form-label"><%= t('Method') %></label>
+                        <select name="method_type[]" class="form-select">
+                          <% methodOptions.forEach(option => { %>
+                            <option value="<%= option.value %>" <%= method.method === option.value ? 'selected' : '' %>><%= option.label %></option>
+                          <% }) %>
+                        </select>
+                      </div>
+                      <div class="sm:col-span-2">
+                        <label class="form-label"><%= t('Amount') %></label>
+                        <input type="number" step="0.01" min="0" name="method_amount[]" value="<%= method.amount %>" class="form-input text-right" data-method-amount>
+                      </div>
+                      <div class="sm:col-span-3">
+                        <label class="form-label"><%= t('Reference') %></label>
+                        <input type="text" name="method_reference[]" value="<%= method.reference || '' %>" maxlength="120" class="form-input" placeholder="<%= t('Check no. or transfer reference') %>">
+                      </div>
+                      <div class="sm:col-span-2">
+                        <label class="form-label"><%= t('Bank / issuer') %></label>
+                        <input type="text" name="method_bank[]" value="<%= method.bank_name || '' %>" maxlength="120" class="form-input">
+                      </div>
+                      <div class="sm:col-span-2">
+                        <label class="form-label"><%= t('Check date') %></label>
+                        <input type="date" name="method_date[]" value="<%= method.check_date || '' %>" class="form-input">
+                      </div>
+                    </div>
+                    <div class="mt-3 flex items-end gap-3">
+                      <div class="flex-1">
+                        <label class="form-label"><%= t('Notes') %></label>
+                        <input type="text" name="method_notes[]" value="<%= method.notes || '' %>" maxlength="255" class="form-input" placeholder="<%= t('Optional details for this method') %>">
+                      </div>
+                      <button type="button" class="btn-icon mb-1 text-error-500" data-remove-method title="<%= t('Remove') %>">
+                        <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                      </button>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+              <% if (errors.methods) { %><div class="border-t border-error-100 px-5 py-3 text-sm text-error-600 dark:border-error-500/20 dark:text-error-400 md:px-6"><%= errors.methods %></div><% } %>
+            </div>
+
+            <div class="card">
+              <div class="card-header flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 class="card-title"><%= t('Adjustments') %></h2>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <%= typeKey === 'customer'
+                      ? t('Apply credit notes or tax withholdings to reduce the amount collected.')
+                      : t('Apply credit notes to reduce the amount paid, or debit notes to add an amount due.') %>
+                  </p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" data-add-adjustment>
+                  <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('Add adjustment') %>
+                </button>
+              </div>
+              <div class="space-y-3 p-5 md:p-6" data-adjustment-rows>
+                <% if (!adjustments.length) { %>
+                  <p class="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400 dark:border-gray-800" data-adjustment-empty><%= t('No adjustments on this payment.') %></p>
+                <% } %>
+                <% adjustments.forEach(adjustment => { %>
+                  <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800" data-adjustment-row>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                      <div class="sm:col-span-4">
+                        <label class="form-label"><%= t('Type') %></label>
+                        <select name="adjustment_kind[]" class="form-select">
+                          <% adjustmentOptions.forEach(option => { %>
+                            <option value="<%= option.value %>" <%= adjustment.kind === option.value ? 'selected' : '' %>><%= option.label %></option>
+                          <% }) %>
+                        </select>
+                      </div>
+                      <div class="sm:col-span-3">
+                        <label class="form-label"><%= t('Amount') %></label>
+                        <input type="number" step="0.01" min="0" name="adjustment_amount[]" value="<%= adjustment.amount %>" class="form-input text-right" data-adjustment-amount>
+                      </div>
+                      <div class="sm:col-span-5">
+                        <label class="form-label"><%= t('Reference') %></label>
+                        <input type="text" name="adjustment_reference[]" value="<%= adjustment.reference || '' %>" maxlength="120" class="form-input" placeholder="<%= t('Credit note, debit note or withholding reference') %>">
+                      </div>
+                    </div>
+                    <div class="mt-3 flex items-end gap-3">
+                      <div class="flex-1">
+                        <label class="form-label"><%= t('Notes') %></label>
+                        <input type="text" name="adjustment_notes[]" value="<%= adjustment.notes || '' %>" maxlength="255" class="form-input" placeholder="<%= t('Optional details') %>">
+                      </div>
+                      <button type="button" class="btn-icon mb-1 text-error-500" data-remove-adjustment title="<%= t('Remove') %>">
+                        <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                      </button>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+              <% if (errors.adjustments) { %><div class="border-t border-error-100 px-5 py-3 text-sm text-error-600 dark:border-error-500/20 dark:text-error-400 md:px-6"><%= errors.adjustments %></div><% } %>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6 xl:sticky xl:top-24">
+              <h2 class="card-title"><%= t('Payment summary') %></h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('The summary updates as you enter amounts.') %></p>
+              <dl class="mt-5 space-y-3 text-sm">
+                <div class="flex items-center justify-between gap-4">
+                  <dt class="text-gray-500 dark:text-gray-400"><%= t('Payment methods') %></dt>
+                  <dd class="font-medium text-gray-800 dark:text-gray-200" data-summary-method><%= money(totals.methodTotal) %></dd>
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                  <dt class="text-gray-500 dark:text-gray-400"><%= t('Credit notes') %></dt>
+                  <dd class="font-medium text-gray-800 dark:text-gray-200" data-summary-credit><%= money(totals.creditTotal) %></dd>
+                </div>
+                <% if (typeKey === 'customer') { %>
+                  <div class="flex items-center justify-between gap-4">
+                    <dt class="text-gray-500 dark:text-gray-400"><%= t('Tax withholdings') %></dt>
+                    <dd class="font-medium text-gray-800 dark:text-gray-200" data-summary-withholding><%= money(totals.withholdingTotal) %></dd>
+                  </div>
+                <% } else { %>
+                  <div class="flex items-center justify-between gap-4">
+                    <dt class="text-gray-500 dark:text-gray-400"><%= t('Debit notes') %></dt>
+                    <dd class="font-medium text-error-600 dark:text-error-400" data-summary-debit><%= money(totals.debitTotal) %></dd>
+                  </div>
+                <% } %>
+                <div class="flex items-center justify-between gap-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+                  <dt class="font-medium text-gray-700 dark:text-gray-200"><%= t('Total sources') %></dt>
+                  <dd class="text-base font-semibold text-gray-900 dark:text-white" data-summary-source><%= money(totals.sourceTotal) %></dd>
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                  <dt class="text-gray-500 dark:text-gray-400"><%= t('Applied to invoices') %></dt>
+                  <dd class="font-medium text-success-600 dark:text-success-400" data-summary-applied><%= money(totals.appliedTotal) %></dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 rounded-lg bg-warning-50 px-3 py-2 dark:bg-warning-500/10">
+                  <dt class="font-medium text-warning-700 dark:text-warning-300"><%= t('Unapplied credit') %></dt>
+                  <dd class="font-semibold text-warning-700 dark:text-warning-300" data-summary-unapplied><%= money(totals.unapplied) %></dd>
+                </div>
+              </dl>
+              <p class="mt-4 text-xs leading-relaxed text-gray-400">
+                <%= t('Any unapplied amount stays as a credit for the {party} and is shown on the customer or supplier balance.', { party: partyText }) %>
+              </p>
+              <% if (errors.sources) { %><p class="mt-3 rounded-lg bg-error-50 px-3 py-2 text-sm text-error-700 dark:bg-error-500/10 dark:text-error-300"><%= errors.sources %></p><% } %>
+              <% if (errors.total) { %><p class="mt-3 rounded-lg bg-error-50 px-3 py-2 text-sm text-error-700 dark:bg-error-500/10 dark:text-error-300"><%= errors.total %></p><% } %>
+              <button type="submit" class="btn btn-primary mt-5 w-full">
+                <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %> <%= paymentType.recordLabel %>
+              </button>
+              <a href="/payments?type=<%= typeKey %>" class="btn btn-ghost mt-2 w-full"><%= t('Cancel') %></a>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <template id="method-row-template">
+    <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800" data-method-row>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-12">
+        <div class="sm:col-span-3">
+          <label class="form-label"><%= t('Method') %></label>
+          <select name="method_type[]" class="form-select">
+            <% methodOptions.forEach(option => { %><option value="<%= option.value %>"><%= option.label %></option><% }) %>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="form-label"><%= t('Amount') %></label>
+          <input type="number" step="0.01" min="0" name="method_amount[]" class="form-input text-right" data-method-amount>
+        </div>
+        <div class="sm:col-span-3">
+          <label class="form-label"><%= t('Reference') %></label>
+          <input type="text" name="method_reference[]" maxlength="120" class="form-input" placeholder="<%= t('Check no. or transfer reference') %>">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="form-label"><%= t('Bank / issuer') %></label>
+          <input type="text" name="method_bank[]" maxlength="120" class="form-input">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="form-label"><%= t('Check date') %></label>
+          <input type="date" name="method_date[]" class="form-input">
+        </div>
+      </div>
+      <div class="mt-3 flex items-end gap-3">
+        <div class="flex-1">
+          <label class="form-label"><%= t('Notes') %></label>
+          <input type="text" name="method_notes[]" maxlength="255" class="form-input" placeholder="<%= t('Optional details for this method') %>">
+        </div>
+        <button type="button" class="btn-icon mb-1 text-error-500" data-remove-method title="<%= t('Remove') %>">
+          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <template id="adjustment-row-template">
+    <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800" data-adjustment-row>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-12">
+        <div class="sm:col-span-4">
+          <label class="form-label"><%= t('Type') %></label>
+          <select name="adjustment_kind[]" class="form-select">
+            <% adjustmentOptions.forEach(option => { %><option value="<%= option.value %>"><%= option.label %></option><% }) %>
+          </select>
+        </div>
+        <div class="sm:col-span-3">
+          <label class="form-label"><%= t('Amount') %></label>
+          <input type="number" step="0.01" min="0" name="adjustment_amount[]" class="form-input text-right" data-adjustment-amount>
+        </div>
+        <div class="sm:col-span-5">
+          <label class="form-label"><%= t('Reference') %></label>
+          <input type="text" name="adjustment_reference[]" maxlength="120" class="form-input" placeholder="<%= t('Credit note, debit note or withholding reference') %>">
+        </div>
+      </div>
+      <div class="mt-3 flex items-end gap-3">
+        <div class="flex-1">
+          <label class="form-label"><%= t('Notes') %></label>
+          <input type="text" name="adjustment_notes[]" maxlength="255" class="form-input" placeholder="<%= t('Optional details') %>">
+        </div>
+        <button type="button" class="btn-icon mb-1 text-error-500" data-remove-adjustment title="<%= t('Remove') %>">
+          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <script src="/js/payments.js" defer></script>
+  <%- include('/layouts/footer') %>

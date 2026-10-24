@@ -1,0 +1,101 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[900px]">
+      <% const errorList = Object.values(errors || {}); %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New user') : t('Edit user') %></h1>
+          <p class="page-subtitle"><%= mode === 'create' ? t('Create an account and choose what it can access.') : row.email %></p>
+        </div>
+        <a href="/settings/users" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back to users
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please fix the following:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header"><h2 class="card-title">Account details</h2></div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+            <div class="md:col-span-2">
+              <label for="name" class="form-label">Full name <span class="text-error-500">*</span></label>
+              <input id="name" name="name" type="text" value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" required>
+              <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+            </div>
+            <div class="md:col-span-2">
+              <label for="email" class="form-label">Email <span class="text-error-500">*</span></label>
+              <input id="email" name="email" type="email" value="<%= row.email || '' %>" class="form-input <%= errors.email ? 'form-input-error' : '' %>" required>
+              <% if (errors.email) { %><p class="form-error"><%= errors.email %></p><% } %>
+              <p class="form-help">Used to sign in. Must be unique.</p>
+            </div>
+            <div>
+              <label for="role" class="form-label">Role <span class="text-error-500">*</span></label>
+              <select id="role" name="role" class="form-select <%= errors.role ? 'form-input-error' : '' %>" required>
+                <option value="staff" <%= row.role === 'staff' ? 'selected' : '' %>>Staff — day-to-day records</option>
+                <option value="manager" <%= row.role === 'manager' ? 'selected' : '' %>>Manager — operations &amp; settings</option>
+                <option value="admin" <%= row.role === 'admin' ? 'selected' : '' %>>Admin — full access</option>
+              </select>
+              <% if (errors.role) { %><p class="form-error"><%= errors.role %></p><% } %>
+            </div>
+            <div class="flex items-end">
+              <label class="flex w-full cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition hover:border-brand-300 dark:border-gray-700 dark:hover:border-brand-500/50">
+                <input type="checkbox" name="is_active" value="1" class="form-checkbox mt-0.5" <%= Number(row.is_active) === 1 ? 'checked' : '' %>>
+                <span>
+                  <span class="block text-sm font-medium text-gray-800 dark:text-gray-200">Active account</span>
+                  <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">Inactive users cannot sign in.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= mode === 'create' ? t('Password') : t('Reset password') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= mode === 'create' ? t('Set an initial password for this user.') : t('Leave blank to keep the current password.') %></p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+            <div>
+              <label for="password" class="form-label">Password <%= mode === 'create' ? '*' : '' %></label>
+              <input id="password" name="password" type="password" class="form-input <%= errors.password ? 'form-input-error' : '' %>" autocomplete="new-password" placeholder="At least 8 characters" <%= mode === 'create' ? 'required' : '' %>>
+              <% if (errors.password) { %><p class="form-error"><%= errors.password %></p><% } %>
+            </div>
+            <div>
+              <label for="password_confirm" class="form-label">Confirm password <%= mode === 'create' ? '*' : '' %></label>
+              <input id="password_confirm" name="password_confirm" type="password" class="form-input <%= errors.password_confirm ? 'form-input-error' : '' %>" autocomplete="new-password" <%= mode === 'create' ? 'required' : '' %>>
+              <% if (errors.password_confirm) { %><p class="form-error"><%= errors.password_confirm %></p><% } %>
+            </div>
+          </div>
+          <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+            <a href="/settings/users" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              <%= mode === 'create' ? t('Create user') : t('Save changes') %>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

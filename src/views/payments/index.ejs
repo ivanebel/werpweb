@@ -1,0 +1,170 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= selectedTypeConfig ? selectedTypeConfig.plural : t('Payments') %></h1>
+          <p class="page-subtitle">
+            <%= selectedTypeConfig ? selectedTypeConfig.indexSubtitle : t('Customer receipts and supplier payments in one place.') %>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/payments/new?type=customer" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= t('New customer payment') %>
+          </a>
+          <a href="/payments/new?type=supplier" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= t('New supplier payment') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= stats.totalLabel %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.total) %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+            <%- include('/partials/icon', { name: 'check-circle', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Applied to invoices') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.applied) %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
+            <%- include('/partials/icon', { name: 'info', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Unapplied credit') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.unapplied) %></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex flex-col gap-4 border-b border-gray-100 p-5 dark:border-gray-800 md:flex-row md:items-end md:justify-between">
+          <div class="flex flex-1 flex-col gap-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <a href="/payments" class="<%= !selectedType ? 'badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' %>">
+                <%= t('All payments') %>
+              </a>
+              <a href="/payments?type=customer" class="<%= selectedType === 'customer' ? 'badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' %>">
+                <%= t('Customer receipts') %>
+              </a>
+              <a href="/payments?type=supplier" class="<%= selectedType === 'supplier' ? 'badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' : 'badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' %>">
+                <%= t('Supplier payments') %>
+              </a>
+            </div>
+            <form method="GET" action="/payments" class="flex flex-1 flex-wrap items-end gap-3">
+              <% if (selectedType) { %><input type="hidden" name="type" value="<%= selectedType %>"><% } %>
+              <div class="min-w-[240px] flex-1 md:max-w-md">
+                <label for="q" class="form-label"><%= t('Search') %></label>
+                <div class="relative">
+                  <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                    <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
+                  </span>
+                  <input id="q" type="search" name="q" value="<%= search %>" class="form-input pl-10" placeholder="<%= t('Payment no., party or reference') %>">
+                </div>
+              </div>
+              <button type="submit" class="btn btn-secondary"><%= t('Apply') %></button>
+              <% if (search || selectedType) { %><a href="/payments" class="btn btn-ghost"><%= t('Reset') %></a><% } %>
+            </form>
+          </div>
+          <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <%= h.pluralize(pagination.total, 'payment') %>
+          </span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table-base">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Payment no.') %></th>
+                <th class="table-th"><%= t('Type') %></th>
+                <th class="table-th"><%= t('Party') %></th>
+                <th class="table-th"><%= t('Payment date') %></th>
+                <th class="table-th text-right"><%= t('Methods') %></th>
+                <th class="table-th text-right"><%= t('Total') %></th>
+                <th class="table-th text-right"><%= t('Applied to invoices') %></th>
+                <th class="table-th text-right"><%= t('Unapplied credit') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach(row => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <a href="/payments/<%= row.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.payment_no %></a>
+                    <% if (row.reference) { %><span class="mt-0.5 block text-xs text-gray-400"><%= row.reference %></span><% } %>
+                  </td>
+                  <td class="table-td">
+                    <% if (row.direction === 'customer') { %>
+                      <span class="badge bg-brand-50 text-brand-700 ring-brand-100 dark:bg-brand-500/15 dark:text-brand-300 dark:ring-brand-500/20"><%= t('Customer receipt') %></span>
+                    <% } else { %>
+                      <span class="badge bg-purple-50 text-purple-700 ring-purple-100 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/20"><%= t('Supplier payment') %></span>
+                    <% } %>
+                  </td>
+                  <td class="table-td">
+                    <a href="<%= row.direction === 'customer' ? '/customers/' : '/suppliers/' %><%= row.direction === 'customer' ? row.customer_id : row.supplier_id %>" class="hover:text-brand-600 dark:hover:text-brand-400"><%= row.party_name %></a>
+                    <% if (row.customer_no || row.supplier_no) { %><span class="mt-0.5 block text-xs text-gray-400"><%= row.customer_no || row.supplier_no %></span><% } %>
+                  </td>
+                  <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(row.payment_date) %></td>
+                  <td class="table-td text-right"><%= money(row.method_total) %></td>
+                  <td class="table-td text-right font-medium"><%= money(row.total_amount) %></td>
+                  <td class="table-td text-right text-success-600 dark:text-success-400"><%= money(row.applied_amount) %></td>
+                  <td class="table-td text-right <%= Number(row.unapplied_amount) > 0 ? 'text-warning-600 dark:text-warning-400' : 'text-gray-400' %>"><%= money(row.unapplied_amount) %></td>
+                  <td class="table-td">
+                    <div class="flex items-center justify-end gap-1">
+                      <a href="/payments/<%= row.id %>" class="btn-icon" title="<%= t('View') %>">
+                        <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
+                      </a>
+                      <a href="/payments/<%= row.id %>/print" class="btn-icon" title="<%= t('Print') %>">
+                        <%- include('/partials/icon', { name: 'printer', className: 'h-4 w-4' }) %>
+                      </a>
+                      <form method="POST" action="/payments/<%= row.id %>/delete" data-confirm="<%= t('Reverse {number}? Invoice allocations will be removed.', { number: row.payment_no }) %>">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn-icon text-error-500" title="<%= t('Reverse') %>">
+                          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!rows.length) { %>
+                <tr>
+                  <td colspan="9" class="px-6 py-16 text-center">
+                    <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                      <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
+                    </span>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No payments found') %></p>
+                    <p class="mt-1 text-sm text-gray-400"><%= t('Adjust the filters or record a new payment.') %></p>
+                    <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                      <a href="/payments/new?type=customer" class="btn btn-primary btn-sm"><%= t('New customer payment') %></a>
+                      <a href="/payments/new?type=supplier" class="btn btn-secondary btn-sm"><%= t('New supplier payment') %></a>
+                    </div>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+
+        <%- include('/partials/pagination', { pagination, basePath: '/payments', query }) %>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

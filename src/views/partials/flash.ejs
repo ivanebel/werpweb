@@ -1,0 +1,20 @@
+<% if (flash) {
+  const tones = {
+    success: { wrap: 'border-success-200 bg-white dark:border-success-500/30 dark:bg-gray-900', icon: 'text-success-500', btn: 'text-success-500 hover:bg-success-50 dark:hover:bg-success-500/10' },
+    error: { wrap: 'border-error-200 bg-white dark:border-error-500/30 dark:bg-gray-900', icon: 'text-error-500', btn: 'text-error-500 hover:bg-error-50 dark:hover:bg-error-500/10' },
+    warning: { wrap: 'border-warning-200 bg-white dark:border-warning-500/30 dark:bg-gray-900', icon: 'text-warning-500', btn: 'text-warning-500 hover:bg-warning-50 dark:hover:bg-warning-500/10' },
+    info: { wrap: 'border-blue-light-200 bg-white dark:border-blue-light-500/30 dark:bg-gray-900', icon: 'text-blue-light-500', btn: 'text-blue-light-500 hover:bg-blue-light-50 dark:hover:bg-blue-light-500/10' }
+  };
+  const tone = tones[flash.type] || tones.info;
+  const iconName = flash.type === 'success' ? 'check-circle' : flash.type === 'error' ? 'exclamation-triangle' : flash.type === 'warning' ? 'exclamation-triangle' : 'info';
+%>
+<div class="fixed right-4 top-4 z-[9999] w-[calc(100%-2rem)] max-w-sm" data-flash role="status" aria-live="polite">
+  <div class="flex items-start gap-3 rounded-xl border p-4 shadow-theme-lg <%= tone.wrap %>">
+    <span class="<%= tone.icon %>"><%- include('/partials/icon', { name: iconName, className: 'h-5 w-5' }) %></span>
+    <p class="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200"><%= t(flash.message, flash.params) %></p>
+    <button type="button" class="rounded-md p-1 <%= tone.btn %>" data-dismiss="none" onclick="this.closest('[data-flash]').remove()" aria-label="Dismiss">
+      <%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %>
+    </button>
+  </div>
+</div>
+<% } %>

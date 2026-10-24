@@ -1,0 +1,110 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1300px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Customer warehouses') %></h1>
+          <p class="page-subtitle">
+            <a href="/customers/<%= customer.id %>" class="link"><%= customer.company_name %></a>
+            · <%= t('Places where this customer receives purchases. Warehouses are separate from the billing address.') %>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/customers/<%= customer.id %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back to customer') %>
+          </a>
+          <a href="/customers/<%= customer.id %>/warehouses/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('New warehouse') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Warehouses') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Sales orders choose one of these destinations. An order can only use a warehouse owned by its customer.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(warehouses.length, 'warehouse') %></span>
+        </div>
+
+        <% if (warehouses.length) { %>
+          <div class="table-wrap">
+            <table class="table-base min-w-[920px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Warehouse') %></th>
+                  <th class="table-th"><%= t('Contact') %></th>
+                  <th class="table-th"><%= t('Address') %></th>
+                  <th class="table-th text-right"><%= t('Orders') %></th>
+                  <th class="table-th"><%= t('Status') %></th>
+                  <th class="table-th w-40 text-right"><%= t('Actions') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% warehouses.forEach(warehouse => { %>
+                  <tr class="table-row align-top">
+                    <td class="table-td">
+                      <a href="/customers/<%= customer.id %>/warehouses/<%= warehouse.id %>/edit" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= warehouse.name %></a>
+                      <% if (warehouse.code) { %><span class="mt-0.5 block font-mono text-xs text-gray-400"><%= warehouse.code %></span><% } %>
+                    </td>
+                    <td class="table-td">
+                      <% if (warehouse.contact_name) { %><p class="text-gray-700 dark:text-gray-300"><%= warehouse.contact_name %></p><% } %>
+                      <% if (warehouse.phone) { %><p class="text-xs text-gray-500 dark:text-gray-400"><%= warehouse.phone %></p><% } %>
+                      <% if (warehouse.email) { %><p class="text-xs"><a href="mailto:<%= warehouse.email %>" class="link"><%= warehouse.email %></a></p><% } %>
+                      <% if (!warehouse.contact_name && !warehouse.phone && !warehouse.email) { %><span class="text-gray-400">—</span><% } %>
+                    </td>
+                    <td class="table-td">
+                      <% if (warehouse.address_line1) { %><p class="text-gray-700 dark:text-gray-300"><%= warehouse.address_line1 %></p><% } %>
+                      <% if (warehouse.address_line2) { %><p class="text-gray-700 dark:text-gray-300"><%= warehouse.address_line2 %></p><% } %>
+                      <% if (warehouse.city || warehouse.state || warehouse.postal_code) { %>
+                        <p class="text-xs text-gray-500 dark:text-gray-400"><%= warehouse.city || '' %><%= warehouse.state ? (warehouse.city ? ', ' : '') + warehouse.state : '' %> <%= warehouse.postal_code || '' %></p>
+                      <% } %>
+                      <% if (warehouse.country) { %><p class="text-xs text-gray-500 dark:text-gray-400"><%= warehouse.country %></p><% } %>
+                      <% if (!warehouse.address_line1 && !warehouse.city && !warehouse.country) { %><span class="text-gray-400">—</span><% } %>
+                    </td>
+                    <td class="table-td text-right font-medium"><%= h.formatNumber(warehouse.order_count, 0) %></td>
+                    <td class="table-td"><%- statusBadge(warehouse.status) %></td>
+                    <td class="table-td">
+                      <div class="flex items-center justify-end gap-2">
+                        <a href="/customers/<%= customer.id %>/warehouses/<%= warehouse.id %>/edit" class="btn btn-secondary btn-sm"><%= t('Edit') %></a>
+                        <% if (Number(warehouse.order_count) === 0) { %>
+                          <form method="POST" action="/customers/<%= customer.id %>/warehouses/<%= warehouse.id %>/delete" data-confirm="<%= t('Delete this warehouse? This cannot be undone.') %>">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete warehouse') %>">
+                              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                            </button>
+                          </form>
+                        <% } else { %>
+                          <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"><%= t('In use') %></span>
+                        <% } %>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="px-6 py-16 text-center">
+            <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+              <%- include('/partials/icon', { name: 'building', className: 'h-6 w-6' }) %>
+            </span>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No warehouses have been added for this customer yet.') %></p>
+            <p class="mt-1 text-sm text-gray-400"><%= t('Add the first warehouse before creating a sales order for this customer.') %></p>
+            <a href="/customers/<%= customer.id %>/warehouses/new" class="btn btn-primary btn-sm mt-4"><%= t('New warehouse') %></a>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="mt-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+        <p><%= t('Warehouses are delivery destinations only. Billing and contact details stay on the customer record.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

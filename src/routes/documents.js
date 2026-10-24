@@ -1,0 +1,1176 @@
+'use strict';
+
+const express = require('express');
+const { getPool, query, one, withTransaction } = require('../db');
+const { nextNumber } = require('../lib/sequences');
+const { pagination, toNumber, todayISO, addDaysISO, formatMoney } = require('../lib/helpers');
+const { translator } = require('../lib/i18n');
+
+const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+function localizeDocConfig(config, locale) {
+  const t = translator(locale);
+  const title = t(config.title);
+  const singular = t(config.singular);
+  return {
+    ...config,
+    title,
+    singular,
+    titleLower: title.toLowerCase(),
+    singularLower: singular.toLowerCase(),
+    newLabel: t(`New ${config.singular}`),
+    editLabel: t(`Edit ${config.singular}`),
+    indexSubtitle: t('Track {items}, their status and outstanding value.', { items: title.toLowerCase() }),
+    party: { ...config.party, label: t(config.party.label) },
+    dateLabel: t(config.dateLabel),
+    dueLabel: t(config.dueLabel),
+    qtyLabel: t(config.qtyLabel),
+    newTitle: t(`New ${config.singular}`),
+    customerOrder: config.customerOrder
+      ? {
+          ...config.customerOrder,
+          orderNoLabel: t(config.customerOrder.orderNoLabel),
+          warehouseLabel: t(config.customerOrder.warehouseLabel),
+          dockingLabel: t(config.customerOrder.dockingLabel),
+          receptionLabel: t(config.customerOrder.receptionLabel),
+        }
+      : null,
+  };
+}
+
+function arr(value) {
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function parseItems(body, config, defaultTaxRate) {
+  const ids = arr(body.item_product_id);
+  const descriptions = arr(body.item_description);
+  const quantities = arr(body.item_quantity);
+  const prices = arr(body.item_unit_price);
+  const taxes = arr(body.item_tax_rate);
+  const items = [];
+
+  for (let i = 0; i < ids.length; i++) {
+    const productId = Number.parseInt(ids[i], 10);
+    if (!productId) continue;
+    const quantity = toNumber(quantities[i], 0);
+    const unitPrice = toNumber(prices[i], 0);
+    const taxRate = taxes[i] === undefined || taxes[i] === '' ? Number(defaultTaxRate || 0) : toNumber(taxes[i], 0);
+    if (quantity <= 0) continue;
+    items.push({
+      product_id: productId,
+      description: String(descriptions[i] || '').slice(0, 255) || null,
+      quantity,
+      unit_price: round2(unitPrice),
+      tax_rate: taxRate,
+      line_total: round2(quantity * unitPrice),
+    });
+  }
+  return items;
+}
+
+function computeTotals(items, discount) {
+  const subtotal = round2(items.reduce((s, it) => s + it.line_total, 0));
+  // Document prices are tax-inclusive. Tax is extracted from the line total,
+  // never added on top of it.
+  const tax_total = round2(
+    items.reduce((s, it) => {
+      const rate = Number(it.tax_rate) || 0;
+      return s + (rate > 0 ? it.line_total * (rate / (100 + rate)) : 0);
+    }, 0),
+  );
+  const discount_total = round2(Math.min(Math.max(Number(discount) || 0, 0), subtotal));
+  return { subtotal, tax_total, discount_total, total: round2(subtotal - discount_total) };
+}
+
+async function loadPartyOptions(config) {
+  const rows = await query(
+    `SELECT id, company_name AS name, contact_name, email FROM \`${config.party.table}\` ORDER BY company_name ASC`,
+  );
+  return rows.map((r) => ({ value: String(r.id), label: r.name, email: r.email, contact: r.contact_name }));
+}
+
+async function loadProductOptions(config) {
+  const rows = await query(
+    `SELECT id, sku, name, unit, sale_price, cost_price, sale_vat_rate, cost_vat_rate, sold_by_weight
+       FROM products WHERE ${config.productWhere} ORDER BY name ASC`,
+  );
+  return rows.map((p) => ({
+    value: String(p.id),
+    label: `${p.sku} — ${p.name}`,
+    sku: p.sku,
+    unit: p.unit,
+    price: config.priceField === 'cost_price' ? Number(p.cost_price) : Number(p.sale_price),
+    taxRate: config.priceField === 'cost_price' ? Number(p.cost_vat_rate || 0) : Number(p.sale_vat_rate || 0),
+    weighted: Number(p.sold_by_weight) === 1,
+  }));
+}
+
+async function loadCustomerCodes() {
+  const rows = await query('SELECT customer_id, product_id, code FROM customer_product_codes');
+  const map = {};
+  for (const row of rows) {
+    if (!map[row.customer_id]) map[row.customer_id] = {};
+    map[row.customer_id][row.product_id] = row.code;
+  }
+  return map;
+}
+
+async function loadWarehouseOptions() {
+  const rows = await query(
+    `SELECT id, customer_id, code, name, status, city, state
+       FROM customer_warehouses
+      ORDER BY customer_id ASC, status = 'active' DESC, name ASC`,
+  );
+  return rows.map((w) => ({
+    value: String(w.id),
+    customerId: String(w.customer_id),
+    name: w.name,
+    code: w.code || '',
+    status: w.status,
+    city: w.city || '',
+    state: w.state || '',
+    label: `${w.name}${w.code ? ` — ${w.code}` : ''}${w.status === 'inactive' ? ` (${w.status})` : ''}`,
+  }));
+}
+
+function normalizeDateTime(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::(\d{2}))?$/);
+  if (!match) return null;
+  const hour = Number(match[2].slice(0, 2));
+  const minute = Number(match[2].slice(3, 5));
+  if (hour > 23 || minute > 59) return null;
+  return `${match[1]} ${match[2]}:${match[3] || '00'}`;
+}
+
+async function ensureWarehouseForCustomer(conn, customerId) {
+  const [existing] = await conn.query(
+    `SELECT id FROM customer_warehouses WHERE customer_id = ?
+      ORDER BY status = 'active' DESC, id ASC LIMIT 1`,
+    [customerId],
+  );
+  if (existing.length) return Number(existing[0].id);
+
+  const [customers] = await conn.query(
+    `SELECT contact_name, email, phone, address_line1, address_line2, city, state, postal_code, country
+       FROM customers WHERE id = ? LIMIT 1`,
+    [customerId],
+  );
+  if (!customers.length) return null;
+  const c = customers[0];
+  const [result] = await conn.query(
+    `INSERT INTO customer_warehouses
+       (customer_id, code, name, contact_name, email, phone, address_line1, address_line2,
+        city, state, postal_code, country, status)
+     VALUES (?, 'MAIN', 'Main warehouse', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+    [
+      customerId, c.contact_name, c.email, c.phone, c.address_line1, c.address_line2,
+      c.city, c.state, c.postal_code, c.country,
+    ],
+  );
+  return Number(result.insertId);
+}
+
+async function findDoc(config, id) {
+  const warehouseSelect = config.customerOrder
+    ? `, cw.name AS warehouse_name, cw.code AS warehouse_code,
+         cw.contact_name AS warehouse_contact, cw.phone AS warehouse_phone,
+         cw.address_line1 AS warehouse_address, cw.address_line2 AS warehouse_address2,
+         cw.city AS warehouse_city, cw.state AS warehouse_state,
+         cw.postal_code AS warehouse_postal, cw.country AS warehouse_country`
+    : '';
+  const warehouseJoin = config.customerOrder
+    ? 'LEFT JOIN customer_warehouses cw ON cw.id = t.customer_warehouse_id'
+    : '';
+  return one(
+    `SELECT t.*, party.company_name AS party_name, party.contact_name AS party_contact,
+            party.email AS party_email, party.phone AS party_phone, party.address_line1 AS party_address,
+            party.city AS party_city, party.state AS party_state, party.postal_code AS party_postal,
+            party.country AS party_country, party.tax_id AS party_tax_id${warehouseSelect}
+       FROM \`${config.table}\` t
+       JOIN \`${config.party.table}\` party ON party.id = t.\`${config.party.field}\`
+       ${warehouseJoin}
+      WHERE t.id = ? LIMIT 1`,
+    [id],
+  );
+}
+
+async function loadItems(config, id, customerId = null) {
+  const codeJoin = customerId
+    ? 'LEFT JOIN customer_product_codes cpc ON cpc.customer_id = ? AND cpc.product_id = i.product_id'
+    : '';
+  const codeSelect = customerId ? ', cpc.code AS customer_code' : '';
+  const params = customerId ? [customerId, id] : [id];
+  return query(
+    `SELECT i.*, p.sku, p.name, p.unit, p.type AS product_type${codeSelect}
+       FROM \`${config.itemTable}\` i
+       JOIN products p ON p.id = i.product_id
+       ${codeJoin}
+      WHERE i.\`${config.itemFk}\` = ?
+      ORDER BY i.id ASC`,
+    params,
+  );
+}
+
+function statusesFor(config, kind) {
+  return config.statuses;
+}
+
+function actionsFor(config, row, locale) {
+  const t = translator(locale);
+  const base = `${config.basePath}/${row.id}`;
+  const actions = [];
+  const add = (action, value, label, tone = 'secondary', confirm = false) =>
+    actions.push({ action, value, label: t(label), tone, confirm });
+  const link = (href, label, tone) => actions.push({ href, label: t(label), tone });
+
+  if (config.kind === 'sales_order') {
+    if (row.status === 'draft') add('status', 'confirmed', 'Confirm order', 'primary');
+    if (['confirmed', 'partially_delivered'].includes(row.status)) {
+      link(`/deliveries/new?sales_order_id=${row.id}`, 'Create delivery', 'primary');
+      link(`/sales/new?sales_order_id=${row.id}`, 'Create invoice', 'secondary');
+    }
+    if (['confirmed', 'partially_delivered'].includes(row.status)) {
+      add('production', '', 'Generate production orders', 'secondary');
+    }
+    if (!['delivered', 'cancelled'].includes(row.status)) add('status', 'cancelled', 'Cancel', 'danger', true);
+  }
+
+  if (config.kind === 'purchase_order') {
+    if (row.status === 'draft') add('status', 'confirmed', 'Confirm order', 'primary');
+    if (['confirmed', 'partially_received'].includes(row.status)) {
+      link(`/purchases/new?purchase_order_id=${row.id}`, 'Create bill', 'secondary');
+    }
+    if (!['received', 'cancelled'].includes(row.status)) add('status', 'cancelled', 'Cancel', 'danger', true);
+  }
+
+  if (config.kind === 'sales_invoice') {
+    if (row.status === 'draft') add('status', 'sent', 'Mark as sent', 'primary');
+    if (['draft', 'sent', 'overdue'].includes(row.status)) {
+      add('status', 'paid', 'Mark as paid', 'success');
+    }
+    if (['sent', 'overdue'].includes(row.status) && Number(row.total) - Number(row.amount_paid) > 0.005) {
+      link(`/payments/new?type=customer&party_id=${row.customer_id}&invoice_id=${row.id}`, 'Record payment', 'primary');
+    }
+    if (!['paid', 'cancelled'].includes(row.status)) add('status', 'cancelled', 'Cancel', 'danger', true);
+    link(`${base}/print`, 'Print / PDF', 'secondary');
+  }
+
+  if (config.kind === 'purchase_invoice') {
+    if (row.status === 'draft') add('status', 'received', 'Receive stock', 'primary', true);
+    if (['draft', 'received', 'overdue'].includes(row.status)) add('status', 'paid', 'Mark as paid', 'success');
+    if (['received', 'overdue'].includes(row.status) && Number(row.total) - Number(row.amount_paid) > 0.005) {
+      link(`/payments/new?type=supplier&party_id=${row.supplier_id}&invoice_id=${row.id}`, 'Record payment', 'primary');
+    }
+    if (!['paid', 'cancelled'].includes(row.status)) add('status', 'cancelled', 'Cancel', 'danger', true);
+    link(`${base}/print`, 'Print / PDF', 'secondary');
+  }
+
+  return actions;
+}
+
+const TRANSITIONS = {
+  sales_order: {
+    draft: ['confirmed', 'cancelled'],
+    confirmed: ['partially_delivered', 'delivered', 'cancelled'],
+    partially_delivered: ['delivered', 'cancelled'],
+    delivered: [],
+    cancelled: [],
+  },
+  purchase_order: {
+    draft: ['confirmed', 'cancelled'],
+    confirmed: ['partially_received', 'received', 'cancelled'],
+    partially_received: ['received', 'cancelled'],
+    received: [],
+    cancelled: [],
+  },
+  sales_invoice: {
+    draft: ['sent', 'cancelled'],
+    sent: ['paid', 'overdue', 'cancelled'],
+    overdue: ['paid', 'cancelled'],
+    paid: [],
+    cancelled: [],
+  },
+  purchase_invoice: {
+    draft: ['received', 'paid', 'cancelled'],
+    received: ['paid', 'overdue', 'cancelled'],
+    overdue: ['paid', 'cancelled'],
+    paid: [],
+    cancelled: [],
+  },
+};
+
+function canTransition(kind, from, to) {
+  if (from === to) return true;
+  return (TRANSITIONS[kind] || {})[from]?.includes(to) || false;
+}
+
+function makeDocumentRouter(config) {
+  const router = express.Router();
+  const basePath = config.basePath;
+
+  async function applyPurchaseStock(conn, invoiceId, direction, label) {
+    const [rows] = await conn.query(
+      `SELECT i.product_id, i.quantity, i.unit_price FROM \`${config.itemTable}\` i WHERE i.\`${config.itemFk}\` = ?`,
+      [invoiceId],
+    );
+    for (const item of rows) {
+      const qty = Number(item.quantity) * direction;
+      await conn.query('UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?', [qty, item.product_id]);
+      await conn.query(
+        `INSERT INTO stock_movements (product_id, movement_type, quantity, unit_cost, reference_type, reference_id, notes)
+         VALUES (?, 'purchase_in', ?, ?, ?, ?, ?)`,
+        [item.product_id, qty, item.unit_price, 'purchase_invoice', invoiceId, label],
+      );
+    }
+  }
+
+  async function handleStatusChange(conn, id, fromStatus, toStatus, req) {
+    if (config.hasStockPosting) {
+      const [rows] = await conn.query('SELECT stock_posted FROM purchase_invoices WHERE id = ? FOR UPDATE', [id]);
+      const posted = Boolean(rows[0] && rows[0].stock_posted);
+      const receiving = ['received', 'paid'].includes(toStatus);
+      if (receiving && !posted) {
+        await applyPurchaseStock(conn, id, 1, `Received via ${config.numberPrefix}-${id}`);
+        await conn.query('UPDATE purchase_invoices SET stock_posted = 1 WHERE id = ?', [id]);
+      } else if (!receiving && posted) {
+        await applyPurchaseStock(conn, id, -1, `Stock reversal for ${config.numberPrefix}-${id}`);
+        await conn.query('UPDATE purchase_invoices SET stock_posted = 0 WHERE id = ?', [id]);
+      }
+    }
+    if (toStatus === 'paid' && config.hasAmountPaid) {
+      await conn.query(`UPDATE \`${config.table}\` SET amount_paid = total WHERE id = ?`, [id]);
+    }
+    if (typeof config.afterStatusChange === 'function') {
+      await config.afterStatusChange(conn, id, fromStatus, toStatus, req);
+    }
+  }
+
+  const usesCustomerCodes = config.party.table === 'customers';
+
+  async function loadFormData(req) {
+    const partyOptions = await loadPartyOptions(config);
+    const productOptions = await loadProductOptions(config);
+    const customerCodes = usesCustomerCodes ? await loadCustomerCodes() : {};
+    const warehouseOptions = config.customerOrder ? await loadWarehouseOptions() : [];
+    const defaults = {
+      [config.numberField]: '',
+      [config.party.field]: '',
+      [config.dateField]: todayISO(),
+      [config.dueField]: addDaysISO(todayISO(), config.defaultDueDays || 14),
+      discount_total: 0,
+      status: config.defaultStatus || 'draft',
+      notes: '',
+    };
+    if (config.hasAmountPaid) defaults.amount_paid = 0;
+    if (config.linkOrder) defaults[config.linkOrder.field] = '';
+    if (config.customerOrder) {
+      defaults[config.customerOrder.orderNoField] = '';
+      defaults[config.customerOrder.warehouseField] = '';
+      defaults[config.customerOrder.dockingField] = '';
+      defaults[config.customerOrder.receptionField] = '';
+    }
+
+    const directParty = Number.parseInt(req.query[config.party.field], 10);
+    if (directParty) defaults[config.party.field] = String(directParty);
+    if (config.customerOrder && directParty) {
+      const own = warehouseOptions.filter((w) => w.customerId === String(directParty));
+      if (own.length === 1) defaults[config.customerOrder.warehouseField] = own[0].value;
+    }
+
+    const prefillOrderId = Number.parseInt(
+      req.query[config.linkOrder ? config.linkOrder.queryParam : '__none'],
+      10,
+    );
+    if (config.linkOrder && prefillOrderId) {
+      const order = await one(
+        `SELECT t.*, party.company_name AS party_name FROM \`${config.linkOrder.table}\` t
+           JOIN \`${config.party.table}\` party ON party.id = t.\`${config.party.field}\`
+          WHERE t.id = ? LIMIT 1`,
+        [prefillOrderId],
+      );
+      if (order) {
+        defaults[config.party.field] = String(order[config.party.field]);
+        defaults[config.linkOrder.field] = order.id;
+        defaults.discount_total = order.discount_total;
+        defaults.notes = order.notes || '';
+        const items = await query(
+          `SELECT i.* FROM \`${config.linkOrder.itemTable}\` i WHERE i.\`${config.linkOrder.itemFk}\` = ? ORDER BY i.id`,
+          [order.id],
+        );
+        return { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items, prefill: order };
+      }
+    }
+
+    const fallbackItems = [
+      { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: config.defaultTaxRate, sku: '', name: '', unit: '' },
+    ];
+    return { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items: fallbackItems, prefill: null };
+  }
+
+  // ---------------------------------------------------------------- index
+  router.get('/', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const search = String(req.query.q || '').trim();
+      const status = String(req.query.status || '');
+      const where = [];
+      const params = [];
+      if (search) {
+        const customerOrderSearch = config.customerOrder ? ' OR t.customer_order_no LIKE ?' : '';
+        where.push(`(t.\`${config.numberField}\` LIKE ? OR party.company_name LIKE ? OR t.notes LIKE ?${customerOrderSearch})`);
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        if (config.customerOrder) params.push(`%${search}%`);
+      }
+      if (status) {
+        where.push('t.status = ?');
+        params.push(status);
+      }
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+      const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+      const perPage = 12;
+      const total = Number(
+        (await require('../db').scalar(
+          `SELECT COUNT(*) FROM \`${config.table}\` t JOIN \`${config.party.table}\` party ON party.id = t.\`${config.party.field}\` ${whereSql}`,
+          params,
+        )) || 0,
+      );
+      const pag = pagination(total, page, perPage);
+      const linkJoin = config.linkOrder
+        ? `LEFT JOIN \`${config.linkOrder.table}\` linked ON linked.id = t.\`${config.linkOrder.field}\``
+        : '';
+      const linkSelect = config.linkOrder ? ', linked.order_no AS linked_order_no' : '';
+      const linkWarehouseJoin = !config.customerOrder && config.linkOrder && config.linkOrder.table === 'sales_orders'
+        ? 'LEFT JOIN customer_warehouses lw ON lw.id = linked.customer_warehouse_id'
+        : '';
+      const linkCustomerOrderSelect = linkWarehouseJoin
+        ? ', linked.customer_order_no AS linked_customer_order_no, lw.name AS linked_warehouse_name, lw.code AS linked_warehouse_code'
+        : '';
+      const warehouseJoin = config.customerOrder
+        ? 'LEFT JOIN customer_warehouses cw ON cw.id = t.customer_warehouse_id'
+        : '';
+      const warehouseSelect = config.customerOrder
+        ? ', cw.name AS warehouse_name, cw.code AS warehouse_code'
+        : '';
+      const rows = await query(
+        `SELECT t.*, party.company_name AS party_name${linkSelect}${linkCustomerOrderSelect}${warehouseSelect}
+           FROM \`${config.table}\` t
+           JOIN \`${config.party.table}\` party ON party.id = t.\`${config.party.field}\`
+           ${linkJoin}
+           ${linkWarehouseJoin}
+           ${warehouseJoin}
+           ${whereSql}
+          ORDER BY t.\`${config.dateField}\` DESC, t.id DESC
+          LIMIT ? OFFSET ?`,
+        [...params, perPage, (pag.page - 1) * perPage],
+      );
+
+      const openStatuses = config.openStatuses || [];
+      let openValue = 0;
+      let openCount = 0;
+      let totalValue = 0;
+      if (openStatuses.length) {
+        const stats = await one(
+          `SELECT COUNT(*) AS c, COALESCE(SUM(total),0) AS v FROM \`${config.table}\` WHERE status IN (${openStatuses
+            .map(() => '?')
+            .join(',')})`,
+          openStatuses,
+        );
+        openCount = Number(stats.c);
+        openValue = Number(stats.v);
+      }
+      const totals = await one(
+        `SELECT COALESCE(SUM(total),0) AS v FROM \`${config.table}\` WHERE status NOT IN ('cancelled','draft')`,
+      );
+      totalValue = Number(totals.v);
+
+      res.render('documents/index', {
+        title: lc.title,
+        active: config.active,
+        breadcrumbs: [{ label: lc.title }],
+        doc: { ...lc, statuses: statusesFor(config) },
+        rows,
+        pagination: pag,
+        search,
+        activeStatus: status,
+        stats: {
+          openCount,
+          openValue,
+          totalValue,
+          label: req.t(config.kind.includes('invoice') ? 'Invoiced (non-draft)' : 'Open value'),
+          openLabel: req.t(config.kind.includes('invoice') ? 'Unpaid invoices' : 'Open orders'),
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // ------------------------------------------------------------------ new
+  router.get('/new', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items, prefill } = await loadFormData(req);
+      const settings = require('../lib/settings');
+      const appSettings = await settings.getSettings();
+      res.render('documents/form', {
+        title: lc.newLabel,
+        active: config.active,
+        breadcrumbs: [{ label: lc.title, href: basePath }, { label: lc.newLabel }],
+        doc: { ...lc, statuses: statusesFor(config) },
+        partyOptions,
+        productOptions,
+        customerCodes,
+        warehouseOptions,
+        row: defaults,
+        items,
+        errors: {},
+        itemErrors: [],
+        mode: 'create',
+        action: basePath,
+        defaultTaxRate: Number(appSettings.default_tax_rate || 0),
+        prefill,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // --------------------------------------------------------------- create
+  router.post('/', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const appSettings = await require('../lib/settings').getSettings();
+      const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
+      const partyId = Number.parseInt(req.body[config.party.field], 10);
+      const items = parseItems(req.body, config, defaultTaxRate);
+      const errors = {};
+      const itemErrors = [];
+      const date = (req.body[config.dateField] || '').slice(0, 10);
+      const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
+
+      if (!partyId) errors[config.party.field] = req.t('{party} is required.', { party: lc.party.label });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errors[config.dateField] = req.t('A valid date is required.');
+      if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) errors[config.dueField] = req.t('Invalid date.');
+      if (items.length === 0) {
+        itemErrors.push(req.t('Add at least one line item with a quantity greater than zero.'));
+      }
+      if (!config.statuses.includes(req.body.status)) errors.status = req.t('Invalid status.');
+
+      let warehouseId = 0;
+      let customerOrderValues = null;
+      if (config.customerOrder) {
+        const co = config.customerOrder;
+        customerOrderValues = {
+          [co.orderNoField]: String(req.body[co.orderNoField] || '').trim().slice(0, 60) || null,
+          [co.dockingField]: String(req.body[co.dockingField] || '').trim().slice(0, 60) || null,
+          [co.receptionField]: normalizeDateTime(req.body[co.receptionField]),
+        };
+        if (String(req.body[co.receptionField] || '').trim() && !customerOrderValues[co.receptionField]) {
+          errors[co.receptionField] = req.t('Enter a valid reception date and time.');
+        }
+        warehouseId = Number.parseInt(req.body[co.warehouseField], 10) || 0;
+        if (partyId && warehouseId) {
+          const selectedWarehouse = await one(
+            'SELECT id, customer_id FROM customer_warehouses WHERE id = ? LIMIT 1',
+            [warehouseId],
+          );
+          if (!selectedWarehouse || Number(selectedWarehouse.customer_id) !== partyId) {
+            errors[co.warehouseField] = req.t('Choose a destination warehouse that belongs to the selected customer.');
+            warehouseId = 0;
+          }
+        }
+      }
+
+      const totals = computeTotals(items, req.body.discount_total);
+      let amountPaid = 0;
+      if (config.hasAmountPaid) {
+        amountPaid = Math.max(0, Math.min(toNumber(req.body.amount_paid, 0), totals.total));
+      }
+      if (Object.keys(errors).length || itemErrors.length) {
+        const { partyOptions, productOptions, customerCodes, warehouseOptions } = await loadFormData({ query: {} });
+        return res.status(422).render('documents/form', {
+          title: lc.newLabel,
+          active: config.active,
+          breadcrumbs: [{ label: lc.title, href: basePath }, { label: lc.newLabel }],
+          doc: { ...lc, statuses: statusesFor(config) },
+          partyOptions,
+          productOptions,
+          customerCodes,
+          warehouseOptions,
+          row: { ...req.body, status: req.body.status || 'draft' },
+          items: items.length ? items : [{}],
+          errors,
+          itemErrors,
+          mode: 'create',
+          action: basePath,
+          defaultTaxRate,
+          prefill: null,
+        });
+      }
+
+      const insertedId = await withTransaction(async (conn) => {
+        const [partyRows] = await conn.query(
+          `SELECT id FROM \`${config.party.table}\` WHERE id = ?`,
+          [partyId],
+        );
+        if (!partyRows.length) {
+          throw Object.assign(
+            new Error(req.t('Selected {party} does not exist.', { party: lc.party.label })),
+            { status: 422 },
+          );
+        }
+
+        if (config.customerOrder && !warehouseId) {
+          warehouseId = await ensureWarehouseForCustomer(conn, partyId);
+        }
+
+        const number = await nextNumber({
+          prefix: config.numberPrefix,
+          table: config.table,
+          column: config.numberField,
+          date,
+          conn,
+        });
+        const status = req.body.status || 'draft';
+        const customerOrderColumns = config.customerOrder
+          ? `, \`${config.customerOrder.orderNoField}\`, \`${config.customerOrder.warehouseField}\`, \`${config.customerOrder.dockingField}\`, \`${config.customerOrder.receptionField}\``
+          : '';
+        const customerOrderPlaceholders = config.customerOrder ? ', ?, ?, ?, ?' : '';
+
+        const [result] = await conn.query(
+          `INSERT INTO \`${config.table}\` (\`${config.numberField}\`, \`${config.party.field}\`, \`${config.dateField}\`, \`${config.dueField}\`, status, subtotal, discount_total, tax_total, total, notes, created_by${config.hasAmountPaid ? ', amount_paid' : ''}${config.linkOrder ? `, \`${config.linkOrder.field}\`` : ''}${customerOrderColumns})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${config.hasAmountPaid ? ', ?' : ''}${config.linkOrder ? ', ?' : ''}${customerOrderPlaceholders})`,
+          [
+            number,
+            partyId,
+            date,
+            dueDate,
+            status,
+            totals.subtotal,
+            totals.discount_total,
+            totals.tax_total,
+            totals.total,
+            (req.body.notes || '').slice(0, 5000) || null,
+            req.session.user.id,
+            ...(config.hasAmountPaid ? [status === 'paid' ? totals.total : amountPaid] : []),
+            ...(config.linkOrder ? [Number.parseInt(req.body[config.linkOrder.field], 10) || null] : []),
+            ...(config.customerOrder
+              ? [
+                  customerOrderValues[config.customerOrder.orderNoField],
+                  warehouseId,
+                  customerOrderValues[config.customerOrder.dockingField],
+                  customerOrderValues[config.customerOrder.receptionField],
+                ]
+              : []),
+          ],
+        );
+        const id = result.insertId;
+
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i];
+          await conn.query(
+            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, unit_price, tax_rate, line_total)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [id, it.product_id, it.description, it.quantity, it.unit_price, it.tax_rate, it.line_total],
+          );
+        }
+
+        if (config.hasStockPosting && ['received', 'paid'].includes(status)) {
+          await applyPurchaseStock(conn, id, 1, `Received via ${number}`);
+          await conn.query('UPDATE purchase_invoices SET stock_posted = 1 WHERE id = ?', [id]);
+        }
+
+        if (typeof config.afterCreate === 'function') await config.afterCreate(conn, id, req);
+        return id;
+      });
+
+      req.flash('success', '{item} created successfully.', { item: lc.singular });
+      res.redirect(`${basePath}/${insertedId}`);
+    } catch (err) {
+      if (err.status === 422) {
+        req.flash('error', err.message);
+        return res.redirect(`${basePath}/new`);
+      }
+      next(err);
+    }
+  });
+
+  // ---------------------------------------------------------------- show
+  router.get('/:id(\\d+)', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const row = await findDoc(config, req.params.id);
+      if (!row) {
+        return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
+      }
+      const items = await loadItems(config, row.id, usesCustomerCodes ? row[config.party.field] : null);
+
+      let linkedOrder = null;
+      if (config.linkOrder && row[config.linkOrder.field]) {
+        if (config.linkOrder.table === 'sales_orders') {
+          linkedOrder = await one(
+            `SELECT so.*, cw.name AS warehouse_name, cw.code AS warehouse_code,
+                    cw.address_line1 AS warehouse_address, cw.city AS warehouse_city,
+                    cw.state AS warehouse_state, cw.postal_code AS warehouse_postal,
+                    cw.country AS warehouse_country
+               FROM sales_orders so
+               LEFT JOIN customer_warehouses cw ON cw.id = so.customer_warehouse_id
+              WHERE so.id = ? LIMIT 1`,
+            [row[config.linkOrder.field]],
+          );
+        } else {
+          linkedOrder = await one(
+            `SELECT * FROM \`${config.linkOrder.table}\` WHERE id = ?`,
+            [row[config.linkOrder.field]],
+          );
+        }
+      }
+
+      let deliveries = [];
+      let invoices = [];
+      let productionOrders = [];
+      if (config.kind === 'sales_order') {
+        deliveries = await query(
+          `SELECT d.*, (SELECT COUNT(*) FROM delivery_items di WHERE di.delivery_id = d.id) AS item_count
+             FROM deliveries d WHERE d.sales_order_id = ? ORDER BY d.delivery_date DESC`,
+          [row.id],
+        );
+        invoices = await query(
+          'SELECT * FROM sales_invoices WHERE sales_order_id = ? ORDER BY invoice_date DESC',
+          [row.id],
+        );
+        productionOrders = await query(
+          `SELECT po.*, b.name AS bom_name FROM production_orders po JOIN boms b ON b.id = po.bom_id
+            WHERE po.sales_order_id = ? ORDER BY po.id DESC`,
+          [row.id],
+        );
+      }
+      if (config.kind === 'purchase_order') {
+        invoices = await query(
+          'SELECT * FROM purchase_invoices WHERE purchase_order_id = ? ORDER BY invoice_date DESC',
+          [row.id],
+        );
+      }
+
+      res.render('documents/show', {
+        title: row[config.numberField],
+        active: config.active,
+        breadcrumbs: [{ label: lc.title, href: basePath }, { label: row[config.numberField] }],
+        doc: { ...lc, statuses: statusesFor(config) },
+        row,
+        items,
+        linkedOrder,
+        deliveries,
+        invoices,
+        productionOrders,
+        actions: actionsFor(config, row, req.locale),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // ---------------------------------------------------------------- edit
+  router.get('/:id(\\d+)/edit', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const row = await findDoc(config, req.params.id);
+      if (!row) {
+        return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
+      }
+      if (config.lockedStatuses && config.lockedStatuses.includes(row.status)) {
+        req.flash('error', '{item} is {status} and can no longer be edited.', {
+          item: lc.singular,
+          status: require('../lib/helpers').statusInfo(row.status, req.locale).label,
+        });
+        return res.redirect(`${basePath}/${row.id}`);
+      }
+      if (config.kind === 'sales_order') {
+        const delivered = await require('../db').scalar(
+          'SELECT COUNT(*) FROM deliveries WHERE sales_order_id = ? AND status <> "cancelled"',
+          [row.id],
+        );
+        if (Number(delivered) > 0 && row.status !== 'draft') {
+          req.flash('error', 'This order already has deliveries. Cancel the delivery first or create a new order.');
+          return res.redirect(`${basePath}/${row.id}`);
+        }
+      }
+
+      const { partyOptions, productOptions, customerCodes, warehouseOptions } = await loadFormData({ query: {} });
+      const items = await loadItems(config, row.id, usesCustomerCodes ? row[config.party.field] : null);
+      const appSettings = await require('../lib/settings').getSettings();
+      res.render('documents/form', {
+        title: lc.editLabel,
+        active: config.active,
+        breadcrumbs: [
+          { label: lc.title, href: basePath },
+          { label: row[config.numberField], href: `${basePath}/${row.id}` },
+          { label: req.t('Edit') },
+        ],
+        doc: { ...lc, statuses: statusesFor(config) },
+        partyOptions,
+        productOptions,
+        customerCodes,
+        warehouseOptions,
+        row,
+        items,
+        errors: {},
+        itemErrors: [],
+        mode: 'edit',
+        action: `${basePath}/${row.id}`,
+        defaultTaxRate: Number(appSettings.default_tax_rate || 0),
+        prefill: null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // -------------------------------------------------------------- update
+  router.post('/:id(\\d+)', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const existing = await findDoc(config, req.params.id);
+      if (!existing) {
+        return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
+      }
+
+      if (config.lockedStatuses && config.lockedStatuses.includes(existing.status)) {
+        req.flash('error', '{item} is {status} and can no longer be edited.', {
+          item: lc.singular,
+          status: require('../lib/helpers').statusInfo(existing.status, req.locale).label,
+        });
+        return res.redirect(`${basePath}/${existing.id}`);
+      }
+
+      let lockedPaymentAmount = null;
+      if (config.hasAmountPaid && config.kind.includes('invoice')) {
+        const invoiceType = config.kind === 'sales_invoice' ? 'sales' : 'purchase';
+        const linked = await one(
+          'SELECT COUNT(*) AS count FROM payment_allocations WHERE invoice_type = ? AND invoice_id = ?',
+          [invoiceType, existing.id],
+        );
+        if (Number(linked.count) > 0) {
+          if (req.body.status !== existing.status) {
+            req.flash('error', 'This invoice has payment allocations. Reverse the payment before changing its status.');
+            return res.redirect(`${basePath}/${existing.id}`);
+          }
+          if (Number.parseInt(req.body[config.party.field], 10) !== Number(existing[config.party.field])) {
+            req.flash('error', 'This invoice has payment allocations. Reverse the payment before changing its party.');
+            return res.redirect(`${basePath}/${existing.id}`);
+          }
+          lockedPaymentAmount = Number(existing.amount_paid || 0);
+        }
+      }
+      if (config.kind === 'sales_order') {
+        const delivered = await require('../db').scalar(
+          'SELECT COUNT(*) FROM deliveries WHERE sales_order_id = ? AND status <> "cancelled"',
+          [existing.id],
+        );
+        if (Number(delivered) > 0 && existing.status !== 'draft') {
+          req.flash('error', 'This order already has deliveries. Cancel the delivery first or create a new order.');
+          return res.redirect(`${basePath}/${existing.id}`);
+        }
+      }
+
+      const appSettings = await require('../lib/settings').getSettings();
+      const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
+      const partyId = Number.parseInt(req.body[config.party.field], 10);
+      const items = parseItems(req.body, config, defaultTaxRate);
+      const errors = {};
+      const itemErrors = [];
+      const date = (req.body[config.dateField] || '').slice(0, 10);
+      const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
+
+      if (!partyId) errors[config.party.field] = req.t('{party} is required.', { party: lc.party.label });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errors[config.dateField] = req.t('A valid date is required.');
+      if (items.length === 0) {
+        itemErrors.push(req.t('Add at least one line item with a quantity greater than zero.'));
+      }
+      if (!config.statuses.includes(req.body.status)) errors.status = req.t('Invalid status.');
+
+      let warehouseId = 0;
+      let customerOrderValues = null;
+      if (config.customerOrder) {
+        const co = config.customerOrder;
+        customerOrderValues = {
+          [co.orderNoField]: String(req.body[co.orderNoField] || '').trim().slice(0, 60) || null,
+          [co.dockingField]: String(req.body[co.dockingField] || '').trim().slice(0, 60) || null,
+          [co.receptionField]: normalizeDateTime(req.body[co.receptionField]),
+        };
+        if (String(req.body[co.receptionField] || '').trim() && !customerOrderValues[co.receptionField]) {
+          errors[co.receptionField] = req.t('Enter a valid reception date and time.');
+        }
+        const postedWarehouse = Number.parseInt(req.body[co.warehouseField], 10) || 0;
+        warehouseId = postedWarehouse || Number(existing[co.warehouseField]) || 0;
+        if (partyId && warehouseId) {
+          const selectedWarehouse = await one(
+            'SELECT id, customer_id FROM customer_warehouses WHERE id = ? LIMIT 1',
+            [warehouseId],
+          );
+          if (!selectedWarehouse || Number(selectedWarehouse.customer_id) !== partyId) {
+            errors[co.warehouseField] = req.t('Choose a destination warehouse that belongs to the selected customer.');
+            warehouseId = 0;
+          }
+        }
+      }
+
+      const totals = computeTotals(items, req.body.discount_total);
+      if (lockedPaymentAmount !== null && totals.total < lockedPaymentAmount - 0.005) {
+        req.flash('error', 'The invoice total cannot be less than the amount already paid.');
+        return res.redirect(`${basePath}/${existing.id}`);
+      }
+      if (Object.keys(errors).length || itemErrors.length) {
+        const { partyOptions, productOptions, customerCodes, warehouseOptions } = await loadFormData({ query: {} });
+        return res.status(422).render('documents/form', {
+          title: lc.editLabel,
+          active: config.active,
+          breadcrumbs: [
+            { label: lc.title, href: basePath },
+            { label: existing[config.numberField], href: `${basePath}/${existing.id}` },
+            { label: req.t('Edit') },
+          ],
+          doc: { ...lc, statuses: statusesFor(config) },
+          partyOptions,
+          productOptions,
+          customerCodes,
+          warehouseOptions,
+          row: { ...existing, ...req.body },
+          items: items.length ? items : [{}],
+          errors,
+          itemErrors,
+          mode: 'edit',
+          action: `${basePath}/${existing.id}`,
+          defaultTaxRate,
+          prefill: null,
+        });
+      }
+
+      if (!canTransition(config.kind, existing.status, req.body.status) && existing.status !== req.body.status) {
+        const statusInfo = require('../lib/helpers').statusInfo;
+        req.flash('error', 'Cannot change status from {from} to {to}.', {
+          from: statusInfo(existing.status, req.locale).label,
+          to: statusInfo(req.body.status, req.locale).label,
+        });
+        return res.redirect(`${basePath}/${existing.id}`);
+      }
+
+      await withTransaction(async (conn) => {
+        if (config.customerOrder && !warehouseId) {
+          warehouseId = await ensureWarehouseForCustomer(conn, partyId);
+        }
+        const customerOrderSet = config.customerOrder
+          ? `, \`${config.customerOrder.orderNoField}\` = ?, \`${config.customerOrder.warehouseField}\` = ?, \`${config.customerOrder.dockingField}\` = ?, \`${config.customerOrder.receptionField}\` = ?`
+          : '';
+        await conn.query(
+          `UPDATE \`${config.table}\` SET \`${config.party.field}\` = ?, \`${config.dateField}\` = ?, \`${config.dueField}\` = ?, status = ?, subtotal = ?, discount_total = ?, tax_total = ?, total = ?, notes = ?${config.hasAmountPaid ? ', amount_paid = ?' : ''}${customerOrderSet} WHERE id = ?`,
+          [
+            partyId,
+            date,
+            dueDate,
+            req.body.status,
+            totals.subtotal,
+            totals.discount_total,
+            totals.tax_total,
+            totals.total,
+            (req.body.notes || '').slice(0, 5000) || null,
+            ...(config.hasAmountPaid
+              ? [
+                  lockedPaymentAmount !== null
+                    ? lockedPaymentAmount
+                    : req.body.status === 'paid'
+                      ? totals.total
+                      : Math.max(0, Math.min(toNumber(req.body.amount_paid, 0), totals.total)),
+                ]
+              : []),
+            ...(config.customerOrder
+              ? [
+                  customerOrderValues[config.customerOrder.orderNoField],
+                  warehouseId,
+                  customerOrderValues[config.customerOrder.dockingField],
+                  customerOrderValues[config.customerOrder.receptionField],
+                ]
+              : []),
+            existing.id,
+          ],
+        );
+
+        await conn.query(`DELETE FROM \`${config.itemTable}\` WHERE \`${config.itemFk}\` = ?`, [existing.id]);
+        for (const it of items) {
+          await conn.query(
+            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, unit_price, tax_rate, line_total)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [existing.id, it.product_id, it.description, it.quantity, it.unit_price, it.tax_rate, it.line_total],
+          );
+        }
+
+        if (existing.status !== req.body.status) {
+          await handleStatusChange(conn, existing.id, existing.status, req.body.status, req);
+        }
+        if (typeof config.afterUpdate === 'function') await config.afterUpdate(conn, existing, req);
+      });
+
+      req.flash('success', '{item} updated successfully.', { item: lc.singular });
+      res.redirect(`${basePath}/${existing.id}`);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // -------------------------------------------------------------- status
+  router.post('/:id(\\d+)/status', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const row = await findDoc(config, req.params.id);
+      if (!row) {
+        return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
+      }
+      const target = req.body.status;
+      if (!config.statuses.includes(target)) {
+        req.flash('error', 'Unknown status.');
+        return res.redirect(`${basePath}/${row.id}`);
+      }
+      if (!canTransition(config.kind, row.status, target)) {
+        const statusInfo = require('../lib/helpers').statusInfo;
+        req.flash('error', 'Cannot change status from {from} to {to}.', {
+          from: statusInfo(row.status, req.locale).label,
+          to: statusInfo(target, req.locale).label,
+        });
+        return res.redirect(`${basePath}/${row.id}`);
+      }
+      if (target === 'cancelled' && config.kind.includes('invoice')) {
+        const invoiceType = config.kind === 'sales_invoice' ? 'sales' : 'purchase';
+        const linked = await one(
+          'SELECT COUNT(*) AS count FROM payment_allocations WHERE invoice_type = ? AND invoice_id = ?',
+          [invoiceType, row.id],
+        );
+        if (Number(linked.count) > 0) {
+          req.flash('error', 'This invoice has payment allocations. Reverse the payment before cancelling the invoice.');
+          return res.redirect(`${basePath}/${row.id}`);
+        }
+      }
+
+      await withTransaction(async (conn) => {
+        await conn.query('UPDATE `' + config.table + '` SET status = ? WHERE id = ?', [target, row.id]);
+        await handleStatusChange(conn, row.id, row.status, target, req);
+        if (config.kind === 'sales_order' && target === 'delivered') {
+          await conn.query('UPDATE sales_order_items SET delivered_qty = quantity WHERE order_id = ?', [row.id]);
+        }
+        if (config.kind === 'purchase_order' && target === 'received') {
+          await conn.query('UPDATE purchase_order_items SET received_qty = quantity WHERE order_id = ?', [row.id]);
+        }
+      });
+
+      req.flash('success', '{item} marked as {status}.', {
+        item: lc.singular,
+        status: require('../lib/helpers').statusInfo(target, req.locale).label,
+      });
+      res.redirect(`${basePath}/${row.id}`);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // -------------------------------------------------------------- delete
+  router.post('/:id(\\d+)/delete', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const row = await findDoc(config, req.params.id);
+      if (!row) {
+        return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
+      }
+      if (!['draft', 'cancelled'].includes(row.status)) {
+        req.flash('error', 'Only draft or cancelled documents can be deleted. Cancel it first.');
+        return res.redirect(`${basePath}/${row.id}`);
+      }
+      await require('../db').getPool().query(`DELETE FROM \`${config.table}\` WHERE id = ?`, [row.id]);
+      req.flash('success', '{item} deleted.', { item: lc.singular });
+      res.redirect(basePath);
+    } catch (err) {
+      if (err.code === 'ER_ROW_IS_REFERENCED_2') {
+        req.flash('error', 'This document is referenced by other records and cannot be deleted.');
+        return res.redirect(`${basePath}/${req.params.id}`);
+      }
+      next(err);
+    }
+  });
+
+  // -------------------------------------------------------------- print
+  router.get('/:id(\\d+)/print', async (req, res, next) => {
+    try {
+      const lc = localizeDocConfig(config, req.locale);
+      const row = await findDoc(config, req.params.id);
+      if (!row) {
+        return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
+      }
+      const items = await loadItems(config, row.id, usesCustomerCodes ? row[config.party.field] : null);
+      let linkedOrder = null;
+      if (config.linkOrder && row[config.linkOrder.field]) {
+        if (config.linkOrder.table === 'sales_orders') {
+          linkedOrder = await one(
+            `SELECT so.*, cw.name AS warehouse_name, cw.code AS warehouse_code,
+                    cw.address_line1 AS warehouse_address, cw.city AS warehouse_city,
+                    cw.state AS warehouse_state, cw.postal_code AS warehouse_postal,
+                    cw.country AS warehouse_country
+               FROM sales_orders so
+               LEFT JOIN customer_warehouses cw ON cw.id = so.customer_warehouse_id
+              WHERE so.id = ? LIMIT 1`,
+            [row[config.linkOrder.field]],
+          );
+        } else {
+          linkedOrder = await one(
+            `SELECT * FROM \`${config.linkOrder.table}\` WHERE id = ?`,
+            [row[config.linkOrder.field]],
+          );
+        }
+      }
+      const settings = await require('../lib/settings').getSettings();
+      res.render('documents/print', {
+        layout: false,
+        title: `${lc.singular} ${row[config.numberField]}`,
+        doc: lc,
+        row,
+        items,
+        linkedOrder,
+        settings,
+        money: (v) => formatMoney(v, settings.currency || 'USD', req.locale),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // --------------------------------------------------- generate production
+  if (config.kind === 'sales_order') {
+    router.post('/:id(\\d+)/production', async (req, res, next) => {
+      try {
+        const { createProductionFromSalesOrder } = require('../lib/production');
+        const result = await createProductionFromSalesOrder(Number(req.params.id), req.session.user.id);
+        if (result.created === 0) {
+          req.flash('error', result.message || 'No production orders were created.');
+        } else {
+          req.flash(
+            'success',
+            result.created === 1 ? '{count} production order created.' : '{count} production orders created.',
+            { count: result.created },
+          );
+        }
+        res.redirect(`${basePath}/${req.params.id}`);
+      } catch (err) {
+        if (err.status === 422) {
+          req.flash('error', err.message);
+          return res.redirect(`${basePath}/${req.params.id}`);
+        }
+        next(err);
+      }
+    });
+  }
+
+  return router;
+}
+
+module.exports = { makeDocumentRouter, loadProductOptions, loadPartyOptions, computeTotals };

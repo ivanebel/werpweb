@@ -1,0 +1,228 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+      <%
+        const productById = {};
+        products.forEach(p => { productById[String(p.value)] = p; });
+        const errorList = Object.values(errors || {});
+        const allErrors = errorList.concat(itemErrors || []);
+        const backUrl = mode === 'edit' ? `/pos/sales/${row.id}` : '/pos/sales';
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New POS sale') : t('Edit POS sale') %></h1>
+          <p class="page-subtitle"><%= mode === 'create' ? t('Record a completed shop sale with its ticket and line items.') : row.ticket_number %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Back') %>
+        </a>
+      </div>
+
+      <% if (allErrors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the POS sale:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% allErrors.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form id="document-form" method="POST" action="<%= action %>" data-currency="<%= currency %>" data-default-tax="<%= defaultTaxRate %>" data-customer-codes="{}">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t('Ticket details') %></h2>
+            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? row.ticket_number : t('Ticket data is saved with the sale') %></span>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div class="md:col-span-2">
+              <label for="pos_id" class="form-label"><%= t('Point of sale') %> <span class="text-error-500">*</span></label>
+              <select id="pos_id" name="pos_id" class="form-select" required>
+                <option value=""><%= t('Select a point of sale…') %></option>
+                <% locations.forEach(location => { %>
+                  <option value="<%= location.id %>" <%= String(row.pos_id || '') === String(location.id) ? 'selected' : '' %>><%= location.code %> · <%= location.name %><%= location.status === 'inactive' ? ` (${t('Inactive')})` : '' %></option>
+                <% }) %>
+              </select>
+              <% if (errors.pos_id) { %><p class="form-error"><%= errors.pos_id %></p><% } %>
+            </div>
+            <div>
+              <label for="ticket_type" class="form-label"><%= t('Ticket type') %> <span class="text-error-500">*</span></label>
+              <input id="ticket_type" name="ticket_type" list="ticket-type-options" value="<%= row.ticket_type || '' %>" class="form-input" placeholder="<%= t('Ticket, Invoice, Credit note') %>" required>
+              <datalist id="ticket-type-options">
+                <% ticketTypeSuggestions.forEach(type => { %><option value="<%= type %>"><%= t(type) %></option><% }) %>
+              </datalist>
+              <% if (errors.ticket_type) { %><p class="form-error"><%= errors.ticket_type %></p><% } %>
+            </div>
+            <div>
+              <label for="ticket_number" class="form-label"><%= t('Ticket number') %> <span class="text-error-500">*</span></label>
+              <input id="ticket_number" name="ticket_number" value="<%= row.ticket_number || '' %>" class="form-input" placeholder="<%= t('e.g. OAK-01-TKT-00042') %>" required>
+              <% if (errors.ticket_number) { %><p class="form-error"><%= errors.ticket_number %></p><% } %>
+            </div>
+            <div>
+              <label for="sale_date" class="form-label"><%= t('Sale date') %> <span class="text-error-500">*</span></label>
+              <input id="sale_date" type="date" name="sale_date" value="<%= String(row.sale_date || '').slice(0, 10) %>" class="form-input" required>
+              <% if (errors.sale_date) { %><p class="form-error"><%= errors.sale_date %></p><% } %>
+            </div>
+            <div>
+              <label for="payment_method" class="form-label"><%= t('Payment method') %></label>
+              <select id="payment_method" name="payment_method" class="form-select">
+                <% paymentMethods.forEach(method => { %>
+                  <option value="<%= method.value %>" <%= (row.payment_method || 'card') === method.value ? 'selected' : '' %>><%= t(method.label) %></option>
+                <% }) %>
+              </select>
+              <% if (errors.payment_method) { %><p class="form-error"><%= errors.payment_method %></p><% } %>
+            </div>
+            <div class="md:col-span-2">
+              <label for="customer_name" class="form-label"><%= t('Customer name') %></label>
+              <input id="customer_name" name="customer_name" value="<%= row.customer_name || '' %>" class="form-input" placeholder="<%= t('Optional — leave blank for a walk-in customer') %>">
+            </div>
+            <div class="md:col-span-2">
+              <label for="notes" class="form-label"><%= t('Notes') %></label>
+              <input id="notes" name="notes" value="<%= row.notes || '' %>" class="form-input" placeholder="<%= t('Optional reference or comments') %>">
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Line items') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Add products, quantities and prices. Unit prices are tax-inclusive; VAT is extracted for the totals.') %></p>
+              </div>
+              <button type="button" id="add-line" class="btn btn-secondary btn-sm">
+                <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+                <%= t('Add line') %>
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[760px]">
+                <thead>
+                  <tr>
+                    <th class="table-th hidden w-8 xl:table-cell">#</th>
+                    <th class="table-th min-w-[200px]"><%= t('Product') %></th>
+                    <th class="table-th hidden min-w-[160px] xl:table-cell"><%= t('Description') %></th>
+                    <th class="table-th w-24 text-right"><%= t('Qty') %></th>
+                    <th class="table-th w-32 text-right"><%= t('Unit price') %></th>
+                    <th class="table-th w-28 text-right"><%= t('VAT %') %></th>
+                    <th class="table-th w-32 text-right"><%= t('Line total') %></th>
+                    <th class="table-th w-12"></th>
+                  </tr>
+                </thead>
+                <tbody id="line-items">
+                  <% (items.length ? items : [{}]).forEach((item, i) => { const p = productById[String(item.product_id || '')]; %>
+                    <tr data-line class="align-top">
+                      <td class="table-td hidden pt-5 text-xs text-gray-400 xl:table-cell"><span data-line-number><%= i + 1 %></span></td>
+                      <td class="table-td">
+                        <select name="item_product_id[<%= i %>]" data-product-select class="form-select w-full">
+                          <option value=""><%= t('Select product…') %></option>
+                          <% products.forEach(opt => { %>
+                            <option value="<%= opt.value %>" data-price="<%= opt.price %>" data-unit="<%= opt.unit %>" data-name="<%= opt.name %>" data-tax-rate="<%= opt.taxRate %>" data-weighted="<%= opt.weighted ? 1 : 0 %>" <%= String(item.product_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }) %>
+                        </select>
+                        <span class="mt-1 block text-[11px] text-gray-400" data-unit><%= item.unit || p?.unit || '' %></span>
+                      </td>
+                      <td class="table-td hidden xl:table-cell">
+                        <input name="item_description[<%= i %>]" data-description value="<%= item.description || '' %>" class="form-input" placeholder="<%= t('Optional') %>">
+                      </td>
+                      <td class="table-td">
+                        <input name="item_quantity[<%= i %>]" data-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td">
+                        <input name="item_unit_price[<%= i %>]" data-price type="number" min="0" step="0.01" value="<%= item.unit_price !== undefined ? Number(item.unit_price).toFixed(2) : '0.00' %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td">
+                        <input name="item_tax_rate[<%= i %>]" data-tax type="number" min="0" step="0.01" value="<%= item.tax_rate !== undefined ? item.tax_rate : defaultTaxRate %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td pt-7 text-right">
+                        <span class="font-medium text-gray-800 dark:text-gray-200" data-line-total><%= money(Number(item.quantity || 0) * Number(item.unit_price || 0)) %></span>
+                        <span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span>
+                      </td>
+                      <td class="table-td pt-4 text-right">
+                        <button type="button" data-remove-line class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove line') %>">
+                          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <template id="line-template">
+              <tr data-line class="align-top">
+                <td class="table-td hidden pt-5 text-xs text-gray-400 xl:table-cell"><span data-line-number></span></td>
+                <td class="table-td">
+                  <select name="item_product_id[__INDEX__]" data-product-select class="form-select w-full">
+                    <option value=""><%= t('Select product…') %></option>
+                    <% products.forEach(opt => { %>
+                      <option value="<%= opt.value %>" data-price="<%= opt.price %>" data-unit="<%= opt.unit %>" data-name="<%= opt.name %>" data-tax-rate="<%= opt.taxRate %>" data-weighted="<%= opt.weighted ? 1 : 0 %>"><%= opt.label %></option>
+                    <% }) %>
+                  </select>
+                  <span class="mt-1 block text-[11px] text-gray-400" data-unit></span>
+                </td>
+                <td class="table-td hidden xl:table-cell"><input name="item_description[__INDEX__]" data-description class="form-input" placeholder="<%= t('Optional') %>"></td>
+                <td class="table-td"><input name="item_quantity[__INDEX__]" data-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
+                <td class="table-td"><input name="item_unit_price[__INDEX__]" data-price type="number" min="0" step="0.01" value="0.00" class="form-input text-right"></td>
+                <td class="table-td"><input name="item_tax_rate[__INDEX__]" data-tax type="number" min="0" step="0.01" value="<%= defaultTaxRate %>" class="form-input text-right"></td>
+                <td class="table-td pt-7 text-right"><span class="font-medium" data-line-total></span><span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span></td>
+                <td class="table-td pt-4 text-right">
+                  <button type="button" data-remove-line class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove line') %>">
+                    <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Summary') %></h2>
+              <div class="mt-5 space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400"><%= t('Subtotal (incl. VAT)') %></span>
+                  <span id="subtotal-display" class="font-medium text-gray-800 dark:text-gray-200">—</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400"><%= t('VAT included') %></span>
+                  <span id="tax-display" class="font-medium text-gray-800 dark:text-gray-200">—</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <label for="discount_total" class="text-gray-500 dark:text-gray-400"><%= t('Discount') %></label>
+                  <input id="discount_total" name="discount_total" type="number" min="0" step="0.01" value="<%= row.discount_total !== undefined ? Number(row.discount_total).toFixed(2) : '0.00' %>" class="form-input h-9 w-28 text-right">
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
+                  <span class="text-base font-semibold text-gray-800 dark:text-gray-200"><%= t('Total') %></span>
+                  <span id="total-display" class="text-xl font-bold text-gray-900 dark:text-white">—</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Save') %></h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('POS sales are reporting records. They do not post stock movements or change Unit #1 inventory.') %></p>
+              <div class="mt-4 flex flex-col gap-2">
+                <button type="submit" class="btn btn-primary">
+                  <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                  <%= mode === 'create' ? t('Record sale') : t('Save changes') %>
+                </button>
+                <a href="<%= backUrl %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script src="/js/orders.js"></script>
+  <%- include('/layouts/footer') %>

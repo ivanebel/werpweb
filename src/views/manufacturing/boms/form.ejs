@@ -1,0 +1,205 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <%
+        const backUrl = mode === 'edit' ? `/manufacturing/boms/${row.id}` : '/manufacturing/boms';
+        const errorList = Object.values(errors || {}).concat(itemErrors || []);
+        const productById = {};
+        products.forEach(p => { productById[String(p.value)] = p; });
+        const lines = items && items.length ? items : [{ component_id: '', quantity: 1, scrap_percent: 0 }];
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New BOM') : t('Edit BOM') %></h1>
+          <p class="page-subtitle"><%= mode === 'create' ? t('Describe what goes into the manufactured product.') : row.name %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please review the BOM:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">BOM details</h2>
+            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? row.version : t('Version assigned below') %></span>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div class="md:col-span-2">
+              <label for="product_id" class="form-label">Output product <span class="text-error-500">*</span></label>
+              <select id="product_id" name="product_id" class="form-select <%= errors.product_id ? 'form-input-error' : '' %>" required>
+                <option value="">Select the manufactured product…</option>
+                <% products.forEach(opt => { %>
+                  <option value="<%= opt.value %>" <%= String(row.product_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %> (<%= h.statusInfo(opt.type).label %>)</option>
+                <% }) %>
+              </select>
+              <% if (errors.product_id) { %><p class="form-error"><%= errors.product_id %></p><% } %>
+              <p class="form-help">Only products set up in Inventory can be selected.</p>
+            </div>
+            <div class="md:col-span-2">
+              <label for="name" class="form-label">BOM name <span class="text-error-500">*</span></label>
+              <input id="name" name="name" type="text" value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="e.g. Aurora Pendant — standard" required>
+              <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+            </div>
+            <div>
+              <label for="version" class="form-label">Version</label>
+              <input id="version" name="version" type="text" value="<%= row.version || 'v1' %>" class="form-input" placeholder="v1" maxlength="20">
+              <p class="form-help">Unique per product.</p>
+            </div>
+            <div>
+              <label for="output_qty" class="form-label">Output quantity <span class="text-error-500">*</span></label>
+              <input id="output_qty" name="output_qty" type="number" min="0.001" step="0.001" value="<%= row.output_qty !== undefined ? row.output_qty : 1 %>" class="form-input <%= errors.output_qty ? 'form-input-error' : '' %>" required>
+              <% if (errors.output_qty) { %><p class="form-error"><%= errors.output_qty %></p><% } %>
+              <p class="form-help">Units produced by this recipe.</p>
+            </div>
+            <div>
+              <label for="status" class="form-label">Status</label>
+              <select id="status" name="status" class="form-select">
+                <% ['draft', 'active', 'archived'].forEach(status => { %>
+                  <option value="<%= status %>" <%= row.status === status ? 'selected' : '' %>><%= h.statusInfo(status).label %></option>
+                <% }) %>
+              </select>
+              <% if (errors.status) { %><p class="form-error"><%= errors.status %></p><% } %>
+            </div>
+            <div class="md:col-span-4">
+              <label for="notes" class="form-label">Notes</label>
+              <textarea id="notes" name="notes" rows="3" class="form-textarea" placeholder="Assembly instructions, quality notes…"><%= row.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Components</h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Raw materials and parts consumed per output quantity.</p>
+              </div>
+              <button type="button" id="add-component" class="btn btn-secondary btn-sm">
+                <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> Add component
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[760px]">
+                <thead>
+                  <tr>
+                    <th class="table-th w-8">#</th>
+                    <th class="table-th min-w-[260px]">Component</th>
+                    <th class="table-th w-28 text-right">Qty</th>
+                    <th class="table-th w-28 text-right">Scrap %</th>
+                    <th class="table-th w-32 text-right">Cost</th>
+                    <th class="table-th w-12"></th>
+                  </tr>
+                </thead>
+                <tbody id="bom-lines">
+                  <% lines.forEach((item, i) => { const component = productById[String(item.component_id || '')]; %>
+                    <tr data-bom-line class="align-top">
+                      <td class="table-td pt-5 text-xs text-gray-400"><span data-bom-number><%= i + 1 %></span></td>
+                      <td class="table-td">
+                        <select name="component_id[<%= i %>]" data-component-select class="form-select w-full">
+                          <option value="">Select component…</option>
+                          <% products.forEach(opt => { %>
+                            <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>" <%= String(item.component_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }) %>
+                        </select>
+                        <span class="mt-1 block text-[11px] text-gray-400">
+                          <%= component ? t('{unit} · stock {qty}', { unit: component.unit, qty: h.formatQty(component.stock_qty) }) : t('Quantity per output unit') %>
+                        </span>
+                      </td>
+                      <td class="table-td">
+                        <input name="quantity[<%= i %>]" data-bom-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td">
+                        <input name="scrap_percent[<%= i %>]" data-bom-scrap type="number" min="0" step="0.01" value="<%= item.scrap_percent !== undefined ? item.scrap_percent : 0 %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td pt-7 text-right">
+                        <span class="font-medium text-gray-800 dark:text-gray-200" data-bom-cost><%= money(item.line_cost || 0) %></span>
+                      </td>
+                      <td class="table-td pt-4 text-right">
+                        <button type="button" data-remove-component class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove component">
+                          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <template id="bom-line-template">
+              <tr data-bom-line class="align-top">
+                <td class="table-td pt-5 text-xs text-gray-400"><span data-bom-number></span></td>
+                <td class="table-td">
+                  <select name="component_id[__INDEX__]" data-component-select class="form-select w-full">
+                    <option value="">Select component…</option>
+                    <% products.forEach(opt => { %>
+                      <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>"><%= opt.label %></option>
+                    <% }) %>
+                  </select>
+                  <span class="mt-1 block text-[11px] text-gray-400">Quantity per output unit</span>
+                </td>
+                <td class="table-td"><input name="quantity[__INDEX__]" data-bom-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
+                <td class="table-td"><input name="scrap_percent[__INDEX__]" data-bom-scrap type="number" min="0" step="0.01" value="0" class="form-input text-right"></td>
+                <td class="table-td pt-7 text-right"><span class="font-medium" data-bom-cost>0.00</span></td>
+                <td class="table-td pt-4 text-right">
+                  <button type="button" data-remove-component class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove component">
+                    <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Cost summary</h2>
+              <dl class="mt-4 space-y-3 text-sm">
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-gray-500 dark:text-gray-400">Material cost</dt>
+                  <dd class="font-semibold text-gray-800 dark:text-gray-200"><span id="material-cost">0.00</span> <span class="text-xs font-normal text-gray-400"><%= currency %></span></dd>
+                </div>
+                <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+                  <dt class="text-gray-500 dark:text-gray-400">Cost per unit</dt>
+                  <dd class="text-lg font-bold text-gray-900 dark:text-white"><span id="unit-cost">0.00</span> <span class="text-xs font-normal text-gray-400"><%= currency %></span></dd>
+                </div>
+              </dl>
+              <p class="form-help">Based on current component cost prices, including scrap allowance.</p>
+            </div>
+
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Save</h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Active BOMs can be used to create production orders. Production orders snapshot the component list.</p>
+              <div class="mt-4 flex flex-col gap-2">
+                <button type="submit" class="btn btn-primary">
+                  <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                  <%= mode === 'create' ? t('Create BOM') : t('Save changes') %>
+                </button>
+                <a href="<%= backUrl %>" class="btn btn-secondary">Cancel</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script src="/js/bom.js"></script>
+  <%- include('/layouts/footer') %>

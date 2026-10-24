@@ -1,0 +1,115 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title">Customer product codes</h1>
+          <p class="page-subtitle">
+            <a href="/customers/<%= customer.id %>" class="link"><%= customer.company_name %></a>
+            · codes printed on this customer’s sales documents
+          </p>
+        </div>
+        <a href="/customers/<%= customer.id %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back to customer
+        </a>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Add or update a code</h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Each product can have one customer-specific code. Saving an existing product replaces its code.</p>
+          </div>
+        </div>
+        <form method="POST" action="/customers/<%= customer.id %>/product-codes" class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="md:col-span-2">
+            <label for="product_id" class="form-label">Product <span class="text-error-500">*</span></label>
+            <select id="product_id" name="product_id" class="form-select" required>
+              <option value="">Select product…</option>
+              <% products.forEach(product => { %>
+                <option value="<%= product.id %>"><%= product.sku %> — <%= product.name %><%= product.status === 'inactive' ? ' ' + t('(inactive)') : '' %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div>
+            <label for="code" class="form-label">Customer code <span class="text-error-500">*</span></label>
+            <input id="code" name="code" type="text" class="form-input" maxlength="80" placeholder="e.g. HV-PEND-100" required>
+          </div>
+          <div>
+            <label for="description" class="form-label">Description</label>
+            <input id="description" name="description" type="text" class="form-input" maxlength="255" placeholder="<%= t('Optional description') %>">
+          </div>
+          <div class="md:col-span-2">
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              Save code
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card mt-5">
+        <div class="card-header">
+          <h2 class="card-title">Assigned codes</h2>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(codes.length, 'code') %></span>
+        </div>
+        <% if (codes.length) { %>
+          <div class="table-wrap">
+            <table class="table-base min-w-[900px]">
+              <thead>
+                <tr>
+                  <th class="table-th">Product</th>
+                  <th class="table-th">Our SKU</th>
+                  <th class="table-th min-w-[220px]">Customer code</th>
+                  <th class="table-th min-w-[220px]">Description</th>
+                  <th class="table-th w-40 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% codes.forEach(codeRow => { %>
+                  <tr class="table-row align-top">
+                    <td class="table-td">
+                      <a href="/products/<%= codeRow.product_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= codeRow.product_name %></a>
+                    </td>
+                    <td class="table-td font-mono text-xs text-gray-500 dark:text-gray-400"><%= codeRow.sku %></td>
+                    <td class="table-td">
+                      <form id="code-form-<%= codeRow.id %>" method="POST" action="/customers/<%= customer.id %>/product-codes/<%= codeRow.id %>">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <input name="code" type="text" value="<%= codeRow.code %>" class="form-input" maxlength="80" required>
+                      </form>
+                    </td>
+                    <td class="table-td">
+                      <input form="code-form-<%= codeRow.id %>" name="description" type="text" value="<%= codeRow.description || '' %>" class="form-input" maxlength="255" placeholder="<%= t('Optional') %>">
+                    </td>
+                    <td class="table-td">
+                      <div class="flex items-center justify-end gap-2">
+                        <button form="code-form-<%= codeRow.id %>" type="submit" class="btn btn-secondary btn-sm">Save</button>
+                        <form method="POST" action="/customers/<%= customer.id %>/product-codes/<%= codeRow.id %>/delete" data-confirm="Remove this customer product code?">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove code">
+                            <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <p class="px-6 py-12 text-center text-sm text-gray-400">No customer-specific codes yet. Add the first one above.</p>
+        <% } %>
+      </div>
+
+      <div class="mt-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+        <p>Customer codes appear on sales orders, sales invoices and packing slips for this customer, next to our own SKU.</p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

@@ -1,0 +1,279 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+      <%
+        const productById = {};
+        productOptions.forEach(p => { productById[String(p.value)] = p; });
+        const errorList = Object.values(errors || {});
+        const allErrors = errorList.concat(itemErrors || []);
+        const backUrl = mode === 'edit' ? `${doc.basePath}/${row.id}` : doc.basePath;
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? doc.newLabel : doc.editLabel %></h1>
+          <p class="page-subtitle"><%= mode === 'create' ? t('Build the document, add line items and set the status.') : row[doc.numberField] %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+        </a>
+      </div>
+
+      <% if (allErrors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please review the document:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% allErrors.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (prefill) { %>
+        <div class="mb-5 flex items-center gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+          <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+          Prefilled from <%= doc.kind === 'sales_invoice' ? 'sales order' : 'purchase order' %> <span class="font-semibold"><%= prefill[doc.linkOrder.numberField] %></span>. Lines can still be adjusted.
+        </div>
+      <% } %>
+
+      <form id="document-form" method="POST" action="<%= action %>" data-currency="<%= currency %>" data-default-tax="<%= defaultTaxRate %>" data-customer-codes="<%= JSON.stringify(customerCodes || {}) %>" data-warehouses="<%= JSON.stringify(warehouseOptions || []) %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <% if (doc.linkOrder) { %>
+          <input type="hidden" name="<%= doc.linkOrder.field %>" value="<%= row[doc.linkOrder.field] || '' %>">
+        <% } %>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Document details</h2>
+            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? row[doc.numberField] : 'Number assigned on save' %></span>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div class="md:col-span-2">
+              <label for="party_id" class="form-label"><%= doc.party.label %> <span class="text-error-500">*</span></label>
+              <select id="party_id" name="<%= doc.party.field %>" class="form-select" required>
+                <option value=""><%= t('Select a {party}…', { party: doc.party.label.toLowerCase() }) %></option>
+                <% partyOptions.forEach(opt => { %>
+                  <option value="<%= opt.value %>" <%= String(row[doc.party.field] || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                <% }) %>
+              </select>
+              <% if (errors[doc.party.field]) { %><p class="form-error"><%= errors[doc.party.field] %></p><% } %>
+            </div>
+            <div>
+              <label for="status" class="form-label">Status</label>
+              <select id="status" name="status" class="form-select">
+                <% doc.statuses.forEach(status => { %>
+                  <option value="<%= status %>" <%= row.status === status ? 'selected' : '' %>><%= h.statusInfo(status).label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Currency</label>
+              <div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"><%= currency %></div>
+            </div>
+            <div>
+              <label for="doc-date" class="form-label"><%= doc.dateLabel %> <span class="text-error-500">*</span></label>
+              <input id="doc-date" type="date" name="<%= doc.dateField %>" value="<%= String(row[doc.dateField] || '').slice(0,10) %>" class="form-input" required>
+              <% if (errors[doc.dateField]) { %><p class="form-error"><%= errors[doc.dateField] %></p><% } %>
+            </div>
+            <div>
+              <label for="doc-due" class="form-label"><%= doc.dueLabel %></label>
+              <input id="doc-due" type="date" name="<%= doc.dueField %>" value="<%= String(row[doc.dueField] || '').slice(0,10) %>" class="form-input">
+            </div>
+            <div class="md:col-span-2">
+              <label for="notes" class="form-label">Notes</label>
+              <input id="notes" name="notes" type="text" value="<%= row.notes || '' %>" class="form-input" placeholder="Optional reference, delivery instructions…">
+            </div>
+          </div>
+        </div>
+
+        <% if (doc.customerOrder) { %>
+          <div class="card mt-5">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Customer order details') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The customer reference and the destination where this order should be received.') %></p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div>
+                <label for="customer_order_no" class="form-label"><%= doc.customerOrder.orderNoLabel %></label>
+                <input id="customer_order_no" name="<%= doc.customerOrder.orderNoField %>" type="text" value="<%= row[doc.customerOrder.orderNoField] || '' %>" class="form-input" maxlength="60" placeholder="<%= t('Order number used by the customer') %>">
+              </div>
+              <div>
+                <label for="customer_warehouse_id" class="form-label"><%= doc.customerOrder.warehouseLabel %> <span class="text-error-500">*</span></label>
+                <select id="customer_warehouse_id" name="<%= doc.customerOrder.warehouseField %>" class="form-select <%= errors[doc.customerOrder.warehouseField] ? 'border-error-500' : '' %>" required>
+                  <option value=""><%= t('Select a warehouse…') %></option>
+                  <% (warehouseOptions || []).forEach(w => { %>
+                    <option value="<%= w.value %>" data-customer="<%= w.customerId %>" <%= String(row[doc.customerOrder.warehouseField] || '') === String(w.value) ? 'selected' : '' %>><%= w.label %></option>
+                  <% }) %>
+                </select>
+                <% if (errors[doc.customerOrder.warehouseField]) { %><p class="form-error"><%= errors[doc.customerOrder.warehouseField] %></p><% } %>
+                <p class="form-help">
+                  <%= t('Warehouses belong to the selected customer.') %>
+                  <a id="warehouse-manage-link" href="/customers" class="link"><%= t('Manage warehouses') %></a>
+                </p>
+              </div>
+              <div>
+                <label for="docking_station" class="form-label"><%= doc.customerOrder.dockingLabel %></label>
+                <input id="docking_station" name="<%= doc.customerOrder.dockingField %>" type="text" value="<%= row[doc.customerOrder.dockingField] || '' %>" class="form-input" maxlength="60" placeholder="<%= t('e.g. Dock 4') %>">
+              </div>
+              <div>
+                <label for="reception_at" class="form-label"><%= doc.customerOrder.receptionLabel %></label>
+                <input id="reception_at" name="<%= doc.customerOrder.receptionField %>" type="datetime-local" value="<%= String(row[doc.customerOrder.receptionField] || '').slice(0, 16).replace(' ', 'T') %>" class="form-input <%= errors[doc.customerOrder.receptionField] ? 'border-error-500' : '' %>">
+                <% if (errors[doc.customerOrder.receptionField]) { %><p class="form-error"><%= errors[doc.customerOrder.receptionField] %></p><% } %>
+              </div>
+            </div>
+          </div>
+        <% } %>
+
+        <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Line items</h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Add products, quantities and prices. Unit prices are tax-inclusive; VAT is extracted for the totals.</p>
+              </div>
+              <button type="button" id="add-line" class="btn btn-secondary btn-sm">
+                <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> Add line
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[980px]">
+                <thead>
+                  <tr>
+                    <th class="table-th w-8">#</th>
+                    <th class="table-th min-w-[240px]">Product</th>
+                    <th class="table-th min-w-[160px]">Description</th>
+                    <th class="table-th w-24 text-right">Qty</th>
+                    <th class="table-th w-32 text-right">Unit price</th>
+                    <th class="table-th w-24 text-right">VAT %</th>
+                    <th class="table-th w-32 text-right">Line total</th>
+                    <th class="table-th w-12"></th>
+                  </tr>
+                </thead>
+                <tbody id="line-items">
+                  <% (items.length ? items : [{}]).forEach((item, i) => { const p = productById[String(item.product_id || '')]; %>
+                    <tr data-line class="align-top">
+                      <td class="table-td pt-5 text-xs text-gray-400"><span data-line-number><%= i + 1 %></span></td>
+                      <td class="table-td">
+                        <select name="item_product_id[<%= i %>]" data-product-select class="form-select w-full">
+                          <option value="">Select product…</option>
+                          <% productOptions.forEach(opt => { %>
+                            <option value="<%= opt.value %>" data-price="<%= opt.price %>" data-unit="<%= opt.unit %>" data-name="<%= opt.label %>" data-tax-rate="<%= opt.taxRate %>" data-weighted="<%= opt.weighted ? 1 : 0 %>" <%= String(item.product_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                          <% }) %>
+                        </select>
+                        <span class="mt-1 block text-[11px] text-gray-400" data-unit><%= item.unit || p?.unit || '' %></span>
+                        <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
+                      </td>
+                      <td class="table-td">
+                        <input name="item_description[<%= i %>]" data-description value="<%= item.description || '' %>" class="form-input" placeholder="Optional">
+                      </td>
+                      <td class="table-td">
+                        <input name="item_quantity[<%= i %>]" data-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td">
+                        <input name="item_unit_price[<%= i %>]" data-price type="number" min="0" step="0.01" value="<%= item.unit_price !== undefined ? Number(item.unit_price).toFixed(2) : '0.00' %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td">
+                        <input name="item_tax_rate[<%= i %>]" data-tax type="number" min="0" step="0.01" value="<%= item.tax_rate !== undefined ? item.tax_rate : defaultTaxRate %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td pt-7 text-right">
+                        <span class="font-medium text-gray-800 dark:text-gray-200" data-line-total><%= money(Number(item.quantity || 0) * Number(item.unit_price || 0)) %></span>
+                        <span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span>
+                      </td>
+                      <td class="table-td pt-4 text-right">
+                        <button type="button" data-remove-line class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove line">
+                          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <template id="line-template">
+              <tr data-line class="align-top">
+                <td class="table-td pt-5 text-xs text-gray-400"><span data-line-number></span></td>
+                <td class="table-td">
+                  <select name="item_product_id[__INDEX__]" data-product-select class="form-select w-full">
+                    <option value="">Select product…</option>
+                    <% productOptions.forEach(opt => { %>
+                      <option value="<%= opt.value %>" data-price="<%= opt.price %>" data-unit="<%= opt.unit %>" data-name="<%= opt.label %>" data-tax-rate="<%= opt.taxRate %>" data-weighted="<%= opt.weighted ? 1 : 0 %>"><%= opt.label %></option>
+                    <% }) %>
+                  </select>
+                  <span class="mt-1 block text-[11px] text-gray-400" data-unit></span>
+                  <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
+                </td>
+                <td class="table-td"><input name="item_description[__INDEX__]" data-description class="form-input" placeholder="Optional"></td>
+                <td class="table-td"><input name="item_quantity[__INDEX__]" data-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
+                <td class="table-td"><input name="item_unit_price[__INDEX__]" data-price type="number" min="0" step="0.01" value="0.00" class="form-input text-right"></td>
+                <td class="table-td"><input name="item_tax_rate[__INDEX__]" data-tax type="number" min="0" step="0.01" value="<%= defaultTaxRate %>" class="form-input text-right"></td>
+                <td class="table-td pt-7 text-right"><span class="font-medium" data-line-total></span><span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span></td>
+                <td class="table-td pt-4 text-right">
+                  <button type="button" data-remove-line class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove line">
+                    <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Summary</h2>
+              <div class="mt-5 space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400">Subtotal (incl. VAT)</span>
+                  <span id="subtotal-display" class="font-medium text-gray-800 dark:text-gray-200">—</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400">VAT included</span>
+                  <span id="tax-display" class="font-medium text-gray-800 dark:text-gray-200">—</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <label for="discount_total" class="text-gray-500 dark:text-gray-400">Discount</label>
+                  <input id="discount_total" name="discount_total" type="number" min="0" step="0.01" value="<%= row.discount_total !== undefined ? Number(row.discount_total).toFixed(2) : '0.00' %>" class="form-input h-9 w-28 text-right">
+                </div>
+                <div class="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
+                  <span class="text-base font-semibold text-gray-800 dark:text-gray-200">Total</span>
+                  <span id="total-display" class="text-xl font-bold text-gray-900 dark:text-white">—</span>
+                </div>
+              </div>
+            </div>
+
+            <% if (doc.hasAmountPaid) { %>
+              <div class="card p-5 md:p-6">
+                <h2 class="card-title">Payment</h2>
+                <div class="mt-4">
+                  <label for="amount_paid" class="form-label">Amount paid</label>
+                  <input id="amount_paid" name="amount_paid" type="number" min="0" step="0.01" value="<%= row.amount_paid !== undefined ? Number(row.amount_paid).toFixed(2) : '0.00' %>" class="form-input">
+                  <p class="form-help">Marking the document as paid records the full total.</p>
+                </div>
+              </div>
+            <% } %>
+
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Save</h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Documents can be edited until they are completed. Stock is posted when a purchase invoice is received and when a delivery is shipped.</p>
+              <div class="mt-4 flex flex-col gap-2">
+                <button type="submit" class="btn btn-primary">
+                  <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                  <%= mode === 'create' ? 'Create' : 'Save changes' %>
+                </button>
+                <a href="<%= backUrl %>" class="btn btn-secondary">Cancel</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script src="/js/orders.js"></script>
+  <%- include('/layouts/footer') %>

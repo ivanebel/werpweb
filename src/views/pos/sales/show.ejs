@@ -1,0 +1,190 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <%
+        const paymentLabel = (value) => t(h.humanize(value));
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= sale.ticket_number %></h1>
+            <span class="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"><%= t(sale.ticket_type) %></span>
+          </div>
+          <p class="page-subtitle"><%= sale.pos_name %> · <%= h.formatDate(sale.sale_date) %> · <%= sale.customer_name || t('Walk-in customer') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/pos/sales" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('POS sales') %>
+          </a>
+          <a href="/pos/sales/<%= sale.id %>/edit" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+            <%= t('Edit') %>
+          </a>
+          <form method="POST" action="/pos/sales/<%= sale.id %>/delete" class="inline" data-confirm="<%= t('Delete this POS sale? This cannot be undone.') %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-danger btn-sm">
+              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+              <%= t('Delete') %>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-2">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('POS sale') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Recorded from {shop}', { shop: sale.pos_name }) %></p>
+              </div>
+              <span class="text-xs text-gray-400"><%= sale.created_by_name ? t('Recorded by {name}', { name: sale.created_by_name }) : '' %></span>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[760px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Product') %></th>
+                    <th class="table-th text-right"><%= t('Qty') %></th>
+                    <th class="table-th text-right"><%= t('Unit price') %></th>
+                    <th class="table-th text-right"><%= t('VAT %') %></th>
+                    <th class="table-th text-right"><%= t('Line total') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% items.forEach(item => { %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
+                        <p class="mt-0.5 text-xs text-gray-400"><%= item.sku %><%= item.description ? ` · ${item.description}` : '' %></p>
+                      </td>
+                      <td class="table-td text-right"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
+                      <td class="table-td text-right"><%= money(item.unit_price) %></td>
+                      <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
+                      <td class="table-td text-right font-medium"><%= money(item.line_total) %></td>
+                    </tr>
+                  <% }) %>
+                  <% if (!items.length) { %>
+                    <tr><td colspan="5" class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No line items.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+            <div class="border-t border-gray-100 p-5 dark:border-gray-800">
+              <div class="ml-auto max-w-sm space-y-2 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400"><%= t('Subtotal (incl. VAT)') %></span>
+                  <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(sale.subtotal) %></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400"><%= t('VAT included') %></span>
+                  <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(sale.tax_total) %></span>
+                </div>
+                <% if (Number(sale.discount_total) > 0) { %>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-500 dark:text-gray-400"><%= t('Discount') %></span>
+                    <span class="font-medium text-error-600 dark:text-error-400">- <%= money(sale.discount_total) %></span>
+                  </div>
+                <% } %>
+                <div class="flex items-center justify-between border-t border-gray-100 pt-2 dark:border-gray-800">
+                  <span class="text-base font-semibold text-gray-800 dark:text-gray-200"><%= t('Total') %></span>
+                  <span class="text-xl font-bold text-gray-900 dark:text-white"><%= money(sale.total) %></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <% if (sale.notes) { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Notes') %></h2>
+              <p class="mt-2 whitespace-pre-line text-sm text-gray-600 dark:text-gray-300"><%= sale.notes %></p>
+            </div>
+          <% } %>
+
+          <div class="rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+            <div class="flex items-start gap-3">
+              <span class="mt-0.5"><%- include('/partials/icon', { name: 'info', className: 'h-5 w-5' }) %></span>
+              <p><%= t('This POS sale is a reporting record. It did not post stock movements or change Unit #1 inventory.') %></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Ticket details') %></h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Type') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= t(sale.ticket_type) %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Ticket number') %></dt>
+                <dd class="text-right font-mono text-xs text-gray-800 dark:text-gray-200"><%= sale.ticket_number %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Point of sale') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= sale.pos_name %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Sale date') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatDate(sale.sale_date) %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Payment method') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= paymentLabel(sale.payment_method) %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Customer') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= sale.customer_name || t('Walk-in customer') %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Line items') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatNumber(items.length, 0) %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Units') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatQty(units) %></dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="card-title"><%= t('Point of sale') %></h2>
+              <a href="/pos/locations/<%= sale.pos_id %>" class="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"><%= t('Open shop') %></a>
+            </div>
+            <p class="mt-3 text-sm font-medium text-gray-800 dark:text-gray-200"><%= sale.pos_name %></p>
+            <p class="mt-0.5 font-mono text-xs text-gray-400"><%= sale.pos_code %></p>
+            <a href="/pos/locations/<%= sale.pos_id %>" class="btn btn-secondary btn-sm mt-4 w-full">
+              <%- include('/partials/icon', { name: 'building', className: 'h-4 w-4' }) %>
+              <%= t('Shop performance') %>
+            </a>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Record') %></h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Created') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatDateTime(sale.created_at) %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Updated') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatDateTime(sale.updated_at) %></dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Recorded by') %></dt>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= sale.created_by_name || '—' %></dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

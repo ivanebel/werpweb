@@ -1,0 +1,107 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+      <% const errorList = Object.values(errors || {}); %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title">My profile</h1>
+          <p class="page-subtitle">Manage your name, email address and password.</p>
+        </div>
+        <a href="/dashboard" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back to dashboard
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please fix the following:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div class="card p-5 md:p-6">
+          <div class="flex flex-col items-center text-center">
+            <span class="flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-2xl font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+              <%= h.initials(row.name) %>
+            </span>
+            <p class="mt-3 text-base font-semibold text-gray-900 dark:text-white"><%= row.name %></p>
+            <p class="text-sm text-gray-500 dark:text-gray-400"><%= row.email %></p>
+            <span class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium capitalize text-gray-700 ring-1 ring-inset ring-gray-500/20 dark:bg-gray-500/15 dark:text-gray-400">
+              <%= row.role %>
+            </span>
+          </div>
+          <dl class="mt-5 space-y-3 border-t border-gray-100 pt-4 text-sm dark:border-gray-800">
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Last login</dt><dd class="text-right text-gray-700 dark:text-gray-300"><%= h.formatDateTime(row.last_login_at) %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">User ID</dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300">#<%= row.id %></dd></div>
+          </dl>
+        </div>
+
+        <form method="POST" action="/profile" class="space-y-5 lg:col-span-2">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+          <div class="card">
+            <div class="card-header"><h2 class="card-title">Profile details</h2></div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div>
+                <label for="name" class="form-label">Full name <span class="text-error-500">*</span></label>
+                <input id="name" name="name" type="text" value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" required>
+                <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+              </div>
+              <div>
+                <label for="email" class="form-label">Email <span class="text-error-500">*</span></label>
+                <input id="email" name="email" type="email" value="<%= row.email || '' %>" class="form-input <%= errors.email ? 'form-input-error' : '' %>" required>
+                <% if (errors.email) { %><p class="form-error"><%= errors.email %></p><% } %>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Change password</h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Leave blank to keep your current password.</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div class="md:col-span-2">
+                <label for="current_password" class="form-label">Current password</label>
+                <input id="current_password" name="current_password" type="password" class="form-input <%= errors.current_password ? 'form-input-error' : '' %>" autocomplete="current-password">
+                <% if (errors.current_password) { %><p class="form-error"><%= errors.current_password %></p><% } %>
+                <p class="form-help">Required when changing your email or password.</p>
+              </div>
+              <div>
+                <label for="password" class="form-label">New password</label>
+                <input id="password" name="password" type="password" class="form-input <%= errors.password ? 'form-input-error' : '' %>" autocomplete="new-password" placeholder="At least 8 characters">
+                <% if (errors.password) { %><p class="form-error"><%= errors.password %></p><% } %>
+              </div>
+              <div>
+                <label for="password_confirm" class="form-label">Confirm new password</label>
+                <input id="password_confirm" name="password_confirm" type="password" class="form-input <%= errors.password_confirm ? 'form-input-error' : '' %>" autocomplete="new-password">
+                <% if (errors.password_confirm) { %><p class="form-error"><%= errors.password_confirm %></p><% } %>
+              </div>
+            </div>
+            <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+              <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary">
+                <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                Save profile
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

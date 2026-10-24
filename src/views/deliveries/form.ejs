@@ -1,0 +1,155 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1300px]">
+      <%
+        const backUrl = mode === 'edit' ? `/deliveries/${delivery.id}` : '/deliveries';
+        const formErrors = errors._form || [];
+        const submittedIds = Array.isArray(row.so_item_id) ? row.so_item_id.map(String) : null;
+        const submittedQtys = Array.isArray(row.item_quantity) ? row.item_quantity : [];
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New delivery') : t('Edit {number}', { number: delivery.delivery_no }) %></h1>
+          <p class="page-subtitle">
+            <%= mode === 'create' ? t('Ship items from sales order') : t('Update packing details for') %>
+            <span class="font-medium text-gray-700 dark:text-gray-300"><%= order.order_no %></span>
+          </p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+        </a>
+      </div>
+
+      <% if (formErrors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please review the delivery:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% formErrors.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="sales_order_id" value="<%= order.id %>">
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Delivery details</h2>
+            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? delivery.delivery_no : 'Number assigned on save' %></span>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div class="md:col-span-2">
+              <label for="delivery_date" class="form-label">Delivery date <span class="text-error-500">*</span></label>
+              <input id="delivery_date" type="date" name="delivery_date" value="<%= String(row.delivery_date || '').slice(0, 10) %>" class="form-input" required>
+            </div>
+            <div class="md:col-span-2">
+              <label class="form-label">Sales order</label>
+              <div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                <a href="/sales-orders/<%= order.id %>" class="link"><%= order.order_no %></a>
+                <span class="ml-2 text-gray-400">·</span>
+                <span class="ml-2 truncate"><%= order.customer_name || t('Sales order') %></span>
+              </div>
+              <div class="mt-2 grid grid-cols-1 gap-1 text-xs text-gray-500 dark:text-gray-400 sm:grid-cols-2">
+                <p><span class="font-medium text-gray-600 dark:text-gray-300"><%= t('Customer order no.') %>:</span> <%= order.customer_order_no || '—' %></p>
+                <p><span class="font-medium text-gray-600 dark:text-gray-300"><%= t('Destination warehouse') %>:</span> <%= order.warehouse_name ? `${order.warehouse_name}${order.warehouse_code ? ` (${order.warehouse_code})` : ''}` : '—' %></p>
+                <% if (order.docking_station) { %><p><span class="font-medium text-gray-600 dark:text-gray-300"><%= t('Docking station') %>:</span> <%= order.docking_station %></p><% } %>
+                <% if (order.reception_at) { %><p><span class="font-medium text-gray-600 dark:text-gray-300"><%= t('Reception date & time') %>:</span> <%= h.formatDateTime(order.reception_at) %></p><% } %>
+              </div>
+            </div>
+            <div>
+              <label for="carrier" class="form-label">Carrier</label>
+              <input id="carrier" name="carrier" type="text" value="<%= row.carrier || '' %>" class="form-input" placeholder="DHL, UPS, local courier…">
+            </div>
+            <div>
+              <label for="tracking_number" class="form-label">Tracking number</label>
+              <input id="tracking_number" name="tracking_number" type="text" value="<%= row.tracking_number || '' %>" class="form-input" placeholder="Optional">
+            </div>
+            <div class="md:col-span-2">
+              <label for="notes" class="form-label">Notes</label>
+              <input id="notes" name="notes" type="text" value="<%= row.notes || '' %>" class="form-input" placeholder="Packing instructions, reference…">
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Items to ship</h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Enter the quantity for each line. Leave at zero to skip a line.</p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              <%= h.pluralize(items.length, 'line') %>
+            </span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[860px]">
+              <thead>
+                <tr>
+                  <th class="table-th">Item</th>
+                  <th class="table-th text-right">Ordered</th>
+                  <th class="table-th text-right">Delivered</th>
+                  <th class="table-th text-right">Reserved</th>
+                  <th class="table-th text-right">Available</th>
+                  <th class="table-th w-32 text-right">Ship qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% items.forEach((item, index) => {
+                  const maxQty = Number(item.quantity) - Number(item.delivered_qty) - Number(item.reserved || 0) + Number(item.current_qty || 0);
+                  let qtyValue;
+                  if (submittedIds) {
+                    const pos = submittedIds.indexOf(String(item.so_item_id));
+                    qtyValue = pos >= 0 ? submittedQtys[pos] : '0';
+                  } else if (mode === 'edit' && Number(item.current_qty) > 0) {
+                    qtyValue = item.current_qty;
+                  } else {
+                    qtyValue = Math.max(0, Number(maxQty.toFixed(3)));
+                  }
+                %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <input type="hidden" name="so_item_id" value="<%= item.so_item_id %>">
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
+                      <p class="text-xs text-gray-400"><%= item.sku %> · <%= item.unit %></p>
+                    </td>
+                    <td class="table-td text-right"><%= h.formatQty(item.quantity) %></td>
+                    <td class="table-td text-right"><%= h.formatQty(item.delivered_qty) %></td>
+                    <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(item.reserved || 0) %></td>
+                    <td class="table-td text-right font-medium <%= maxQty > 0 ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400' %>">
+                      <%= h.formatQty(Math.max(0, maxQty)) %> <span class="text-xs font-normal text-gray-400"><%= item.unit %></span>
+                    </td>
+                    <td class="table-td">
+                      <input name="item_quantity" type="number" min="0" max="<%= Math.max(0, maxQty) %>" step="0.001" value="<%= qtyValue %>" class="form-input text-right" aria-label="<%= t('Quantity to ship for {item}', { item: item.name }) %>">
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+            <a href="<%= backUrl %>" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              <%= mode === 'create' ? t('Create delivery') : t('Save changes') %>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div class="mt-5 flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+        <%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5 shrink-0' }) %>
+        <p>Stock is only reduced when the delivery is marked as shipped. The system blocks shipping if any product does not have enough stock.</p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

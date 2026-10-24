@@ -1,0 +1,206 @@
+<%
+  const isCustomer = typeKey === 'customer';
+  const printTitle = isCustomer ? t('Customer payment order') : t('Supplier payment order');
+%>
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= printTitle %> <%= payment.payment_no %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    @page { size: A4; margin: 14mm; }
+    body { background: #fff; color: #1d2939; }
+    @media print {
+      .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-outfit text-gray-800" data-locale="<%= locale %>">
+  <div class="no-print sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
+    <a href="/payments/<%= payment.id %>" class="btn btn-secondary btn-sm"><%= t('Back to payment') %></a>
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-gray-500"><%= printTitle %> <%= payment.payment_no %></span>
+      <button type="button" onclick="window.print()" class="btn btn-primary btn-sm"><%= t('Print / Save PDF') %></button>
+    </div>
+  </div>
+
+  <div class="mx-auto my-6 max-w-[820px] bg-white p-8 shadow-theme-lg print:my-0 print:max-w-none print:p-0 print:shadow-none sm:p-10">
+    <div class="flex flex-wrap items-start justify-between gap-6 border-b border-gray-200 pb-6">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-white"><%= (settings.company_name || 'W').charAt(0) %></span>
+          <div>
+            <p class="text-lg font-bold text-gray-900"><%= settings.company_name %></p>
+            <p class="text-xs text-gray-500"><%= settings.company_email %><%= settings.company_phone ? ' · ' + settings.company_phone : '' %></p>
+          </div>
+        </div>
+        <div class="mt-4 whitespace-pre-line text-xs leading-relaxed text-gray-500"><%= settings.company_address %></div>
+        <% if (settings.company_tax_id) { %><p class="mt-1 text-xs text-gray-500"><%= t('Tax ID:') %> <%= settings.company_tax_id %></p><% } %>
+      </div>
+      <div class="text-right">
+        <p class="text-2xl font-semibold uppercase tracking-wide text-brand-600"><%= t('Payment order') %></p>
+        <p class="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-gray-400"><%= isCustomer ? t('Customer payment') : t('Supplier payment') %></p>
+        <p class="mt-2 text-sm font-medium text-gray-700"><%= payment.payment_no %></p>
+        <div class="mt-3 space-y-0.5 text-xs text-gray-500">
+          <p><span class="font-medium text-gray-700"><%= t('Payment date') %>:</span> <%= h.formatDate(payment.payment_date) %></p>
+          <% if (payment.reference) { %><p><span class="font-medium text-gray-700"><%= t('Reference') %>:</span> <%= payment.reference %></p><% } %>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-2">
+      <div>
+        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400"><%= isCustomer ? t('Received from') : t('Paid to') %></p>
+        <p class="mt-2 text-sm font-semibold text-gray-900"><%= payment.party_name %></p>
+        <% if (payment.party_no) { %><p class="text-sm text-gray-600"><%= payment.party_no %></p><% } %>
+        <% if (payment.party_contact) { %><p class="text-sm text-gray-600"><%= payment.party_contact %></p><% } %>
+        <% if (payment.party_address) { %><p class="text-sm text-gray-600"><%= payment.party_address %></p><% } %>
+        <% if (payment.party_city) { %><p class="text-sm text-gray-600"><%= payment.party_city %><%= payment.party_state ? ', ' + payment.party_state : '' %> <%= payment.party_postal %></p><% } %>
+        <% if (payment.party_email) { %><p class="mt-1 text-sm text-gray-600"><%= payment.party_email %></p><% } %>
+        <% if (payment.party_tax_id) { %><p class="mt-1 text-xs text-gray-500"><%= t('Tax ID:') %> <%= payment.party_tax_id %></p><% } %>
+      </div>
+      <div class="sm:text-right">
+        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400"><%= t('Summary') %></p>
+        <p class="mt-2 text-sm text-gray-600"><%= t('Total sources') %>: <span class="font-semibold text-gray-900"><%= money(payment.total_amount) %></span></p>
+        <p class="text-sm text-gray-600"><%= t('Applied to invoices') %>: <span class="font-medium text-gray-800"><%= money(payment.applied_amount) %></span></p>
+        <p class="text-sm text-gray-600"><%= t('Unapplied credit') %>: <span class="font-medium text-gray-800"><%= money(payment.unapplied_amount) %></span></p>
+        <% if (Array.isArray(payment.allocations) && payment.allocations.length) { %>
+          <p class="mt-2 text-xs text-gray-500"><%= h.pluralize(payment.allocations.length, 'invoice') %></p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="mt-8">
+      <h2 class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400"><%= t('Payment methods') %></h2>
+      <table class="mt-2 w-full border-collapse text-left text-sm">
+        <thead>
+          <tr class="border-y border-gray-200 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+            <th class="py-2.5 pl-3 pr-2 font-semibold"><%= t('Method') %></th>
+            <th class="px-2 py-2.5 font-semibold"><%= t('Reference') %></th>
+            <th class="px-2 py-2.5 font-semibold"><%= t('Bank / issuer') %></th>
+            <th class="px-2 py-2.5 font-semibold"><%= t('Check date') %></th>
+            <th class="py-2.5 pl-2 pr-3 text-right font-semibold"><%= t('Amount') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% payment.methods.forEach(method => { %>
+            <tr class="border-b border-gray-100">
+              <td class="py-3 pl-3 pr-2 font-medium text-gray-800"><%= methodLabels[method.method] || method.method %></td>
+              <td class="px-2 py-3 text-gray-600"><%= method.reference || '—' %></td>
+              <td class="px-2 py-3 text-gray-600"><%= method.bank_name || '—' %></td>
+              <td class="px-2 py-3 text-gray-600"><%= method.check_date ? h.formatDate(method.check_date) : '—' %></td>
+              <td class="py-3 pl-2 pr-3 text-right font-medium whitespace-nowrap"><%= money(method.amount) %></td>
+            </tr>
+          <% }) %>
+          <% if (!payment.methods.length) { %>
+            <tr class="border-b border-gray-100"><td colspan="5" class="px-3 py-6 text-center text-sm text-gray-400"><%= t('No cash or bank movement.') %></td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (payment.adjustments.length) { %>
+      <div class="mt-6">
+        <h2 class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400"><%= t('Adjustments') %></h2>
+        <table class="mt-2 w-full border-collapse text-left text-sm">
+          <thead>
+            <tr class="border-y border-gray-200 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+              <th class="py-2.5 pl-3 pr-2 font-semibold"><%= t('Type') %></th>
+              <th class="px-2 py-2.5 font-semibold"><%= t('Reference') %></th>
+              <th class="py-2.5 pl-2 pr-3 text-right font-semibold"><%= t('Amount') %></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% payment.adjustments.forEach(adjustment => { %>
+              <tr class="border-b border-gray-100">
+                <td class="py-3 pl-3 pr-2 font-medium text-gray-800"><%= adjustmentLabels[adjustment.kind] || adjustment.kind %></td>
+                <td class="px-2 py-3 text-gray-600"><%= adjustment.reference || '—' %></td>
+                <td class="py-3 pl-2 pr-3 text-right font-medium whitespace-nowrap"><%= money(adjustment.amount) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <div class="mt-6">
+      <h2 class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400"><%= t('Invoice allocations') %></h2>
+      <table class="mt-2 w-full border-collapse text-left text-sm">
+        <thead>
+          <tr class="border-y border-gray-200 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+            <th class="py-2.5 pl-3 pr-2 font-semibold"><%= isCustomer ? t('Invoice') : t('Bill') %></th>
+            <th class="py-2.5 pl-2 pr-3 text-right font-semibold"><%= t('Applied amount') %></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% payment.allocations.forEach(allocation => { %>
+            <tr class="border-b border-gray-100">
+              <td class="py-3 pl-3 pr-2 font-medium text-gray-800"><%= allocation.invoice_no %></td>
+              <td class="py-3 pl-2 pr-3 text-right font-medium whitespace-nowrap"><%= money(allocation.amount) %></td>
+            </tr>
+          <% }) %>
+          <% if (!payment.allocations.length) { %>
+            <tr class="border-b border-gray-100"><td colspan="2" class="px-3 py-6 text-center text-sm text-gray-400"><%= t('No invoices were allocated.') %></td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-6 ml-auto w-full max-w-sm space-y-2 rounded-xl bg-gray-50 p-5 text-sm">
+      <div class="flex items-center justify-between gap-4">
+        <span class="text-gray-500"><%= t('Payment methods') %></span>
+        <span class="font-medium text-gray-800"><%= money(payment.method_total) %></span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span class="text-gray-500"><%= t('Credit notes') %></span>
+        <span class="font-medium text-gray-800"><%= money(payment.credit_total) %></span>
+      </div>
+      <% if (isCustomer) { %>
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-gray-500"><%= t('Tax withholdings') %></span>
+          <span class="font-medium text-gray-800"><%= money(payment.withholding_total) %></span>
+        </div>
+      <% } else { %>
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-gray-500"><%= t('Debit notes') %></span>
+          <span class="font-medium text-gray-800"><%= money(payment.debit_total) %></span>
+        </div>
+      <% } %>
+      <div class="flex items-center justify-between gap-4 border-t border-gray-200 pt-2">
+        <span class="font-medium text-gray-700"><%= t('Total sources') %></span>
+        <span class="font-semibold text-gray-900"><%= money(payment.total_amount) %></span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span class="text-gray-500"><%= t('Applied to invoices') %></span>
+        <span class="font-medium text-gray-800"><%= money(payment.applied_amount) %></span>
+      </div>
+      <div class="flex items-center justify-between gap-4 rounded-lg bg-warning-50 px-3 py-2">
+        <span class="font-medium text-warning-700"><%= t('Unapplied credit') %></span>
+        <span class="font-semibold text-warning-700"><%= money(payment.unapplied_amount) %></span>
+      </div>
+    </div>
+
+    <% if (payment.notes) { %>
+      <div class="mt-6 border-t border-gray-200 pt-4">
+        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400"><%= t('Notes') %></p>
+        <p class="mt-1 whitespace-pre-line text-sm text-gray-600"><%= payment.notes %></p>
+      </div>
+    <% } %>
+
+    <div class="mt-12 grid grid-cols-1 gap-10 sm:grid-cols-2">
+      <div class="border-t border-gray-300 pt-2 text-center text-xs text-gray-500"><%= isCustomer ? t('Received by') : t('Prepared by') %></div>
+      <div class="border-t border-gray-300 pt-2 text-center text-xs text-gray-500"><%= t('Authorized signature') %></div>
+    </div>
+
+    <p class="mt-8 border-t border-gray-200 pt-3 text-center text-[10px] text-gray-400">
+      <%= settings.company_name %> · <%= t('Payment order') %> <%= payment.payment_no %> · <%= h.formatDate(payment.payment_date) %>
+    </p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <%
+        const canEdit = ['admin', 'manager'].includes(currentUser.role);
+        const errorList = Object.values(errors || {});
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title">Company settings</h1>
+          <p class="page-subtitle">These details appear on documents, packing slips and throughout the app.</p>
+        </div>
+        <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+          <%- include('/partials/icon', { name: 'building', className: 'h-4 w-4' }) %>
+          <%= values.company_name %>
+        </span>
+      </div>
+
+      <% if (!canEdit) { %>
+        <div class="mb-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+          <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+          <p>You can view company settings, but only administrators and managers can change them.</p>
+        </div>
+      <% } %>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400">Please fix the following:</p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/settings">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="space-y-5 xl:col-span-2">
+            <div class="card">
+              <div class="card-header"><h2 class="card-title">Company profile</h2></div>
+              <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+                <div class="md:col-span-2">
+                  <label for="company_name" class="form-label">Company name <span class="text-error-500">*</span></label>
+                  <input id="company_name" name="company_name" type="text" value="<%= values.company_name || '' %>" class="form-input <%= errors.company_name ? 'form-input-error' : '' %>" <%= canEdit ? '' : 'readonly' %> required>
+                  <% if (errors.company_name) { %><p class="form-error"><%= errors.company_name %></p><% } %>
+                </div>
+                <div>
+                  <label for="company_email" class="form-label">Email</label>
+                  <input id="company_email" name="company_email" type="email" value="<%= values.company_email || '' %>" class="form-input" <%= canEdit ? '' : 'readonly' %>>
+                </div>
+                <div>
+                  <label for="company_phone" class="form-label">Phone</label>
+                  <input id="company_phone" name="company_phone" type="text" value="<%= values.company_phone || '' %>" class="form-input" <%= canEdit ? '' : 'readonly' %>>
+                </div>
+                <div>
+                  <label for="company_tax_id" class="form-label">Tax ID / VAT number</label>
+                  <input id="company_tax_id" name="company_tax_id" type="text" value="<%= values.company_tax_id || '' %>" class="form-input" <%= canEdit ? '' : 'readonly' %>>
+                </div>
+                <div>
+                  <label for="currency" class="form-label">Currency</label>
+                  <input id="currency" name="currency" type="text" value="<%= values.currency || 'USD' %>" class="form-input uppercase <%= errors.currency ? 'form-input-error' : '' %>" maxlength="3" placeholder="USD" <%= canEdit ? '' : 'readonly' %>>
+                  <% if (errors.currency) { %><p class="form-error"><%= errors.currency %></p><% } %>
+                  <p class="form-help">Three-letter ISO code, e.g. USD or EUR.</p>
+                </div>
+                <div class="md:col-span-2">
+                  <label for="company_address" class="form-label">Address</label>
+                  <textarea id="company_address" name="company_address" rows="3" class="form-textarea" <%= canEdit ? '' : 'readonly' %>><%= values.company_address || '' %></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><h2 class="card-title">Document defaults</h2></div>
+              <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+                <div>
+                  <label for="default_tax_rate" class="form-label">Default tax rate (%)</label>
+                  <input id="default_tax_rate" name="default_tax_rate" type="number" min="0" step="0.01" value="<%= values.default_tax_rate || '0' %>" class="form-input <%= errors.default_tax_rate ? 'form-input-error' : '' %>" <%= canEdit ? '' : 'readonly' %>>
+                  <% if (errors.default_tax_rate) { %><p class="form-error"><%= errors.default_tax_rate %></p><% } %>
+                  <p class="form-help">Prefilled on new invoice and order lines.</p>
+                </div>
+                <div>
+                  <label for="fiscal_year_start" class="form-label">Fiscal year start</label>
+                  <input id="fiscal_year_start" name="fiscal_year_start" type="text" value="<%= values.fiscal_year_start || '01-01' %>" class="form-input" placeholder="01-01" maxlength="5" <%= canEdit ? '' : 'readonly' %>>
+                  <p class="form-help">Month and day, e.g. 01-01 for January 1.</p>
+                </div>
+                <div class="md:col-span-2">
+                  <label for="invoice_footer" class="form-label">Document footer</label>
+                  <textarea id="invoice_footer" name="invoice_footer" rows="3" class="form-textarea" placeholder="Thank you for your business." <%= canEdit ? '' : 'readonly' %>><%= values.invoice_footer || '' %></textarea>
+                  <p class="form-help">Printed at the bottom of invoices, orders and packing slips.</p>
+                </div>
+              </div>
+              <% if (canEdit) { %>
+                <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+                  <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+                  <button type="submit" class="btn btn-primary">
+                    <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                    Save settings
+                  </button>
+                </div>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Preview</h2>
+              <div class="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white/[0.03]">
+                <div class="flex items-center gap-3">
+                  <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white"><%= h.initials(values.company_name || 'W') %></span>
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-gray-800 dark:text-gray-200"><%= values.company_name %></p>
+                    <p class="truncate text-xs text-gray-500 dark:text-gray-400"><%= values.company_email || t('No email set') %></p>
+                  </div>
+                </div>
+                <div class="mt-3 whitespace-pre-line text-xs leading-relaxed text-gray-500 dark:text-gray-400"><%= values.company_address || t('No address set') %></div>
+                <div class="mt-3 flex items-center justify-between border-t border-gray-200 pt-3 text-xs dark:border-gray-700">
+                  <span class="text-gray-500 dark:text-gray-400">Currency</span>
+                  <span class="font-medium text-gray-700 dark:text-gray-300"><%= values.currency %></span>
+                </div>
+                <div class="mt-1 flex items-center justify-between text-xs">
+                  <span class="text-gray-500 dark:text-gray-400">Default tax</span>
+                  <span class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatNumber(values.default_tax_rate, 2) %>%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">System</h2>
+              <dl class="mt-4 space-y-3 text-sm">
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Signed in as</dt><dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= currentUser.name %></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Role</dt><dd class="font-medium capitalize text-gray-700 dark:text-gray-300"><%= currentUser.role %></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Fiscal year</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= values.fiscal_year_start %></dd></div>
+              </dl>
+              <div class="mt-4 flex flex-col gap-2">
+                <a href="/profile" class="btn btn-secondary btn-sm">My profile</a>
+                <% if (currentUser.role === 'admin') { %>
+                  <a href="/settings/users" class="btn btn-secondary btn-sm">Manage users</a>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

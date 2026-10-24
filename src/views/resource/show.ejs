@@ -1,0 +1,245 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1300px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div class="flex items-start gap-4">
+          <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            <%- include('/partials/icon', { name: resource.key === 'customers' ? 'users' : resource.key === 'suppliers' ? 'truck' : resource.key === 'employees' ? 'user-group' : resource.key === 'products' ? 'cube' : (resource.key === 'product-categories' || resource.key === 'brands') ? 'tag' : 'cube', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="page-title"><%= row[resource.titleField || 'name'] || (t('Record #') + row.id) %></h1>
+              <% if (row.status) { %><%- statusBadge(row.status) %><% } %>
+            </div>
+            <p class="page-subtitle">
+              <% if (row.customer_no) { %><%= t('Customer {number}', { number: row.customer_no }) %><% } %>
+              <% if (row.supplier_no) { %><%= t('Supplier {number}', { number: row.supplier_no }) %><% } %>
+              <% if (row.employee_no) { %><%= t('Employee {number}', { number: row.employee_no }) %><% } %>
+              <% if (row.sku && resource.key === 'products') { %>SKU <%= row.sku %><% } %>
+              <% if (row.product_count !== undefined && (resource.key === 'product-categories' || resource.key === 'brands')) { %><%= h.pluralize(row.product_count, 'product') %><% } %>
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="<%= resource.basePath %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+          </a>
+          <% if (resource.key === 'customers') { %>
+            <a href="/payments/new?type=customer&party_id=<%= row.id %>" class="btn btn-primary btn-sm">
+              <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %> <%= t('New customer payment') %>
+            </a>
+          <% } else if (resource.key === 'suppliers') { %>
+            <a href="/payments/new?type=supplier&party_id=<%= row.id %>" class="btn btn-primary btn-sm">
+              <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %> <%= t('New supplier payment') %>
+            </a>
+          <% } %>
+          <a href="<%= resource.basePath %>/<%= row.id %>/edit" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> Edit
+          </a>
+          <form action="<%= resource.basePath %>/<%= row.id %>/delete" method="POST" data-confirm="<%= t('Delete {item}? This cannot be undone.', { item: resource.singularLower }) %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-danger btn-sm">
+              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %> Delete
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <%
+        const defaultSection = t('General');
+        const displaySections = [];
+        detailFields.forEach(f => {
+          const s = f.section || defaultSection;
+          if (!displaySections.includes(s)) displaySections.push(s);
+        });
+        const moneyFields = ['cost_gross_price', 'cost_price', 'sale_gross_price', 'sale_price', 'credit_limit', 'salary'];
+        const hasValue = v => v !== null && v !== undefined && v !== '';
+        const visibleFields = f => hasValue(row[f.name]);
+        const visibleSections = displaySections.filter(section =>
+          detailFields.some(f => (f.section || defaultSection) === section && visibleFields(f))
+        );
+      %>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-2">
+          <% visibleSections.forEach(section => { %>
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title"><%= section %></h2>
+              </div>
+              <dl class="grid grid-cols-1 gap-x-8 gap-y-5 p-5 sm:grid-cols-2 md:p-6">
+                <% detailFields.filter(f => (f.section || defaultSection) === section && visibleFields(f)).forEach(f => { %>
+                  <% const value = row[f.name]; %>
+                  <div class="<%= f.full || f.type === 'textarea' || f.type === 'notes' ? 'sm:col-span-2' : '' %>">
+                    <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= f.label %></dt>
+                    <dd class="mt-1 text-sm text-gray-800 dark:text-gray-200">
+                      <% if (f.type === 'checkbox') { %>
+                        <span class="<%= Number(value) === 1 ? 'text-success-600 dark:text-success-400' : 'text-gray-400' %>"><%= Number(value) === 1 ? t('Yes') : t('No') %></span>
+                      <% } else if (f.type === 'status') { %>
+                        <%- statusBadge(value) %>
+                      <% } else if (f.type === 'select') { %>
+                        <%= (f.options || []).find(o => String(o.value) === String(value))?.label || h.humanize(value) %>
+                      <% } else if (f.type === 'date') { %>
+                        <%= h.formatDate(value) %>
+                      <% } else if (moneyFields.includes(f.name)) { %>
+                        <span class="font-medium"><%= money(value) %></span>
+                      <% } else if (f.name.endsWith('_rate')) { %>
+                        <%= Number(value || 0).toFixed(2) %>%
+                      <% } else if (f.type === 'email') { %>
+                        <a href="mailto:<%= value %>" class="link"><%= value %></a>
+                      <% } else if (f.type === 'url') { %>
+                        <a href="<%= value %>" target="_blank" rel="noopener noreferrer" class="link"><%= value %></a>
+                      <% } else if (f.name === 'website') { %>
+                        <a href="<%= value %>" target="_blank" rel="noopener noreferrer" class="link"><%= value %></a>
+                      <% } else if (f.type === 'textarea') { %>
+                        <p class="whitespace-pre-line"><%= value %></p>
+                      <% } else { %>
+                        <%= value %>
+                      <% } %>
+                    </dd>
+                  </div>
+                <% }) %>
+              </dl>
+            </div>
+          <% }) %>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title">Record details</h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex items-center justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Created</dt>
+                <dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(row.created_at) %></dd>
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Last updated</dt>
+                <dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(row.updated_at) %></dd>
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <dt class="text-gray-500 dark:text-gray-400">Record ID</dt>
+                <dd class="font-mono text-xs text-gray-500 dark:text-gray-400">#<%= row.id %></dd>
+              </div>
+            </dl>
+          </div>
+
+          <% if (resource.key === 'customers') { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Quick actions</h2>
+              <div class="mt-4 space-y-2">
+                <a href="/sales-orders/new?customer_id=<%= row.id %>" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'clipboard-list', className: 'h-4 w-4' }) %> New sales order
+                </a>
+                <a href="/sales/new?customer_id=<%= row.id %>" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'receipt', className: 'h-4 w-4' }) %> New invoice
+                </a>
+                <a href="/customers/<%= row.id %>/warehouses" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'building', className: 'h-4 w-4' }) %> Warehouses
+                </a>
+                <a href="/customers/<%= row.id %>/product-codes" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'tag', className: 'h-4 w-4' }) %> Customer product codes
+                </a>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (resource.key === 'suppliers') { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Quick actions</h2>
+              <div class="mt-4 space-y-2">
+                <a href="/purchase-orders/new?supplier_id=<%= row.id %>" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'clipboard', className: 'h-4 w-4' }) %> New purchase order
+                </a>
+                <a href="/purchases/new?supplier_id=<%= row.id %>" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %> New purchase invoice
+                </a>
+              </div>
+            </div>
+          <% } %>
+
+          <% if (resource.key === 'products') { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Inventory position</h2>
+              <div class="mt-4 space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400">On hand</span>
+                  <span class="font-semibold text-gray-800 dark:text-gray-200"><%= h.formatQty(row.stock_qty) %> <%= row.unit %></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400">Reorder level</span>
+                  <span class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatQty(row.reorder_level) %> <%= row.unit %></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400">Stock value</span>
+                  <span class="font-medium text-gray-700 dark:text-gray-300"><%= money(Number(row.stock_qty) * Number(row.cost_price)) %></span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500 dark:text-gray-400">Margin</span>
+                  <span class="font-medium text-gray-700 dark:text-gray-300"><%= money(Number(row.sale_price) - Number(row.cost_price)) %></span>
+                </div>
+              </div>
+              <a href="/deliveries/new" class="btn btn-secondary btn-sm mt-4 w-full">Deliveries</a>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <% related.forEach(section => { %>
+        <div class="card mt-5">
+          <div class="card-header">
+            <h2 class="card-title"><%= section.title %></h2>
+            <% if (section.href) { %><a href="<%= section.href %>" class="btn btn-secondary btn-sm">View all</a><% } %>
+          </div>
+          <% if (section.rows && section.rows.length) { %>
+            <div class="table-wrap">
+              <table class="table-base min-w-[560px]">
+                <thead>
+                  <tr>
+                    <% section.columns.forEach(col => { %>
+                      <th class="table-th <%= col.align === 'right' ? 'text-right' : '' %>"><%= col.label %></th>
+                    <% }) %>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% section.rows.forEach(r => { %>
+                    <tr class="table-row">
+                      <% section.columns.forEach(col => { const v = r[col.key]; %>
+                        <td class="table-td <%= col.align === 'right' ? 'text-right' : '' %>">
+                          <% if (col.type === 'status') { %>
+                            <%- statusBadge(v) %>
+                          <% } else if (col.type === 'money') { %>
+                            <span class="font-medium"><%= money(v) %></span>
+                          <% } else if (col.type === 'date') { %>
+                            <span class="text-gray-500 dark:text-gray-400"><%= h.formatDate(v) %></span>
+                          <% } else if (col.type === 'datetime') { %>
+                            <span class="text-gray-500 dark:text-gray-400"><%= h.formatDateTime(v) %></span>
+                          <% } else if (col.type === 'signed') { %>
+                            <span class="font-semibold <%= Number(v) >= 0 ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400' %>"><%= Number(v) > 0 ? '+' : '' %><%= h.formatQty(v) %></span>
+                          <% } else if (col.type === 'number') { %>
+                            <%= h.formatNumber(v, 0) %>
+                          <% } else if (col.type === 'stock_note') { %>
+                            <span class="text-gray-600 dark:text-gray-300"><%= h.localizeStockNote(v) %></span>
+                          <% } else if (section.linkBase && col === section.columns[0]) { %>
+                            <a href="<%= section.linkBase %>/<%= r.id %>" class="link"><%= v %></a>
+                          <% } else { %>
+                            <span class="text-gray-600 dark:text-gray-300"><%= v || '—' %></span>
+                          <% } %>
+                        </td>
+                      <% }) %>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <p class="px-6 py-10 text-center text-sm text-gray-400"><%= section.emptyText || t('Nothing to show yet.') %></p>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

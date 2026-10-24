@@ -1,0 +1,201 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <%
+        const toneClass = { primary: 'btn-primary', secondary: 'btn-secondary', danger: 'btn-danger', success: 'btn-success' };
+        const totalCost = materials.reduce((sum, m) => sum + Number(m.line_cost || 0), 0);
+        const steps = ['planned', 'released', 'in_progress', 'completed'];
+        const currentStep = steps.indexOf(order.status);
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= order.production_no %></h1>
+            <%- statusBadge(order.status) %>
+          </div>
+          <p class="page-subtitle">
+            <%= order.product_name %>
+            <span class="font-mono text-xs text-gray-400"><%= order.product_sku %></span>
+            · <%= h.formatQty(order.quantity) %> <%= order.unit %>
+            <% if (order.order_no) { %>· <%= t('for') %> <a href="/sales-orders/<%= order.sales_order_id %>" class="link"><%= order.order_no %></a><% } %>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/manufacturing/production-orders" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+          </a>
+          <% actions.forEach(a => { %>
+            <% if (a.href) { %>
+              <a href="<%= a.href %>" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></a>
+            <% } else { %>
+              <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/status" class="inline" <%= a.confirm ? 'data-confirm="Complete this production order? Material stock will be consumed and finished goods added."' : '' %>>
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="status" value="<%= a.value %>">
+                <button type="submit" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></button>
+              </form>
+            <% } %>
+          <% }) %>
+          <% if (['planned', 'cancelled'].includes(order.status)) { %>
+            <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/delete" data-confirm="<%= t('Delete {number}? This cannot be undone.', { number: order.production_no }) %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn btn-danger btn-sm">
+                <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %> Delete
+              </button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (shortage && ['planned', 'released', 'in_progress'].includes(order.status)) { %>
+        <div class="mb-5 flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+          <%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5 shrink-0' }) %>
+          <p><span class="font-semibold">Material shortage:</span> one or more components do not have enough stock for this order. Purchase or adjust stock before completing production.</p>
+        </div>
+      <% } %>
+
+      <div class="mb-5 card p-5">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex flex-1 items-center gap-2">
+            <% steps.forEach((step, index) => { %>
+              <% const done = currentStep >= index && order.status !== 'cancelled'; %>
+              <div class="flex flex-1 items-center gap-2">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold <%= done ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-400 dark:bg-gray-800' %>">
+                  <%= index + 1 %>
+                </span>
+                <span class="hidden text-xs font-medium sm:block <%= done ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400' %>"><%= h.statusInfo(step).label %></span>
+                <% if (index < steps.length - 1) { %>
+                  <span class="h-px flex-1 <%= currentStep > index && order.status !== 'cancelled' ? 'bg-brand-300' : 'bg-gray-200 dark:bg-gray-800' %>"></span>
+                <% } %>
+              </div>
+            <% }) %>
+          </div>
+          <% if (order.status === 'cancelled') { %>
+            <span class="shrink-0 rounded-full bg-error-50 px-3 py-1.5 text-xs font-medium text-error-700 dark:bg-error-500/15 dark:text-error-400">Order cancelled</span>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card overflow-hidden xl:col-span-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Material requirements</h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Snapshot from {bom} ({version}) at order creation.', { bom: order.bom_name, version: order.version }) %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(materials.length, 'component') %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[820px]">
+              <thead>
+                <tr>
+                  <th class="table-th">Component</th>
+                  <th class="table-th text-right">Required</th>
+                  <th class="table-th text-right">Consumed</th>
+                  <th class="table-th text-right">On hand</th>
+                  <th class="table-th text-right">Unit cost</th>
+                  <th class="table-th text-right">Line cost</th>
+                  <th class="table-th">Availability</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% materials.forEach(m => {
+                  const short = Number(m.track_stock) === 1 && Number(m.stock_qty) < Number(m.quantity_required);
+                %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <a href="/products/<%= m.component_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= m.name %></a>
+                      <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= m.sku %> · <%= m.unit %></span>
+                    </td>
+                    <td class="table-td text-right font-medium"><%= h.formatQty(m.quantity_required) %></td>
+                    <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(m.quantity_consumed) %></td>
+                    <td class="table-td text-right"><%= h.formatQty(m.stock_qty) %></td>
+                    <td class="table-td text-right"><%= money(m.cost_price) %></td>
+                    <td class="table-td text-right font-medium"><%= money(m.line_cost) %></td>
+                    <td class="table-td">
+                      <% if (Number(m.track_stock) !== 1) { %>
+                        <span class="text-xs text-gray-400">Not tracked</span>
+                      <% } else if (short) { %>
+                        <span class="badge bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-500/15 dark:text-warning-400">Short</span>
+                      <% } else { %>
+                        <span class="badge bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/15 dark:text-success-400">Available</span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (!materials.length) { %>
+                  <tr>
+                    <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400">No materials snapped for this order.</td>
+                  </tr>
+                <% } %>
+              </tbody>
+              <tfoot>
+                <tr class="bg-gray-50 dark:bg-white/[0.02]">
+                  <td class="table-td font-semibold text-gray-800 dark:text-gray-200" colspan="5">Estimated material cost</td>
+                  <td class="table-td text-right font-semibold text-gray-900 dark:text-white"><%= money(totalCost) %></td>
+                  <td class="table-td"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <% if (order.notes) { %>
+            <div class="border-t border-gray-100 px-6 py-4 dark:border-gray-800">
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Notes</p>
+              <p class="mt-1 whitespace-pre-line text-sm text-gray-600 dark:text-gray-400"><%= order.notes %></p>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <div class="flex items-center justify-between">
+              <h2 class="card-title">Order status</h2>
+              <%- statusBadge(order.status) %>
+            </div>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Production no.</dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= order.production_no %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">BOM</dt><dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= order.bom_name %> (<%= order.version %>)</dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Output</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatQty(order.quantity) %> <%= order.unit %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Start date</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.start_date) %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Due date</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.due_date) %></dd></div>
+              <% if (order.completed_at) { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Completed</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(order.completed_at) %></dd></div>
+              <% } %>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Created</dt><dd class="text-gray-700 dark:text-gray-300"><%= h.formatDate(order.created_at) %></dd></div>
+            </dl>
+            <% if (order.status === 'planned') { %>
+              <a href="/manufacturing/production-orders/<%= order.id %>/edit" class="btn btn-secondary btn-sm mt-4 w-full">
+                <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> Edit order
+              </a>
+            <% } %>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title">Product &amp; order</h2>
+            <p class="mt-3 text-sm font-semibold text-gray-800 dark:text-gray-200"><%= order.product_name %></p>
+            <p class="font-mono text-xs text-gray-400"><%= order.product_sku %></p>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Current stock: <span class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatQty(order.product_stock) %> <%= order.unit %></span></p>
+            <div class="mt-4 grid grid-cols-1 gap-2">
+              <a href="/products/<%= order.product_id %>" class="btn btn-secondary btn-sm">Open product</a>
+              <a href="/manufacturing/boms/<%= order.bom_id %>" class="btn btn-secondary btn-sm">Open BOM</a>
+              <% if (order.order_no) { %>
+                <a href="/sales-orders/<%= order.sales_order_id %>" class="btn btn-secondary btn-sm"><%= t('Sales order {number}', { number: order.order_no }) %></a>
+              <% } %>
+            </div>
+          </div>
+
+          <% if (order.customer_name) { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title">Customer</h2>
+              <p class="mt-2 text-sm font-semibold text-gray-800 dark:text-gray-200"><%= order.customer_name %></p>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">This production run is linked to a sales order for this customer.</p>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

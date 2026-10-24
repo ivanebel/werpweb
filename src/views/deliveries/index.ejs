@@ -1,0 +1,152 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title">Deliveries</h1>
+          <p class="page-subtitle">Fulfil confirmed sales orders and keep track of every shipment.</p>
+        </div>
+        <a href="/deliveries/new" class="btn btn-primary btn-sm">
+          <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+          New delivery
+        </a>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
+            <%- include('/partials/icon', { name: 'truck', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Pending</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(counts.pending, 0) %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/15 dark:text-blue-light-400">
+            <%- include('/partials/icon', { name: 'arrow-up', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Shipped</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(counts.shipped, 0) %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+            <%- include('/partials/icon', { name: 'check-circle', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Delivered</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(counts.delivered, 0) %></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex flex-col gap-4 border-b border-gray-100 p-5 dark:border-gray-800 md:flex-row md:items-end md:justify-between">
+          <form method="GET" action="/deliveries" class="flex flex-1 flex-wrap items-end gap-3">
+            <div class="min-w-[240px] flex-1 md:max-w-md">
+              <label for="q" class="form-label">Search</label>
+              <div class="relative">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
+                </span>
+                <input id="q" type="search" name="q" value="<%= search %>" class="form-input pl-10" placeholder="Delivery no., customer, order or tracking…">
+              </div>
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="status" class="form-label">Status</label>
+              <select id="status" name="status" class="form-select sm:w-44">
+                <option value="">All statuses</option>
+                <% ['pending', 'shipped', 'delivered', 'cancelled'].forEach(status => { %>
+                  <option value="<%= status %>" <%= activeStatus === status ? 'selected' : '' %>><%= h.statusInfo(status).label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-secondary">Apply</button>
+            <% if (search || activeStatus) { %><a href="/deliveries" class="btn btn-ghost">Reset</a><% } %>
+          </form>
+          <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <%= h.pluralize(pagination.total, 'delivery', 'deliveries') %>
+          </span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table-base">
+            <thead>
+              <tr>
+                <th class="table-th">Delivery</th>
+                <th class="table-th">Sales order</th>
+                <th class="table-th">Customer</th>
+                <th class="table-th">Date</th>
+                <th class="table-th">Carrier</th>
+                <th class="table-th text-right">Items</th>
+                <th class="table-th">Status</th>
+                <th class="table-th text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach(row => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <a href="/deliveries/<%= row.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.delivery_no %></a>
+                    <% if (row.tracking_number) { %><span class="mt-0.5 block font-mono text-xs text-gray-400"><%= row.tracking_number %></span><% } %>
+                  </td>
+                  <td class="table-td">
+                    <% if (row.order_no) { %>
+                      <a href="/sales-orders/<%= row.sales_order_id %>" class="link"><%= row.order_no %></a>
+                    <% } else { %>
+                      <span class="text-gray-400">—</span>
+                    <% } %>
+                    <% if (row.customer_order_no) { %><span class="mt-0.5 block text-xs text-gray-400"><%= t('Customer order no.') %>: <%= row.customer_order_no %></span><% } %>
+                  </td>
+                  <td class="table-td">
+                    <%= row.customer_name %>
+                    <% if (row.warehouse_name) { %><span class="mt-0.5 block text-xs text-gray-400"><%= row.warehouse_name %><%= row.warehouse_code ? ` · ${row.warehouse_code}` : '' %></span><% } %>
+                  </td>
+                  <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(row.delivery_date) %></td>
+                  <td class="table-td text-gray-500 dark:text-gray-400"><%= row.carrier || '—' %></td>
+                  <td class="table-td text-right"><%= h.formatNumber(row.item_count, 0) %></td>
+                  <td class="table-td"><%- statusBadge(row.status) %></td>
+                  <td class="table-td">
+                    <div class="flex items-center justify-end gap-1">
+                      <a href="/deliveries/<%= row.id %>" class="btn-icon" title="View">
+                        <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
+                      </a>
+                      <% if (row.status === 'pending') { %>
+                        <a href="/deliveries/<%= row.id %>/edit" class="btn-icon" title="Edit">
+                          <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                        </a>
+                      <% } %>
+                      <a href="/deliveries/<%= row.id %>/print" class="btn-icon" title="Print packing slip">
+                        <%- include('/partials/icon', { name: 'printer', className: 'h-4 w-4' }) %>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!rows.length) { %>
+                <tr>
+                  <td colspan="8" class="px-6 py-16 text-center">
+                    <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                      <%- include('/partials/icon', { name: 'truck', className: 'h-6 w-6' }) %>
+                    </span>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">No deliveries found</p>
+                    <p class="mt-1 text-sm text-gray-400">Create a delivery from a confirmed sales order.</p>
+                    <a href="/deliveries/new" class="btn btn-primary btn-sm mt-4">New delivery</a>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+
+        <%- include('/partials/pagination', { pagination, basePath: '/deliveries', query }) %>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>

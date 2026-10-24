@@ -1,0 +1,39 @@
+<%- include('/layouts/head') %>
+<%
+  const titles = { 400: 'Bad request', 401: 'Not signed in', 403: 'Access denied', 404: 'Page not found', 422: 'Invalid request' };
+  const heading = titles[status] || 'Something went wrong';
+%>
+<main class="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
+  <div class="w-full max-w-lg text-center">
+    <a href="/dashboard" class="mb-8 inline-flex items-center gap-3">
+      <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-lg font-bold text-white shadow-theme-md">W</span>
+      <span class="text-left">
+        <span class="block text-lg font-bold leading-tight text-gray-900 dark:text-white">WerpWeb</span>
+        <span class="block text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">ERP Suite</span>
+      </span>
+    </a>
+
+    <div class="card overflow-hidden p-8 md:p-10">
+      <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-error-50 text-error-500 dark:bg-error-500/15 dark:text-error-400">
+        <%- include('/partials/icon', { name: status === 403 ? 'shield' : 'exclamation-triangle', className: 'h-7 w-7' }) %>
+      </span>
+      <p class="mt-4 text-4xl font-bold text-gray-900 dark:text-white"><%= status %></p>
+      <h1 class="mt-1 text-xl font-semibold text-gray-900 dark:text-white"><%= heading %></h1>
+      <p class="mx-auto mt-2 max-w-sm text-sm text-gray-500 dark:text-gray-400"><%= message || 'An unexpected error occurred.' %></p>
+      <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+        <a href="/dashboard" class="btn btn-primary">
+          <%- include('/partials/icon', { name: 'dashboard', className: 'h-4 w-4' }) %>
+          Back to dashboard
+        </a>
+        <a href="javascript:history.back()" class="btn btn-secondary">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          Go back
+        </a>
+      </div>
+    </div>
+
+    <p class="mt-6 text-xs text-gray-400">&copy; <%= new Date().getFullYear() %> <%= settings.company_name %> · WerpWeb ERP</p>
+  </div>
+</main>
+</body>
+</html>

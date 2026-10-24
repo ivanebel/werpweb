@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="<%= locale %>" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= t('Sign in') %> · <%= settings.company_name %></title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="min-h-full bg-gray-50 font-outfit text-gray-800 antialiased dark:bg-gray-950 dark:text-gray-300" data-locale="<%= locale %>" data-i18n="<%= JSON.stringify(jsMessages || {}) %>">
+<%- include('/partials/flash') %>
+<form action="/language" method="POST" class="fixed right-4 top-4 z-50 flex items-center">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <input type="hidden" name="next" value="/login">
+  <label for="language-select-login" class="sr-only"><%= t('Language') %></label>
+  <select id="language-select-login" name="locale" onchange="this.form.submit()" class="h-9 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 outline-none transition hover:bg-gray-50 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+    <% locales.forEach((item) => { %>
+      <option value="<%= item.code %>" <%= locale === item.code ? 'selected' : '' %>><%= item.label %></option>
+    <% }) %>
+  </select>
+</form>
+<div class="flex min-h-screen">
+  <div class="relative hidden w-1/2 overflow-hidden bg-gray-950 lg:flex lg:flex-col lg:justify-between">
+    <div class="pointer-events-none absolute -left-24 -top-24 h-96 w-96 rounded-full bg-brand-600/30 blur-3xl"></div>
+    <div class="pointer-events-none absolute -bottom-32 -right-24 h-[28rem] w-[28rem] rounded-full bg-blue-light-500/20 blur-3xl"></div>
+    <div class="relative z-10 flex items-center gap-3 px-12 pt-10">
+      <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-xl font-bold text-white shadow-theme-lg">W</span>
+      <div>
+        <p class="text-lg font-bold text-white">WerpWeb</p>
+        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">ERP Suite</p>
+      </div>
+    </div>
+    <div class="relative z-10 px-12">
+      <p class="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-gray-300">
+        <span class="h-1.5 w-1.5 rounded-full bg-success-400"></span>
+        Built for small manufacturers
+      </p>
+      <h1 class="max-w-lg text-4xl font-semibold leading-tight text-white">
+        Everything you make,<br>buy and sell —<br><span class="text-brand-300">in one place.</span>
+      </h1>
+      <p class="mt-5 max-w-md text-base leading-relaxed text-gray-400">
+        Sales, purchasing, inventory, BOMs and production orders, connected so your team always works from the same numbers.
+      </p>
+      <div class="mt-10 grid max-w-md grid-cols-2 gap-3">
+        <% [['Orders & invoices','Quote to cash in one flow'],['BOM & production','Turn materials into stock'],['Live inventory','Raw materials and finished goods'],['Clear reporting','Revenue, margin and pipeline']].forEach(([title, sub]) => { %>
+          <div class="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+            <p class="text-sm font-semibold text-white"><%= title %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= sub %></p>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+    <div class="relative z-10 px-12 pb-10 text-xs text-gray-500">
+      &copy; <%= new Date().getFullYear() %> <%= settings.company_name %>
+    </div>
+  </div>
+
+  <div class="flex w-full items-center justify-center px-4 py-10 sm:px-8 lg:w-1/2">
+    <div class="w-full max-w-md">
+      <div class="mb-8 flex items-center gap-3 lg:hidden">
+        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-xl font-bold text-white">W</span>
+        <div>
+          <p class="text-lg font-bold text-gray-900 dark:text-white">WerpWeb</p>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">ERP Suite</p>
+        </div>
+      </div>
+
+      <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">Welcome back</h2>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Sign in to your workspace to continue.</p>
+
+      <form action="/login" method="POST" class="mt-8 space-y-5">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div>
+          <label for="email" class="form-label">Email address</label>
+          <input id="email" name="email" type="email" value="<%= email %>" required autofocus autocomplete="username"
+                 class="form-input" placeholder="you@company.com">
+        </div>
+        <div>
+          <label for="password" class="form-label">Password</label>
+          <div class="relative">
+            <input id="password" name="password" type="password" required autocomplete="current-password"
+                   class="form-input pr-12" placeholder="Enter your password">
+            <button type="button" id="toggle-password" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800" aria-label="Show password">
+              <%- include('/partials/icon', { name: 'eye', className: 'h-5 w-5' }) %>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Sign in</button>
+      </form>
+
+      <div class="mt-6 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+        <span>Need access? Ask your administrator.</span>
+        <a href="/login" class="link">Reset?</a>
+      </div>
+
+      <% if (settings.company_name) { %>
+      <p class="mt-10 text-center text-xs text-gray-400 dark:text-gray-500">
+        <span class="font-medium text-gray-500 dark:text-gray-400"><%= settings.company_name %></span> · WerpWeb ERP
+      </p>
+      <% } %>
+    </div>
+  </div>
+</div>
+<script>
+  document.getElementById('toggle-password').addEventListener('click', function () {
+    const input = document.getElementById('password');
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+</script>
+</body>
+</html>
