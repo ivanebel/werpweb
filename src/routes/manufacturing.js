@@ -899,7 +899,8 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
     await withTransaction(async (conn) => {
       await conn.query(
         `UPDATE production_orders
-            SET sales_order_id = ?, start_date = ?, due_date = ?, notes = ?
+            SET sales_order_id = ?, start_date = ?, due_date = ?, notes = ?,
+                bom_id = NULL, product_id = NULL, quantity = NULL, lot_number = NULL, expiry_date = NULL
           WHERE id = ?`,
         [
           Number.parseInt(req.body.sales_order_id, 10) || null,
