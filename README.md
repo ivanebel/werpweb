@@ -306,7 +306,9 @@ public/
 - Tailwind is built with the CLI: `npm run build:css` for a minified build, `npm run watch:css` while developing.
 - ApexCharts is served from `node_modules` at `/vendor/apexcharts/apexcharts.min.js`, so the dashboard works without a CDN.
 - Fonts are loaded from Google Fonts (Outfit). If the app runs offline, self-host the font or remove the link in `src/views/layouts/head.ejs`.
-- Dark mode is controlled by the `dark` class on `<html>` and persisted in `localStorage`.
+- Dark mode is controlled by the `dark` class on `<html>` and persisted in `localStorage`. A small inline script in the page head applies the saved theme before the stylesheet loads, avoiding a light flash on navigation.
+- The desktop sidebar can be collapsed manually with the button next to the mobile menu button. The collapsed state is persisted in `localStorage`; on mobile the sidebar remains an overlay.
+- CSS and JS links include a per-restart version query (`assetVersion`), so a normal deploy/restart refreshes cached assets without requiring users to hard-refresh.
 
 ---
 

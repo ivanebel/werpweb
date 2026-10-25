@@ -2386,6 +2386,8 @@ const ES = {
   'Average days overdue': 'Días promedio de atraso',
   'Not set': 'Sin definir',
   'Supplier not found.': 'No se encontró el proveedor.',
+  'Collapse sidebar': 'Contraer menú lateral',
+  'Expand sidebar': 'Expandir menú lateral',
 };
 
 function normalizeLocale(value) {

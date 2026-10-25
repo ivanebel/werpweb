@@ -4,7 +4,12 @@
 
 @layer base {
   html {
-    @apply font-outfit;
+    @apply bg-gray-50 font-outfit dark:bg-gray-950;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -179,6 +184,79 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+}
+
+/* Desktop sidebar collapse. The state is applied to <html> by an inline
+   script before first paint, and toggled by public/js/app.js. */
+@media (min-width: 1024px) {
+  #app-sidebar {
+    transition: width 250ms ease, transform 300ms ease;
+  }
+
+  body > div.min-h-screen.flex-col {
+    transition: padding-left 250ms ease;
+  }
+
+  html.sidebar-collapsed #app-sidebar {
+    width: 88px;
+  }
+
+  html.sidebar-collapsed #app-sidebar .sidebar-text,
+  html.sidebar-collapsed #app-sidebar .menu-group {
+    display: none;
+  }
+
+  html.sidebar-collapsed #app-sidebar .sidebar-header {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  html.sidebar-collapsed #app-sidebar .sidebar-brand {
+    gap: 0;
+  }
+
+  html.sidebar-collapsed #app-sidebar nav {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  html.sidebar-collapsed #app-sidebar nav ul {
+    margin-top: 0.5rem;
+  }
+
+  html.sidebar-collapsed #app-sidebar nav ul:first-of-type {
+    margin-top: 0;
+  }
+
+  html.sidebar-collapsed #app-sidebar .menu-item {
+    justify-content: center;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  html.sidebar-collapsed #app-sidebar .menu-icon {
+    opacity: 1;
+  }
+
+  html.sidebar-collapsed #app-sidebar .sidebar-footer {
+    padding: 0.75rem;
+  }
+
+  html.sidebar-collapsed #app-sidebar .sidebar-user-card {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem;
+  }
+
+  html.sidebar-collapsed body > div.min-h-screen.flex-col {
+    padding-left: 88px;
+  }
+
+  html.sidebar-collapsed [data-sidebar-collapse-icon] {
+    transform: rotate(180deg);
   }
 }
 

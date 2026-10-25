@@ -5,10 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= t('Sign in') %> · <%= settings.company_name %></title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('werp-theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {
+        /* localStorage may be unavailable */
+      }
+    })();
+  </script>
+  <style>
+    html { background-color: #f9fafb; color-scheme: light; }
+    html.dark { background-color: #030712; color-scheme: dark; }
+  </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/app.css?v=<%= assetVersion %>">
 </head>
 <body class="min-h-full bg-gray-50 font-outfit text-gray-800 antialiased dark:bg-gray-950 dark:text-gray-300" data-locale="<%= locale %>" data-i18n="<%= JSON.stringify(jsMessages || {}) %>">
 <%- include('/partials/flash') %>

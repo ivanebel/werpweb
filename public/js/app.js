@@ -36,7 +36,44 @@
   }
   applyTheme(savedTheme);
 
+  // -------------------------------------------------------------- sidebar
+  function applySidebar(collapsed, persist, notify) {
+    root.classList.toggle('sidebar-collapsed', collapsed);
+    const label = collapsed
+      ? (messages.expandSidebar || 'Expand sidebar')
+      : (messages.collapseSidebar || 'Collapse sidebar');
+    document.querySelectorAll('[data-sidebar-collapse]').forEach((button) => {
+      button.setAttribute('aria-expanded', String(!collapsed));
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+    });
+    if (persist) {
+      try {
+        localStorage.setItem('werp-sidebar', collapsed ? 'collapsed' : 'expanded');
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    if (notify) {
+      window.setTimeout(() => window.dispatchEvent(new Event('resize')), 280);
+    }
+  }
+  let savedSidebar = false;
+  try {
+    savedSidebar = localStorage.getItem('werp-sidebar') === 'collapsed';
+  } catch (e) {
+    /* ignore */
+  }
+  applySidebar(root.classList.contains('sidebar-collapsed') || savedSidebar, false, false);
+
   document.addEventListener('click', (event) => {
+    const sidebarCollapse = event.target.closest('[data-sidebar-collapse]');
+    if (sidebarCollapse) {
+      event.preventDefault();
+      applySidebar(!root.classList.contains('sidebar-collapsed'), true, true);
+      return;
+    }
+
     const toggle = event.target.closest('[data-theme-toggle]');
     if (toggle) {
       event.preventDefault();

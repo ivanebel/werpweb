@@ -40,6 +40,10 @@ const settingsRoutes = require('./routes/settings');
 async function createApp() {
   const app = express();
   const root = config.root;
+  // Bust browser caches for CSS/JS after each restart. The production static
+  // handler caches public assets for 7 days, so a versioned URL is required to
+  // deliver sidebar/theme changes immediately after a deploy.
+  app.locals.assetVersion = process.env.ASSET_VERSION || Date.now().toString(36);
 
   const viewsDir = path.join(root, 'src', 'views');
   app.set('view engine', 'ejs');
@@ -112,6 +116,10 @@ async function createApp() {
   app.use('/attendance/import/preview', attendanceRoutes.importUpload);
   app.use(csrf);
   app.use(webLocals);
+  app.use((req, res, next) => {
+    res.locals.assetVersion = app.locals.assetVersion;
+    next();
+  });
   app.use(localizeResponses);
 
   app.use(languageRoutes);
@@ -171,6 +179,7 @@ async function createApp() {
       locale: errorLocale,
       csrfToken: res.locals.csrfToken || '',
       jsMessages: res.locals.jsMessages || {},
+      assetVersion: app.locals.assetVersion,
       settings: res.locals.settings || { company_name: 'WerpWeb' },
     });
   });

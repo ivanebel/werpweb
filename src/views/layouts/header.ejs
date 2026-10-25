@@ -3,6 +3,11 @@
     <button type="button" data-sidebar-toggle class="btn-icon lg:hidden" aria-label="Open menu">
       <%- include('/partials/icon', { name: 'menu' }) %>
     </button>
+    <button type="button" data-sidebar-collapse class="btn-icon hidden lg:inline-flex" aria-expanded="true" aria-label="<%= t('Collapse sidebar') %>" title="<%= t('Collapse sidebar') %>">
+      <span class="inline-flex transition-transform duration-300" data-sidebar-collapse-icon>
+        <%- include('/partials/icon', { name: 'chevron-double-left', className: 'h-4 w-4' }) %>
+      </span>
+    </button>
     <nav class="hidden items-center gap-1.5 text-sm sm:flex" aria-label="Breadcrumb">
       <a href="/dashboard" class="text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200" aria-label="Home">
         <%- include('/partials/icon', { name: 'dashboard', className: 'h-4 w-4' }) %>
