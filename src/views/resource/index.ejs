@@ -147,6 +147,20 @@
                       <% } else if (col.type === 'signed') { %>
                         <% const n = Number(value); %>
                         <span class="font-semibold <%= n >= 0 ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400' %>"><%= n > 0 ? '+' : '' %><%= h.formatQty(n) %></span>
+                      <% } else if (col.type === 'margin') { %>
+                        <%
+                          const sale = Number(row[col.saleKey || 'sale_price'] || 0);
+                          const cost = Number(row[col.costKey || 'cost_price'] || 0);
+                          const pct = sale > 0 ? ((sale - cost) / sale) * 100 : null;
+                          const tone = pct === null
+                            ? 'text-gray-400'
+                            : pct < 20
+                              ? 'text-error-600 dark:text-error-400'
+                              : pct <= 35
+                                ? 'text-warning-600 dark:text-warning-400'
+                                : 'text-success-600 dark:text-success-400';
+                        %>
+                        <span class="font-semibold <%= tone %>"><%= pct === null ? '—' : `${h.formatNumber(pct, 1)}%` %></span>
                       <% } else { %>
                         <span class="text-gray-600 dark:text-gray-300"><%= value || '—' %></span>
                       <% } %>

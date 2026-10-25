@@ -219,6 +219,7 @@ const resourceRouter = makeResourceRouter({
     { key: 'stock_qty', label: 'In stock', type: 'stock', align: 'right', unitKey: 'unit', reorderKey: 'reorder_level', trackKey: 'track_stock' },
     { key: 'sale_price', label: 'Sale price (incl. VAT)', type: 'money', align: 'right' },
     { key: 'cost_price', label: 'Net cost', type: 'money', align: 'right' },
+    { key: 'margin', label: 'Net margin', type: 'margin', align: 'right', saleKey: 'sale_price', costKey: 'cost_price' },
     { key: 'status', label: 'Status', type: 'status' },
   ],
   showData: async (row) => ({ productBarcodes: productBarcodes(row) }),

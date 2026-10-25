@@ -443,6 +443,7 @@ const ES = {
   'In stock': 'En stock',
   'Sale price (incl. VAT)': 'Precio de venta (IVA incluido)',
   'Net cost': 'Costo neto',
+  'Net margin': 'Margen neto',
   'Sale price': 'Precio de venta',
   'Stock': 'Stock',
   'Brand name': 'Nombre de la marca',
