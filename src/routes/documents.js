@@ -5,6 +5,14 @@ const { getPool, query, one, withTransaction } = require('../db');
 const { nextNumber } = require('../lib/sequences');
 const { pagination, toNumber, todayISO, addDaysISO, formatMoney } = require('../lib/helpers');
 const { translator } = require('../lib/i18n');
+const {
+  normalizeInvoiceNumber,
+  getFiscalType,
+  fiscalFamily,
+  isNoteCode,
+  isRegularInvoiceCode,
+  invoiceTypeCodes,
+} = require('../lib/fiscalDocumentTypes');
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
@@ -82,6 +90,324 @@ function computeTotals(items, discount) {
   );
   const discount_total = round2(Math.min(Math.max(Number(discount) || 0, 0), subtotal));
   return { subtotal, tax_total, discount_total, total: round2(subtotal - discount_total) };
+}
+
+function validDateValue(value) {
+  const raw = String(value || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(new Date(`${raw}T00:00:00Z`).getTime());
+}
+
+function parseIdList(value) {
+  return [...new Set(arr(value).map((item) => Number.parseInt(item, 10)).filter((id) => id > 0))];
+}
+
+async function loadFiscalTypes(includeCode = null) {
+  const rows = await query(
+    `SELECT code, name, active FROM fiscal_document_types
+      WHERE active = 1 OR code = ?
+      ORDER BY code`,
+    [Number(includeCode) || 0],
+  );
+  return rows.map((row) => ({
+    code: Number(row.code),
+    name: row.name,
+    active: Number(row.active) === 1,
+    family: fiscalFamily(row.code),
+  }));
+}
+
+async function loadDeliveryOptions(config) {
+  if (config.kind !== 'sales_invoice') return [];
+  return query(
+    `SELECT d.id, d.delivery_no, d.packing_slip_no, d.delivery_date, d.status,
+            d.customer_id, c.company_name
+       FROM deliveries d
+       JOIN customers c ON c.id = d.customer_id
+      WHERE d.status <> 'cancelled'
+      ORDER BY d.delivery_date DESC, d.id DESC
+      LIMIT 500`,
+  );
+}
+
+async function loadNoteInvoiceOptions(config, excludeId = 0) {
+  const codes = invoiceTypeCodes();
+  const placeholders = codes.map(() => '?').join(', ');
+  const rows = await query(
+    `SELECT i.id, i.\`${config.numberField}\` AS number, i.invoice_date, i.total, i.status,
+            i.document_type_code, i.\`${config.party.field}\` AS party_id, party.company_name,
+            fdt.name AS document_type_name
+       FROM \`${config.table}\` i
+       JOIN \`${config.party.table}\` party ON party.id = i.\`${config.party.field}\`
+       LEFT JOIN fiscal_document_types fdt ON fdt.code = i.document_type_code
+      WHERE i.id <> ?
+        AND i.status <> 'cancelled'
+        AND (i.document_type_code IS NULL OR i.document_type_code IN (${placeholders}))
+      ORDER BY i.invoice_date DESC, i.id DESC
+      LIMIT 500`,
+    [excludeId, ...codes],
+  );
+  return rows;
+}
+
+async function loadSelectedDeliveryIds(config, invoiceId) {
+  if (!config.deliveryLinkTable) return [];
+  const rows = await query(
+    `SELECT delivery_id FROM \`${config.deliveryLinkTable}\` WHERE invoice_id = ? ORDER BY delivery_id`,
+    [invoiceId],
+  );
+  return rows.map((row) => Number(row.delivery_id));
+}
+
+async function loadSelectedNoteInvoiceIds(config, noteId) {
+  if (!config.fiscalRelationTable) return [];
+  const rows = await query(
+    `SELECT invoice_id FROM \`${config.fiscalRelationTable}\` WHERE note_id = ? ORDER BY invoice_id`,
+    [noteId],
+  );
+  return rows.map((row) => Number(row.invoice_id));
+}
+
+async function loadInvoiceFormOptions(config, { existing = null, posted = null } = {}) {
+  if (!config.isInvoice) {
+    return {
+      fiscalTypes: [],
+      deliveryOptions: [],
+      noteInvoiceOptions: [],
+      selectedDeliveryIds: [],
+      selectedNoteInvoiceIds: [],
+    };
+  }
+  const postedType = posted ? Number.parseInt(posted.document_type_code, 10) : null;
+  const includeCode = existing
+    ? existing.document_type_code
+    : (postedType || 1);
+  const fiscalTypes = await loadFiscalTypes(includeCode);
+  const deliveryOptions = await loadDeliveryOptions(config);
+  const noteInvoiceOptions = await loadNoteInvoiceOptions(config, existing ? existing.id : 0);
+  const selectedDeliveryIds = posted
+    ? parseIdList(posted.delivery_ids)
+    : existing
+      ? await loadSelectedDeliveryIds(config, existing.id)
+      : [];
+  const selectedNoteInvoiceIds = posted
+    ? parseIdList(posted.note_invoice_ids)
+    : existing
+      ? await loadSelectedNoteInvoiceIds(config, existing.id)
+      : [];
+  return { fiscalTypes, deliveryOptions, noteInvoiceOptions, selectedDeliveryIds, selectedNoteInvoiceIds };
+}
+
+async function validateInvoiceNumber(config, body, req, existing = null) {
+  if (!config.isInvoice) return { value: null, errors: {} };
+  const raw = String(body[config.numberField] || '').trim();
+  if (existing && (!raw || raw === String(existing[config.numberField] || ''))) {
+    return { value: existing[config.numberField], errors: {} };
+  }
+  const normalized = normalizeInvoiceNumber(raw);
+  if (!normalized) {
+    return {
+      value: null,
+      errors: {
+        [config.numberField]: req.t('Use the invoice number format 00000-00000000 (point of sale and document number).'),
+      },
+    };
+  }
+  const duplicate = await one(
+    `SELECT id FROM \`${config.table}\` WHERE \`${config.numberField}\` = ? AND id <> ? LIMIT 1`,
+    [normalized, existing ? existing.id : 0],
+  );
+  if (duplicate) {
+    return { value: normalized, errors: { [config.numberField]: req.t('This invoice number already exists.') } };
+  }
+  return { value: normalized, errors: {} };
+}
+
+async function validateFiscalFields(config, body, req, existing = null) {
+  if (!config.isInvoice) {
+    return {
+      errors: {},
+      values: {
+        document_type_code: null,
+        cae: null,
+        cae_expiry_date: null,
+        cbu: null,
+        transfer_option: null,
+        payment_expiry_date: null,
+        packing_slip_no: null,
+      },
+    };
+  }
+
+  const errors = {};
+  const values = {
+    document_type_code: null,
+    cae: null,
+    cae_expiry_date: null,
+    cbu: null,
+    transfer_option: null,
+    payment_expiry_date: null,
+    packing_slip_no: null,
+  };
+
+  const rawType = String(body.document_type_code || '').trim();
+  if (rawType) {
+    const code = Number.parseInt(rawType, 10);
+    const type = getFiscalType(code);
+    if (!type) {
+      errors.document_type_code = req.t('Select a valid fiscal document type.');
+    } else if (!type.active && (!existing || Number(existing.document_type_code) !== code)) {
+      errors.document_type_code = req.t('This fiscal document type is not active.');
+    } else {
+      values.document_type_code = code;
+    }
+  } else if (existing && existing.document_type_code) {
+    values.document_type_code = Number(existing.document_type_code);
+  }
+  if (config.isInvoice && !values.document_type_code && !(existing && !existing.document_type_code)) {
+    errors.document_type_code = req.t('Select a fiscal document type.');
+  }
+
+  if (config.kind === 'sales_invoice') {
+    const cae = String(body.cae || '').trim();
+    if (cae) {
+      if (!/^\d{14}$/.test(cae)) {
+        errors.cae = req.t('The CAE number must contain exactly 14 digits.');
+      } else {
+        values.cae = cae;
+      }
+    }
+    const caeExpiry = String(body.cae_expiry_date || '').slice(0, 10);
+    if (caeExpiry) {
+      if (!validDateValue(caeExpiry)) {
+        errors.cae_expiry_date = req.t('Enter a valid CAE expiry date.');
+      } else {
+        values.cae_expiry_date = caeExpiry;
+      }
+    }
+    const cbu = String(body.cbu || '').replace(/[\s-]/g, '');
+    if (cbu) {
+      if (!/^\d{22}$/.test(cbu)) {
+        errors.cbu = req.t('The CBU must contain exactly 22 digits.');
+      } else {
+        values.cbu = cbu;
+      }
+    }
+    const transfer = String(body.transfer_option || '').trim().toUpperCase();
+    if (transfer) {
+      if (!['ADC', 'SCA'].includes(transfer)) {
+        errors.transfer_option = req.t('Invalid transfer option.');
+      } else {
+        values.transfer_option = transfer;
+      }
+    }
+    const paymentExpiry = String(body.payment_expiry_date || '').slice(0, 10);
+    if (paymentExpiry) {
+      if (!validDateValue(paymentExpiry)) {
+        errors.payment_expiry_date = req.t('Enter a valid payment expiry date.');
+      } else {
+        values.payment_expiry_date = paymentExpiry;
+      }
+    }
+  }
+
+  if (config.kind === 'purchase_invoice') {
+    const packingSlip = String(body.packing_slip_no || '').trim().slice(0, 30);
+    values.packing_slip_no = packingSlip || null;
+  }
+
+  return { errors, values };
+}
+
+async function validateDeliveryIds(ids, customerId) {
+  if (!ids.length) return { ids: [], invalid: false };
+  const placeholders = ids.map(() => '?').join(', ');
+  const rows = await query(
+    `SELECT id FROM deliveries
+      WHERE id IN (${placeholders})
+        AND customer_id = ?
+        AND status <> 'cancelled'`,
+    [...ids, customerId],
+  );
+  return { ids: rows.map((row) => Number(row.id)), invalid: rows.length !== ids.length };
+}
+
+async function validateRelatedInvoiceIds(ids, config, partyId, currentId) {
+  if (!ids.length) return { ids: [], invalid: false };
+  const placeholders = ids.map(() => '?').join(', ');
+  const rows = await query(
+    `SELECT id, document_type_code FROM \`${config.table}\`
+      WHERE id IN (${placeholders})
+        AND \`${config.party.field}\` = ?
+        AND id <> ?
+        AND status <> 'cancelled'`,
+    [...ids, partyId, currentId],
+  );
+  const regular = rows.filter((row) => isRegularInvoiceCode(row.document_type_code));
+  return { ids: regular.map((row) => Number(row.id)), invalid: regular.length !== ids.length };
+}
+
+async function saveInvoiceLinks(conn, config, id, { fiscalCode, deliveryIds, relatedInvoiceIds }) {
+  if (!config.isInvoice) return;
+  if (config.deliveryLinkTable) {
+    await conn.query(`DELETE FROM \`${config.deliveryLinkTable}\` WHERE invoice_id = ?`, [id]);
+    if (!isNoteCode(fiscalCode) && deliveryIds.length) {
+      await conn.query(
+        `INSERT INTO \`${config.deliveryLinkTable}\` (invoice_id, delivery_id) VALUES ?`,
+        [deliveryIds.map((deliveryId) => [id, deliveryId])],
+      );
+    }
+  }
+  if (config.fiscalRelationTable) {
+    await conn.query(`DELETE FROM \`${config.fiscalRelationTable}\` WHERE note_id = ?`, [id]);
+    if (isNoteCode(fiscalCode) && relatedInvoiceIds.length) {
+      await conn.query(
+        `INSERT INTO \`${config.fiscalRelationTable}\` (note_id, invoice_id) VALUES ?`,
+        [relatedInvoiceIds.map((invoiceId) => [id, invoiceId])],
+      );
+    }
+  }
+}
+
+async function loadInvoiceAssociations(config, row) {
+  const associations = { linkedDeliveries: [], relatedInvoices: [], relatedNotes: [] };
+  if (!config.isInvoice) return associations;
+
+  if (config.kind === 'sales_invoice') {
+    associations.linkedDeliveries = await query(
+      `SELECT d.*
+         FROM deliveries d
+         JOIN \`${config.deliveryLinkTable}\` link ON link.delivery_id = d.id
+        WHERE link.invoice_id = ?
+        ORDER BY d.delivery_date DESC, d.id DESC`,
+      [row.id],
+    );
+  }
+
+  if (isNoteCode(row.document_type_code)) {
+    associations.relatedInvoices = await query(
+      `SELECT i.id, i.\`${config.numberField}\` AS number, i.invoice_date, i.total, i.status,
+              i.document_type_code, fdt.name AS document_type_name
+         FROM \`${config.table}\` i
+         JOIN \`${config.fiscalRelationTable}\` link ON link.invoice_id = i.id
+         LEFT JOIN fiscal_document_types fdt ON fdt.code = i.document_type_code
+        WHERE link.note_id = ?
+        ORDER BY i.invoice_date, i.id`,
+      [row.id],
+    );
+  } else {
+    associations.relatedNotes = await query(
+      `SELECT n.id, n.\`${config.numberField}\` AS number, n.invoice_date, n.total, n.status,
+              n.document_type_code, fdt.name AS document_type_name
+         FROM \`${config.table}\` n
+         JOIN \`${config.fiscalRelationTable}\` link ON link.note_id = n.id
+         LEFT JOIN fiscal_document_types fdt ON fdt.code = n.document_type_code
+        WHERE link.invoice_id = ?
+        ORDER BY n.invoice_date, n.id`,
+      [row.id],
+    );
+  }
+
+  return associations;
 }
 
 async function loadPartyOptions(config) {
@@ -185,14 +511,19 @@ async function findDoc(config, id) {
   const warehouseJoin = config.customerOrder
     ? 'LEFT JOIN customer_warehouses cw ON cw.id = t.customer_warehouse_id'
     : '';
+  const fiscalSelect = config.isInvoice ? ', fdt.name AS document_type_name' : '';
+  const fiscalJoin = config.isInvoice
+    ? 'LEFT JOIN fiscal_document_types fdt ON fdt.code = t.document_type_code'
+    : '';
   return one(
     `SELECT t.*, party.company_name AS party_name, party.contact_name AS party_contact,
             party.email AS party_email, party.phone AS party_phone, party.address_line1 AS party_address,
             party.city AS party_city, party.state AS party_state, party.postal_code AS party_postal,
-            party.country AS party_country, party.tax_id AS party_tax_id${warehouseSelect}
+            party.country AS party_country, party.tax_id AS party_tax_id${warehouseSelect}${fiscalSelect}
        FROM \`${config.table}\` t
        JOIN \`${config.party.table}\` party ON party.id = t.\`${config.party.field}\`
        ${warehouseJoin}
+       ${fiscalJoin}
       WHERE t.id = ? LIMIT 1`,
     [id],
   );
@@ -398,6 +729,19 @@ function makeDocumentRouter(config) {
     };
     if (config.hasAmountPaid) defaults.amount_paid = 0;
     if (config.linkOrder) defaults[config.linkOrder.field] = '';
+    if (config.isInvoice) {
+      defaults.document_type_code = 1;
+      if (config.kind === 'sales_invoice') {
+        defaults.cae = '';
+        defaults.cae_expiry_date = '';
+        defaults.cbu = '';
+        defaults.transfer_option = '';
+        defaults.payment_expiry_date = addDaysISO(todayISO(), 7);
+      }
+      if (config.kind === 'purchase_invoice') {
+        defaults.packing_slip_no = '';
+      }
+    }
     if (config.customerOrder) {
       defaults[config.customerOrder.orderNoField] = '';
       defaults[config.customerOrder.warehouseField] = '';
@@ -486,13 +830,18 @@ function makeDocumentRouter(config) {
       const warehouseSelect = config.customerOrder
         ? ', cw.name AS warehouse_name, cw.code AS warehouse_code'
         : '';
+      const fiscalJoin = config.isInvoice
+        ? 'LEFT JOIN fiscal_document_types fdt ON fdt.code = t.document_type_code'
+        : '';
+      const fiscalSelect = config.isInvoice ? ', fdt.name AS document_type_name' : '';
       const rows = await query(
-        `SELECT t.*, party.company_name AS party_name${linkSelect}${linkCustomerOrderSelect}${warehouseSelect}
+        `SELECT t.*, party.company_name AS party_name${linkSelect}${linkCustomerOrderSelect}${warehouseSelect}${fiscalSelect}
            FROM \`${config.table}\` t
            JOIN \`${config.party.table}\` party ON party.id = t.\`${config.party.field}\`
            ${linkJoin}
            ${linkWarehouseJoin}
            ${warehouseJoin}
+           ${fiscalJoin}
            ${whereSql}
           ORDER BY t.\`${config.dateField}\` DESC, t.id DESC
           LIMIT ? OFFSET ?`,
@@ -545,6 +894,7 @@ function makeDocumentRouter(config) {
     try {
       const lc = localizeDocConfig(config, req.locale);
       const { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items, prefill } = await loadFormData(req);
+      const invoiceOptions = await loadInvoiceFormOptions(config);
       const settings = require('../lib/settings');
       const appSettings = await settings.getSettings();
       res.render('documents/form', {
@@ -556,6 +906,7 @@ function makeDocumentRouter(config) {
         productOptions,
         customerCodes,
         warehouseOptions,
+        ...invoiceOptions,
         row: defaults,
         items,
         errors: {},
@@ -583,6 +934,12 @@ function makeDocumentRouter(config) {
       const date = (req.body[config.dateField] || '').slice(0, 10);
       const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
 
+      const invoiceNumber = await validateInvoiceNumber(config, req.body, req);
+      Object.assign(errors, invoiceNumber.errors);
+      const fiscal = await validateFiscalFields(config, req.body, req);
+      Object.assign(errors, fiscal.errors);
+      const fiscalCode = fiscal.values.document_type_code;
+
       if (!partyId) errors[config.party.field] = req.t('{party} is required.', { party: lc.party.label });
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errors[config.dateField] = req.t('A valid date is required.');
       if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) errors[config.dueField] = req.t('Invalid date.');
@@ -590,6 +947,27 @@ function makeDocumentRouter(config) {
         itemErrors.push(req.t('Add at least one line item with a quantity greater than zero.'));
       }
       if (!config.statuses.includes(req.body.status)) errors.status = req.t('Invalid status.');
+
+      let deliveryIds = [];
+      let relatedInvoiceIds = [];
+      if (config.isInvoice && partyId) {
+        if (config.deliveryLinkTable && !isNoteCode(fiscalCode)) {
+          const checked = await validateDeliveryIds(parseIdList(req.body.delivery_ids), partyId);
+          if (checked.invalid) {
+            errors.delivery_ids = req.t('Select only packing slips that belong to the selected customer.');
+          } else {
+            deliveryIds = checked.ids;
+          }
+        }
+        if (config.fiscalRelationTable && isNoteCode(fiscalCode)) {
+          const checked = await validateRelatedInvoiceIds(parseIdList(req.body.note_invoice_ids), config, partyId, 0);
+          if (checked.invalid) {
+            errors.note_invoice_ids = req.t('Select only regular invoices for the same party.');
+          } else {
+            relatedInvoiceIds = checked.ids;
+          }
+        }
+      }
 
       let warehouseId = 0;
       let customerOrderValues = null;
@@ -623,6 +1001,7 @@ function makeDocumentRouter(config) {
       }
       if (Object.keys(errors).length || itemErrors.length) {
         const { partyOptions, productOptions, customerCodes, warehouseOptions } = await loadFormData({ query: {} });
+        const invoiceOptions = await loadInvoiceFormOptions(config, { posted: req.body });
         return res.status(422).render('documents/form', {
           title: lc.newLabel,
           active: config.active,
@@ -632,6 +1011,7 @@ function makeDocumentRouter(config) {
           productOptions,
           customerCodes,
           warehouseOptions,
+          ...invoiceOptions,
           row: { ...req.body, status: req.body.status || 'draft' },
           items: items.length ? items : [{}],
           errors,
@@ -659,22 +1039,30 @@ function makeDocumentRouter(config) {
           warehouseId = await ensureWarehouseForCustomer(conn, partyId);
         }
 
-        const number = await nextNumber({
-          prefix: config.numberPrefix,
-          table: config.table,
-          column: config.numberField,
-          date,
-          conn,
-        });
+        const number = config.isInvoice
+          ? invoiceNumber.value
+          : await nextNumber({
+              prefix: config.numberPrefix,
+              table: config.table,
+              column: config.numberField,
+              date,
+              conn,
+            });
         const status = req.body.status || 'draft';
         const customerOrderColumns = config.customerOrder
           ? `, \`${config.customerOrder.orderNoField}\`, \`${config.customerOrder.warehouseField}\`, \`${config.customerOrder.dockingField}\`, \`${config.customerOrder.receptionField}\``
           : '';
         const customerOrderPlaceholders = config.customerOrder ? ', ?, ?, ?, ?' : '';
+        const fiscalColumns = config.isInvoice
+          ? `, document_type_code${config.kind === 'sales_invoice' ? ', cae, cae_expiry_date, cbu, transfer_option, payment_expiry_date' : ''}${config.kind === 'purchase_invoice' ? ', packing_slip_no' : ''}`
+          : '';
+        const fiscalPlaceholders = config.isInvoice
+          ? `, ?${config.kind === 'sales_invoice' ? ', ?, ?, ?, ?, ?' : ''}${config.kind === 'purchase_invoice' ? ', ?' : ''}`
+          : '';
 
         const [result] = await conn.query(
-          `INSERT INTO \`${config.table}\` (\`${config.numberField}\`, \`${config.party.field}\`, \`${config.dateField}\`, \`${config.dueField}\`, status, subtotal, discount_total, tax_total, total, notes, created_by${config.hasAmountPaid ? ', amount_paid' : ''}${config.linkOrder ? `, \`${config.linkOrder.field}\`` : ''}${customerOrderColumns})
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${config.hasAmountPaid ? ', ?' : ''}${config.linkOrder ? ', ?' : ''}${customerOrderPlaceholders})`,
+          `INSERT INTO \`${config.table}\` (\`${config.numberField}\`, \`${config.party.field}\`, \`${config.dateField}\`, \`${config.dueField}\`, status, subtotal, discount_total, tax_total, total, notes, created_by${config.hasAmountPaid ? ', amount_paid' : ''}${config.linkOrder ? `, \`${config.linkOrder.field}\`` : ''}${customerOrderColumns}${fiscalColumns})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${config.hasAmountPaid ? ', ?' : ''}${config.linkOrder ? ', ?' : ''}${customerOrderPlaceholders}${fiscalPlaceholders})`,
           [
             number,
             partyId,
@@ -697,6 +1085,17 @@ function makeDocumentRouter(config) {
                   customerOrderValues[config.customerOrder.receptionField],
                 ]
               : []),
+            ...(config.isInvoice ? [fiscal.values.document_type_code] : []),
+            ...(config.kind === 'sales_invoice'
+              ? [
+                  fiscal.values.cae,
+                  fiscal.values.cae_expiry_date,
+                  fiscal.values.cbu,
+                  fiscal.values.transfer_option,
+                  fiscal.values.payment_expiry_date,
+                ]
+              : []),
+            ...(config.kind === 'purchase_invoice' ? [fiscal.values.packing_slip_no] : []),
           ],
         );
         const id = result.insertId;
@@ -709,6 +1108,12 @@ function makeDocumentRouter(config) {
             [id, it.product_id, it.description, it.quantity, it.unit_price, it.tax_rate, it.line_total],
           );
         }
+
+        await saveInvoiceLinks(conn, config, id, {
+          fiscalCode: fiscal.values.document_type_code,
+          deliveryIds,
+          relatedInvoiceIds,
+        });
 
         if (config.hasStockPosting && ['received', 'paid'].includes(status)) {
           await applyPurchaseStock(conn, id, 1, `Received via ${number}`);
@@ -726,6 +1131,10 @@ function makeDocumentRouter(config) {
         req.flash('error', err.message);
         return res.redirect(`${basePath}/new`);
       }
+      if (err.code === 'ER_DUP_ENTRY') {
+        req.flash('error', 'This invoice number already exists.');
+        return res.redirect(`${basePath}/new`);
+      }
       next(err);
     }
   });
@@ -739,6 +1148,7 @@ function makeDocumentRouter(config) {
         return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
       }
       const items = await loadItems(config, row.id, usesCustomerCodes ? row[config.party.field] : null);
+      const invoiceAssociations = await loadInvoiceAssociations(config, row);
 
       let linkedOrder = null;
       if (config.linkOrder && row[config.linkOrder.field]) {
@@ -802,6 +1212,7 @@ function makeDocumentRouter(config) {
         row,
         items,
         linkedOrder,
+        ...invoiceAssociations,
         deliveries,
         invoices,
         productionOrders,
@@ -840,6 +1251,7 @@ function makeDocumentRouter(config) {
 
       const { partyOptions, productOptions, customerCodes, warehouseOptions } = await loadFormData({ query: {} });
       const items = await loadItems(config, row.id, usesCustomerCodes ? row[config.party.field] : null);
+      const invoiceOptions = await loadInvoiceFormOptions(config, { existing: row });
       const appSettings = await require('../lib/settings').getSettings();
       res.render('documents/form', {
         title: lc.editLabel,
@@ -854,6 +1266,7 @@ function makeDocumentRouter(config) {
         productOptions,
         customerCodes,
         warehouseOptions,
+        ...invoiceOptions,
         row,
         items,
         errors: {},
@@ -924,12 +1337,44 @@ function makeDocumentRouter(config) {
       const date = (req.body[config.dateField] || '').slice(0, 10);
       const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
 
+      const invoiceNumber = await validateInvoiceNumber(config, req.body, req, existing);
+      Object.assign(errors, invoiceNumber.errors);
+      const fiscal = await validateFiscalFields(config, req.body, req, existing);
+      Object.assign(errors, fiscal.errors);
+      const fiscalCode = fiscal.values.document_type_code;
+
       if (!partyId) errors[config.party.field] = req.t('{party} is required.', { party: lc.party.label });
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errors[config.dateField] = req.t('A valid date is required.');
       if (items.length === 0) {
         itemErrors.push(req.t('Add at least one line item with a quantity greater than zero.'));
       }
       if (!config.statuses.includes(req.body.status)) errors.status = req.t('Invalid status.');
+
+      let deliveryIds = [];
+      let relatedInvoiceIds = [];
+      if (config.isInvoice && partyId) {
+        if (config.deliveryLinkTable && !isNoteCode(fiscalCode)) {
+          const checked = await validateDeliveryIds(parseIdList(req.body.delivery_ids), partyId);
+          if (checked.invalid) {
+            errors.delivery_ids = req.t('Select only packing slips that belong to the selected customer.');
+          } else {
+            deliveryIds = checked.ids;
+          }
+        }
+        if (config.fiscalRelationTable && isNoteCode(fiscalCode)) {
+          const checked = await validateRelatedInvoiceIds(
+            parseIdList(req.body.note_invoice_ids),
+            config,
+            partyId,
+            existing.id,
+          );
+          if (checked.invalid) {
+            errors.note_invoice_ids = req.t('Select only regular invoices for the same party.');
+          } else {
+            relatedInvoiceIds = checked.ids;
+          }
+        }
+      }
 
       let warehouseId = 0;
       let customerOrderValues = null;
@@ -964,6 +1409,7 @@ function makeDocumentRouter(config) {
       }
       if (Object.keys(errors).length || itemErrors.length) {
         const { partyOptions, productOptions, customerCodes, warehouseOptions } = await loadFormData({ query: {} });
+        const invoiceOptions = await loadInvoiceFormOptions(config, { existing, posted: req.body });
         return res.status(422).render('documents/form', {
           title: lc.editLabel,
           active: config.active,
@@ -977,6 +1423,7 @@ function makeDocumentRouter(config) {
           productOptions,
           customerCodes,
           warehouseOptions,
+          ...invoiceOptions,
           row: { ...existing, ...req.body },
           items: items.length ? items : [{}],
           errors,
@@ -986,6 +1433,11 @@ function makeDocumentRouter(config) {
           defaultTaxRate,
           prefill: null,
         });
+      }
+
+      if (lockedPaymentAmount !== null && config.isInvoice && invoiceNumber.value !== existing[config.numberField]) {
+        req.flash('error', 'This invoice has payment allocations. Reverse the payment before changing its number.');
+        return res.redirect(`${basePath}/${existing.id}`);
       }
 
       if (!canTransition(config.kind, existing.status, req.body.status) && existing.status !== req.body.status) {
@@ -1004,8 +1456,12 @@ function makeDocumentRouter(config) {
         const customerOrderSet = config.customerOrder
           ? `, \`${config.customerOrder.orderNoField}\` = ?, \`${config.customerOrder.warehouseField}\` = ?, \`${config.customerOrder.dockingField}\` = ?, \`${config.customerOrder.receptionField}\` = ?`
           : '';
+        const numberSet = config.isInvoice ? `, \`${config.numberField}\` = ?` : '';
+        const fiscalSet = config.isInvoice
+          ? `, document_type_code = ?${config.kind === 'sales_invoice' ? ', cae = ?, cae_expiry_date = ?, cbu = ?, transfer_option = ?, payment_expiry_date = ?' : ''}${config.kind === 'purchase_invoice' ? ', packing_slip_no = ?' : ''}`
+          : '';
         await conn.query(
-          `UPDATE \`${config.table}\` SET \`${config.party.field}\` = ?, \`${config.dateField}\` = ?, \`${config.dueField}\` = ?, status = ?, subtotal = ?, discount_total = ?, tax_total = ?, total = ?, notes = ?${config.hasAmountPaid ? ', amount_paid = ?' : ''}${customerOrderSet} WHERE id = ?`,
+          `UPDATE \`${config.table}\` SET \`${config.party.field}\` = ?, \`${config.dateField}\` = ?, \`${config.dueField}\` = ?, status = ?, subtotal = ?, discount_total = ?, tax_total = ?, total = ?, notes = ?${config.hasAmountPaid ? ', amount_paid = ?' : ''}${numberSet}${customerOrderSet}${fiscalSet} WHERE id = ?`,
           [
             partyId,
             date,
@@ -1025,6 +1481,7 @@ function makeDocumentRouter(config) {
                       : Math.max(0, Math.min(toNumber(req.body.amount_paid, 0), totals.total)),
                 ]
               : []),
+            ...(config.isInvoice ? [invoiceNumber.value] : []),
             ...(config.customerOrder
               ? [
                   customerOrderValues[config.customerOrder.orderNoField],
@@ -1033,6 +1490,17 @@ function makeDocumentRouter(config) {
                   customerOrderValues[config.customerOrder.receptionField],
                 ]
               : []),
+            ...(config.isInvoice ? [fiscal.values.document_type_code] : []),
+            ...(config.kind === 'sales_invoice'
+              ? [
+                  fiscal.values.cae,
+                  fiscal.values.cae_expiry_date,
+                  fiscal.values.cbu,
+                  fiscal.values.transfer_option,
+                  fiscal.values.payment_expiry_date,
+                ]
+              : []),
+            ...(config.kind === 'purchase_invoice' ? [fiscal.values.packing_slip_no] : []),
             existing.id,
           ],
         );
@@ -1046,6 +1514,12 @@ function makeDocumentRouter(config) {
           );
         }
 
+        await saveInvoiceLinks(conn, config, existing.id, {
+          fiscalCode: fiscal.values.document_type_code,
+          deliveryIds,
+          relatedInvoiceIds,
+        });
+
         if (existing.status !== req.body.status) {
           await handleStatusChange(conn, existing.id, existing.status, req.body.status, req);
         }
@@ -1055,6 +1529,10 @@ function makeDocumentRouter(config) {
       req.flash('success', '{item} updated successfully.', { item: lc.singular });
       res.redirect(`${basePath}/${existing.id}`);
     } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        req.flash('error', 'This invoice number already exists.');
+        return res.redirect(`${basePath}/${existing.id}/edit`);
+      }
       next(err);
     }
   });
@@ -1167,6 +1645,7 @@ function makeDocumentRouter(config) {
         }
       }
       const settings = await require('../lib/settings').getSettings();
+      const invoiceAssociations = await loadInvoiceAssociations(config, row);
       res.render('documents/print', {
         layout: false,
         title: `${lc.singular} ${row[config.numberField]}`,
@@ -1174,6 +1653,7 @@ function makeDocumentRouter(config) {
         row,
         items,
         linkedOrder,
+        ...invoiceAssociations,
         settings,
         money: (v) => formatMoney(v, settings.currency || 'USD', req.locale),
       });

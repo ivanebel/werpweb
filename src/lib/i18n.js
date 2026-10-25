@@ -2388,6 +2388,72 @@ const ES = {
   'Supplier not found.': 'No se encontró el proveedor.',
   'Collapse sidebar': 'Contraer menú lateral',
   'Expand sidebar': 'Expandir menú lateral',
+
+  // ------------------------------------------------------------ ARCA invoices
+  'Enter the invoice number': 'Ingresá el número de factura',
+  'Invoice number': 'Número de factura',
+  'Bill number': 'Número de factura de compra',
+  'Fiscal document type': 'Tipo de comprobante fiscal',
+  'Select a fiscal document type…': 'Seleccioná un tipo de comprobante fiscal…',
+  'Only document types marked active are available. The code is the ARCA code.':
+    'Solo están disponibles los tipos marcados como activos. El código es el código de ARCA.',
+  'inactive': 'inactivo',
+  'CAE number': 'Número de CAE',
+  '14 digits provided by ARCA. Leave blank until the CAE is obtained.':
+    '14 dígitos otorgados por ARCA. Dejalo vacío hasta obtener el CAE.',
+  'CAE expiry date': 'Fecha de vencimiento del CAE',
+  'Supplier remito no.': 'N.º de remito del proveedor',
+  'Optional supplier packing slip reference': 'Referencia opcional del remito del proveedor',
+  'Associations': 'Asociaciones',
+  'Link packing slips to invoices, and regular invoices to credit or debit notes.':
+    'Vinculá remitos con facturas y facturas regulares con notas de crédito o débito.',
+  'Link regular invoices to credit or debit notes.':
+    'Vinculá facturas regulares con notas de crédito o débito.',
+  'Packing slips (remitos)': 'Remitos',
+  'Only packing slips for the selected customer are listed. Hold Ctrl/Cmd to select more than one.':
+    'Solo se listan los remitos del cliente seleccionado. Mantené Ctrl/Cmd para seleccionar más de uno.',
+  'Related invoices': 'Facturas relacionadas',
+  'Only regular invoices for the selected party are listed. This section applies to credit and debit notes.':
+    'Solo se listan facturas regulares del mismo tercero. Esta sección aplica a notas de crédito y débito.',
+  'MiPyME credit invoice options': 'Opciones de factura de crédito MiPyME',
+  'Optional fields required for certain fiscal document types (FCE).':
+    'Campos opcionales requeridos para ciertos tipos de comprobante (FCE).',
+  'CBU, transfer option and payment expiry': 'CBU, opción de transferencia y vencimiento de pago',
+  'CBU number': 'Número de CBU',
+  '22 digits. Optional.': '22 dígitos. Opcional.',
+  'Transfer option': 'Opción de transferencia',
+  'Payment expiry date': 'Fecha de vencimiento del pago',
+  'Usually one week after the document date.':
+    'Normalmente una semana después de la fecha del comprobante.',
+  'None': 'Ninguno',
+  'Fiscal information': 'Información fiscal',
+  'CAE pending': 'CAE pendiente',
+  'Credit and debit notes': 'Notas de crédito y débito',
+  'Related documents': 'Documentos relacionados',
+  'Related invoice': 'Factura relacionada',
+  'Note': 'Nota',
+  'Use the invoice number format 00000-00000000 (point of sale and document number).':
+    'Usá el formato de número de factura 00000-00000000 (punto de venta y número de documento).',
+  'This invoice number already exists.': 'Este número de factura ya existe.',
+  'The CAE number must contain exactly 14 digits.':
+    'El número de CAE debe tener exactamente 14 dígitos.',
+  'Enter a valid CAE expiry date.': 'Ingresá una fecha de vencimiento de CAE válida.',
+  'The CBU must contain exactly 22 digits.': 'El CBU debe tener exactamente 22 dígitos.',
+  'Invalid transfer option.': 'Opción de transferencia inválida.',
+  'Enter a valid payment expiry date.': 'Ingresá una fecha de vencimiento de pago válida.',
+  'Select a valid fiscal document type.': 'Seleccioná un tipo de comprobante fiscal válido.',
+  'This fiscal document type is not active.': 'Este tipo de comprobante fiscal no está activo.',
+  'Select a fiscal document type.': 'Seleccioná un tipo de comprobante fiscal.',
+  'Select only packing slips that belong to the selected customer.':
+    'Seleccioná solo remitos del cliente seleccionado.',
+  'Select only regular invoices for the same party.':
+    'Seleccioná solo facturas regulares del mismo tercero.',
+  'This invoice has payment allocations. Reverse the payment before changing its number.':
+    'Esta factura tiene imputaciones de pago. Revertí el pago antes de cambiar su número.',
+  'CAE pending. Complete the fiscal data before using this document as a valid invoice.':
+    'CAE pendiente. Completá los datos fiscales antes de usar este comprobante como factura válida.',
+  'Format: 00000-00000000 (point of sale and document number). You can type 10-1450.':
+    'Formato: 00000-00000000 (punto de venta y número de documento). Podés escribir 10-1450.',
 };
 
 function normalizeLocale(value) {

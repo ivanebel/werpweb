@@ -1,0 +1,487 @@
+[
+  {
+    "code": 1,
+    "name": "FACTURA A",
+    "active": true
+  },
+  {
+    "code": 2,
+    "name": "NOTA DE DEBITO A",
+    "active": true
+  },
+  {
+    "code": 3,
+    "name": "NOTA DE CREDITO A",
+    "active": true
+  },
+  {
+    "code": 4,
+    "name": "RECIBO A",
+    "active": false
+  },
+  {
+    "code": 5,
+    "name": "NOTAS DE VENTA AL CONTADO A",
+    "active": false
+  },
+  {
+    "code": 6,
+    "name": "FACTURA B",
+    "active": true
+  },
+  {
+    "code": 7,
+    "name": "NOTA DE DEBITO B",
+    "active": true
+  },
+  {
+    "code": 8,
+    "name": "NOTA DE CREDITO B",
+    "active": true
+  },
+  {
+    "code": 9,
+    "name": "RECIBO B",
+    "active": false
+  },
+  {
+    "code": 10,
+    "name": "NOTAS DE VENTA AL CONTADO B",
+    "active": false
+  },
+  {
+    "code": 11,
+    "name": "FACTURA C",
+    "active": false
+  },
+  {
+    "code": 12,
+    "name": "NOTA DE DEBITO C",
+    "active": false
+  },
+  {
+    "code": 13,
+    "name": "NOTA DE CREDITO C",
+    "active": false
+  },
+  {
+    "code": 15,
+    "name": "RECIBO C",
+    "active": false
+  },
+  {
+    "code": 16,
+    "name": "NOTAS DE VENTA AL CONTADO C",
+    "active": false
+  },
+  {
+    "code": 17,
+    "name": "LIQUIDACION DE SERVICIOS PUBLICOS CLASE A",
+    "active": false
+  },
+  {
+    "code": 18,
+    "name": "LIQUIDACION DE SERVICIOS PUBLICOS CLASE B",
+    "active": false
+  },
+  {
+    "code": 19,
+    "name": "FACTURA POR OPERACIONES CON EL EXTERIOR",
+    "active": false
+  },
+  {
+    "code": 20,
+    "name": "NOTA DE DEBITO POR OPERACIONES CON EL EXTERIOR",
+    "active": false
+  },
+  {
+    "code": 21,
+    "name": "NOTA DE CREDITO POR OPERACIONES CON EL EXTERIOR",
+    "active": false
+  },
+  {
+    "code": 22,
+    "name": "FACTURA PERMISO EXPORTACION SIMPLIFICADO - DTO. 855/97",
+    "active": false
+  },
+  {
+    "code": 23,
+    "name": "COMPROBANTES CLASE “A” DE COMPRA PRIMARIA PARA EL SECTOR PESQUERO MARITIMO",
+    "active": false
+  },
+  {
+    "code": 24,
+    "name": "COMPROBANTES CLASE “A” DE CONSIGNACION PRIMARIA PARA EL SECTOR PESQUERO MARITIMO",
+    "active": false
+  },
+  {
+    "code": 25,
+    "name": "COMPROBANTES CLASE “B” DE COMPRA PRIMARIA PARA EL SECTOR PESQUERO MARITIMO",
+    "active": false
+  },
+  {
+    "code": 26,
+    "name": "COMPROBANTES CLASE “B” DE CONSIGNACION PRIMARIA PARA EL SECTOR PESQUERO MARITIMO",
+    "active": false
+  },
+  {
+    "code": 27,
+    "name": "LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE A",
+    "active": false
+  },
+  {
+    "code": 28,
+    "name": "LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE B",
+    "active": false
+  },
+  {
+    "code": 29,
+    "name": "LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE C",
+    "active": false
+  },
+  {
+    "code": 30,
+    "name": "COMPROBANTE DE COMPRA DE BIENES USADOS",
+    "active": false
+  },
+  {
+    "code": 31,
+    "name": "MANDATO - CONSIGNACION",
+    "active": false
+  },
+  {
+    "code": 32,
+    "name": "COMPROBANTE DE COMPRA DE MATERIALES A RECICLAR PROVENIENTE DE RESIDUOS",
+    "active": false
+  },
+  {
+    "code": 33,
+    "name": "LIQUIDACION PRIMARIA DE GRANOS",
+    "active": false
+  },
+  {
+    "code": 34,
+    "name": "COMPROBANTES A DEL ANEXO I, APARTADO A,  INCISO F)  R.G. N°  1415",
+    "active": false
+  },
+  {
+    "code": 35,
+    "name": "COMPROBANTES B  DEL ANEXO I, APARTADO A, INC. F), R.G. N° 1415",
+    "active": false
+  },
+  {
+    "code": 36,
+    "name": "COMPROBANTES C DEL ANEXO I, APARTADO A, INC.F), R.G. N° 1415",
+    "active": false
+  },
+  {
+    "code": 37,
+    "name": "NOTAS DE DEBITO O DOCUMENTOS EQUIVALENTES QUE CUMPLAN CON LA R.G. N° 1415",
+    "active": false
+  },
+  {
+    "code": 38,
+    "name": "NOTAS DE CREDITO O DOCUMENTOS EQUIVALENTES QUE CUMPLAN CON LA R.G. N° 1415",
+    "active": false
+  },
+  {
+    "code": 39,
+    "name": "OTROS COMPROBANTES A QUE CUMPLEN CON LA R G  N° 1415",
+    "active": false
+  },
+  {
+    "code": 40,
+    "name": "OTROS COMPROBANTES B QUE CUMPLAN CON LA R.G. N° 1415",
+    "active": false
+  },
+  {
+    "code": 41,
+    "name": "OTROS COMPROBANTES C QUE CUMPLAN CON LA R.G. N° 1415",
+    "active": false
+  },
+  {
+    "code": 43,
+    "name": "NOTA DE CREDITO LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE B",
+    "active": false
+  },
+  {
+    "code": 44,
+    "name": "NOTA DE CREDITO LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE C",
+    "active": false
+  },
+  {
+    "code": 45,
+    "name": "NOTA DE DEBITO LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE A",
+    "active": false
+  },
+  {
+    "code": 46,
+    "name": "NOTA DE DEBITO LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE B",
+    "active": false
+  },
+  {
+    "code": 47,
+    "name": "NOTA DE DEBITO LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE C",
+    "active": false
+  },
+  {
+    "code": 48,
+    "name": "NOTA DE CREDITO LIQUIDACION UNICA COMERCIAL IMPOSITIVA CLASE A",
+    "active": false
+  },
+  {
+    "code": 49,
+    "name": "COMPROBANTES DE COMPRA DE BIENES USADOS NO REGISTRABLES A CONSUMIDORES FINALES",
+    "active": false
+  },
+  {
+    "code": 51,
+    "name": "FACTURA A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”",
+    "active": false
+  },
+  {
+    "code": 52,
+    "name": "NOTA DE DEBITO A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”",
+    "active": false
+  },
+  {
+    "code": 53,
+    "name": "NOTA DE CREDITO A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”",
+    "active": false
+  },
+  {
+    "code": 54,
+    "name": "RECIBO A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”",
+    "active": false
+  },
+  {
+    "code": 55,
+    "name": "NOTAS DE VENTA AL CONTADO A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”",
+    "active": false
+  },
+  {
+    "code": 56,
+    "name": "COMPROBANTES A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN” DEL ANEXO I, APARTADO A, INC. F), R.G. N° 1.415",
+    "active": false
+  },
+  {
+    "code": 57,
+    "name": "OTROS COMPROBANTES A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”QUE CUMPLAN CON LA R.G. N° 1.415",
+    "active": false
+  },
+  {
+    "code": 58,
+    "name": "CUENTA DE VENTA Y LIQUIDO PRODUCTO A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”",
+    "active": false
+  },
+  {
+    "code": 59,
+    "name": "LIQUIDACION A CON LEYENDA “OPERACIÓN SUJETA A RETENCIÓN”",
+    "active": false
+  },
+  {
+    "code": 60,
+    "name": "CUENTAS DE VENTA Y LIQUIDO PRODUCTO A",
+    "active": false
+  },
+  {
+    "code": 61,
+    "name": "CUENTAS DE VENTA Y LIQUIDO PRODUCTO B",
+    "active": false
+  },
+  {
+    "code": 63,
+    "name": "LIQUIDACIONES A",
+    "active": false
+  },
+  {
+    "code": 64,
+    "name": "LIQUIDACIONES B",
+    "active": false
+  },
+  {
+    "code": 66,
+    "name": "DESPACHO DE IMPORTACION",
+    "active": false
+  },
+  {
+    "code": 80,
+    "name": "INFORME DIARIO DE CIERRE (ZETA) - CONTROLADORES FISCALES (*)",
+    "active": false
+  },
+  {
+    "code": 81,
+    "name": "TIQUE FACTURA A (*)",
+    "active": true
+  },
+  {
+    "code": 82,
+    "name": "TIQUE FACTURA B (*)",
+    "active": true
+  },
+  {
+    "code": 83,
+    "name": "TIQUE (*)",
+    "active": true
+  },
+  {
+    "code": 88,
+    "name": "REMITO ELECTRONICO",
+    "active": false
+  },
+  {
+    "code": 89,
+    "name": "RESUMEN DE DATOS",
+    "active": false
+  },
+  {
+    "code": 90,
+    "name": "OTROS COMPROBANTES - DOCUMENTOS EXCEPTUADOS - NOTAS DE CREDITO",
+    "active": false
+  },
+  {
+    "code": 91,
+    "name": "REMITOS R",
+    "active": false
+  },
+  {
+    "code": 99,
+    "name": "OTROS COMPROBANTES QUE NO CUMPLEN O ESTÁN EXCEPTUADOS DE LA R.G. 1415 Y SUS MODIF",
+    "active": false
+  },
+  {
+    "code": 109,
+    "name": "TIQUE C",
+    "active": false
+  },
+  {
+    "code": 110,
+    "name": "TIQUE NOTA DE CREDITO (*)",
+    "active": false
+  },
+  {
+    "code": 111,
+    "name": "TIQUE FACTURA C (*)",
+    "active": false
+  },
+  {
+    "code": 112,
+    "name": "TIQUE NOTA DE CREDITO A (*)",
+    "active": false
+  },
+  {
+    "code": 113,
+    "name": "TIQUE NOTA DE CREDITO B (*)",
+    "active": false
+  },
+  {
+    "code": 114,
+    "name": "TIQUE NOTA DE CREDITO C (*)",
+    "active": false
+  },
+  {
+    "code": 115,
+    "name": "TIQUE NOTA DE DEBITO A (*)",
+    "active": false
+  },
+  {
+    "code": 116,
+    "name": "TIQUE NOTA DE DEBITO B (*)",
+    "active": false
+  },
+  {
+    "code": 117,
+    "name": "TIQUE NOTA DE DEBITO C (*)",
+    "active": false
+  },
+  {
+    "code": 201,
+    "name": "FACTURA DE CRÉDITO ELECTRÓNICA MiPyMEs (FCE) A",
+    "active": true
+  },
+  {
+    "code": 202,
+    "name": "NOTA DE DEBITO ELECTRÓNICA MiPyMEs (FCE) A",
+    "active": true
+  },
+  {
+    "code": 203,
+    "name": "NOTA DE CREDITO ELECTRÓNICA MiPyMEs (FCE) A",
+    "active": true
+  },
+  {
+    "code": 206,
+    "name": "FACTURA DE CRÉDITO ELECTRÓNICA MiPyMEs (FCE) B",
+    "active": true
+  },
+  {
+    "code": 207,
+    "name": "NOTA DE DEBITO ELECTRÓNICA MiPyMEs (FCE) B",
+    "active": true
+  },
+  {
+    "code": 208,
+    "name": "NOTA DE CREDITO ELECTRÓNICA MiPyMEs (FCE) B",
+    "active": true
+  },
+  {
+    "code": 211,
+    "name": "FACTURA DE CRÉDITO ELECTRÓNICA MiPyMEs (FCE) C",
+    "active": false
+  },
+  {
+    "code": 212,
+    "name": "NOTA DE DEBITO ELECTRÓNICA MiPyMEs (FCE) C",
+    "active": false
+  },
+  {
+    "code": 213,
+    "name": "NOTA DE CREDITO ELECTRÓNICA MiPyMEs (FCE) C",
+    "active": false
+  },
+  {
+    "code": 331,
+    "name": "LIQUIDACION SECUNDARIA DE GRANOS",
+    "active": false
+  },
+  {
+    "code": 332,
+    "name": "CERTIFICACION ELECTRONICA (GRANOS)",
+    "active": false
+  },
+  {
+    "code": 991,
+    "name": "REMITO ELECTRÓNICO DE TABACO EN HEBRA",
+    "active": false
+  },
+  {
+    "code": 992,
+    "name": "RESUMEN DE DATOS DE TABACO EN HEBRA",
+    "active": false
+  },
+  {
+    "code": 993,
+    "name": "REMITO ELECTRÓNICO HARINERO - AUTOMOTOR",
+    "active": false
+  },
+  {
+    "code": 994,
+    "name": "REMITO ELECTRÓNICO HARINERO - FERROVIARIO",
+    "active": false
+  },
+  {
+    "code": 995,
+    "name": "REMITO ELECTRÓNICO CÁRNICO",
+    "active": false
+  },
+  {
+    "code": 997,
+    "name": "Remito Electrónico para Azúcar, Alcohol y Subproductos -Mercado Interno-",
+    "active": false
+  },
+  {
+    "code": 998,
+    "name": "Remito Electrónico para Azúcar, Alcohol y Subproductos -Exportación-",
+    "active": false
+  }
+]

@@ -19,6 +19,13 @@
   const partySelect = document.getElementById('party_id');
   const warehouseSelect = document.getElementById('customer_warehouse_id');
   const warehouseLink = document.getElementById('warehouse-manage-link');
+  const fiscalTypeSelect = document.querySelector('[data-fiscal-type]');
+  const deliverySelect = document.getElementById('delivery_ids');
+  const noteInvoiceSelect = document.getElementById('note_invoice_ids');
+  const deliverySection = document.getElementById('packing-slips-section');
+  const noteInvoiceSection = document.getElementById('note-invoices-section');
+  const associationsCard = document.getElementById('invoice-associations-card');
+  const invoiceNumberInput = document.querySelector('[data-invoice-number]');
   let warehouses = [];
   try {
     warehouses = JSON.parse(form.getAttribute('data-warehouses') || '[]');
@@ -95,6 +102,43 @@
         input.name = input.name.replace(/\[[^\]]*\]/, `[${index}]`);
       });
     });
+  }
+
+  function fiscalFamily() {
+    const selected = fiscalTypeSelect?.selectedOptions?.[0];
+    return selected?.dataset.family || '';
+  }
+
+  function filterAssociationOptions(select, dataAttribute) {
+    if (!select) return;
+    const partyId = partySelect?.value || '';
+    Array.from(select.options).forEach((option) => {
+      const belongs = Boolean(partyId) && option.dataset[dataAttribute] === partyId;
+      option.hidden = !belongs;
+      option.disabled = !belongs;
+      if (!belongs) option.selected = false;
+    });
+  }
+
+  function updateInvoiceAssociations() {
+    if (!fiscalTypeSelect) return;
+    const family = fiscalFamily();
+    const isNote = family === 'credit_note' || family === 'debit_note';
+    if (deliverySection) deliverySection.classList.toggle('hidden', isNote);
+    if (noteInvoiceSection) noteInvoiceSection.classList.toggle('hidden', !isNote);
+    if (associationsCard) {
+      associationsCard.classList.toggle('hidden', !deliverySection && !isNote);
+    }
+    filterAssociationOptions(deliverySelect, 'customer');
+    filterAssociationOptions(noteInvoiceSelect, 'party');
+  }
+
+  function addDays(dateValue, days) {
+    if (!dateValue) return '';
+    const date = new Date(`${dateValue}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
   }
 
   function updateCustomerCode(row) {
@@ -215,6 +259,37 @@
     partySelect.addEventListener('change', () => {
       updateAllCustomerCodes();
       updateWarehouseOptions();
+      updateInvoiceAssociations();
+    });
+  }
+
+  if (fiscalTypeSelect) {
+    fiscalTypeSelect.addEventListener('change', updateInvoiceAssociations);
+  }
+
+  if (invoiceNumberInput) {
+    invoiceNumberInput.addEventListener('blur', () => {
+      const match = invoiceNumberInput.value.trim().match(/^(\d{1,5})\s*-\s*(\d{1,8})$/);
+      if (match) {
+        invoiceNumberInput.value = `${match[1].padStart(5, '0')}-${match[2].padStart(8, '0')}`;
+      }
+    });
+  }
+
+  const documentDate = document.getElementById('doc-date');
+  const caeInput = document.getElementById('cae');
+  const caeExpiry = document.getElementById('cae_expiry_date');
+  const paymentExpiry = document.getElementById('payment_expiry_date');
+  if (caeInput && caeExpiry && documentDate) {
+    caeInput.addEventListener('input', () => {
+      if (caeInput.value.trim() && !caeExpiry.value) {
+        caeExpiry.value = addDays(documentDate.value, 10);
+      }
+    });
+  }
+  if (documentDate && paymentExpiry) {
+    documentDate.addEventListener('change', () => {
+      if (!paymentExpiry.value) paymentExpiry.value = addDays(documentDate.value, 7);
     });
   }
 
@@ -224,5 +299,6 @@
   renumber();
   updateAllCustomerCodes();
   updateWarehouseOptions();
+  updateInvoiceAssociations();
   recalcAll();
 })();

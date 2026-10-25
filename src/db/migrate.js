@@ -249,6 +249,31 @@ async function upgradeSchema(conn, dbName) {
         )
       WHERE r.punch_count = 0`,
   );
+
+  // --------------------------------------------------------- ARCA invoicing
+  await addColumn(conn, dbName, 'sales_invoices', 'document_type_code', 'SMALLINT UNSIGNED NULL AFTER invoice_no');
+  await addColumn(conn, dbName, 'sales_invoices', 'cae', 'VARCHAR(14) NULL AFTER document_type_code');
+  await addColumn(conn, dbName, 'sales_invoices', 'cae_expiry_date', 'DATE NULL AFTER cae');
+  await addColumn(conn, dbName, 'sales_invoices', 'cbu', 'VARCHAR(22) NULL AFTER cae_expiry_date');
+  await addColumn(conn, dbName, 'sales_invoices', 'transfer_option', "ENUM('ADC','SCA') NULL AFTER cbu");
+  await addColumn(conn, dbName, 'sales_invoices', 'payment_expiry_date', 'DATE NULL AFTER transfer_option');
+  await addIndex(conn, dbName, 'sales_invoices', 'idx_sales_invoices_fiscal_type', 'KEY `idx_sales_invoices_fiscal_type` (`document_type_code`)');
+  await addConstraint(conn, dbName, 'sales_invoices', 'fk_sales_invoices_fiscal_type',
+    'FOREIGN KEY (`document_type_code`) REFERENCES `fiscal_document_types` (`code`) ON DELETE SET NULL');
+
+  await addColumn(conn, dbName, 'purchase_invoices', 'document_type_code', 'SMALLINT UNSIGNED NULL AFTER bill_no');
+  await addColumn(conn, dbName, 'purchase_invoices', 'packing_slip_no', 'VARCHAR(30) NULL AFTER document_type_code');
+  await addIndex(conn, dbName, 'purchase_invoices', 'idx_purchase_invoices_fiscal_type', 'KEY `idx_purchase_invoices_fiscal_type` (`document_type_code`)');
+  await addConstraint(conn, dbName, 'purchase_invoices', 'fk_purchase_invoices_fiscal_type',
+    'FOREIGN KEY (`document_type_code`) REFERENCES `fiscal_document_types` (`code`) ON DELETE SET NULL');
+
+  const { FISCAL_DOCUMENT_TYPES } = require('../lib/fiscalDocumentTypes');
+  if (FISCAL_DOCUMENT_TYPES.length) {
+    await conn.query(
+      'INSERT IGNORE INTO fiscal_document_types (code, name, active) VALUES ?',
+      [FISCAL_DOCUMENT_TYPES.map((type) => [type.code, type.name, type.active ? 1 : 0])],
+    );
+  }
 }
 
 async function main() {

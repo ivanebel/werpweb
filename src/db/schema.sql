@@ -107,6 +107,14 @@ CREATE TABLE IF NOT EXISTS suppliers (
   KEY idx_suppliers_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS fiscal_document_types (
+  code       SMALLINT UNSIGNED NOT NULL,
+  name       VARCHAR(255) NOT NULL,
+  active     TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS employees (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   employee_no     VARCHAR(30) NOT NULL,
@@ -537,6 +545,12 @@ CREATE TABLE IF NOT EXISTS delivery_items (
 CREATE TABLE IF NOT EXISTS sales_invoices (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   invoice_no     VARCHAR(30) NOT NULL,
+  document_type_code SMALLINT UNSIGNED NULL,
+  cae            VARCHAR(14) NULL,
+  cae_expiry_date DATE NULL,
+  cbu            VARCHAR(22) NULL,
+  transfer_option ENUM('ADC','SCA') NULL,
+  payment_expiry_date DATE NULL,
   sales_order_id INT UNSIGNED NULL,
   customer_id    INT UNSIGNED NOT NULL,
   invoice_date   DATE NOT NULL,
@@ -557,10 +571,37 @@ CREATE TABLE IF NOT EXISTS sales_invoices (
   KEY idx_sales_invoices_customer (customer_id),
   KEY idx_sales_invoices_status (status),
   KEY idx_sales_invoices_date (invoice_date),
+  KEY idx_sales_invoices_fiscal_type (document_type_code),
   CONSTRAINT fk_sales_invoices_order FOREIGN KEY (sales_order_id)
     REFERENCES sales_orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_sales_invoices_customer FOREIGN KEY (customer_id)
-    REFERENCES customers (id) ON DELETE RESTRICT
+    REFERENCES customers (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_sales_invoices_fiscal_type FOREIGN KEY (document_type_code)
+    REFERENCES fiscal_document_types (code) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_invoice_deliveries (
+  invoice_id  INT UNSIGNED NOT NULL,
+  delivery_id INT UNSIGNED NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (invoice_id, delivery_id),
+  KEY idx_sales_invoice_deliveries_delivery (delivery_id),
+  CONSTRAINT fk_sales_invoice_deliveries_invoice FOREIGN KEY (invoice_id)
+    REFERENCES sales_invoices (id) ON DELETE CASCADE,
+  CONSTRAINT fk_sales_invoice_deliveries_delivery FOREIGN KEY (delivery_id)
+    REFERENCES deliveries (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_invoice_relations (
+  note_id     INT UNSIGNED NOT NULL,
+  invoice_id  INT UNSIGNED NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (note_id, invoice_id),
+  KEY idx_sales_invoice_relations_invoice (invoice_id),
+  CONSTRAINT fk_sales_invoice_relations_note FOREIGN KEY (note_id)
+    REFERENCES sales_invoices (id) ON DELETE CASCADE,
+  CONSTRAINT fk_sales_invoice_relations_invoice FOREIGN KEY (invoice_id)
+    REFERENCES sales_invoices (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sales_invoice_items (
@@ -583,6 +624,8 @@ CREATE TABLE IF NOT EXISTS sales_invoice_items (
 CREATE TABLE IF NOT EXISTS purchase_invoices (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   bill_no           VARCHAR(30) NOT NULL,
+  document_type_code SMALLINT UNSIGNED NULL,
+  packing_slip_no   VARCHAR(30) NULL,
   purchase_order_id INT UNSIGNED NULL,
   supplier_id       INT UNSIGNED NOT NULL,
   invoice_date      DATE NOT NULL,
@@ -604,10 +647,25 @@ CREATE TABLE IF NOT EXISTS purchase_invoices (
   KEY idx_purchase_invoices_supplier (supplier_id),
   KEY idx_purchase_invoices_status (status),
   KEY idx_purchase_invoices_date (invoice_date),
+  KEY idx_purchase_invoices_fiscal_type (document_type_code),
   CONSTRAINT fk_purchase_invoices_order FOREIGN KEY (purchase_order_id)
     REFERENCES purchase_orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_purchase_invoices_supplier FOREIGN KEY (supplier_id)
-    REFERENCES suppliers (id) ON DELETE RESTRICT
+    REFERENCES suppliers (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_purchase_invoices_fiscal_type FOREIGN KEY (document_type_code)
+    REFERENCES fiscal_document_types (code) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS purchase_invoice_relations (
+  note_id     INT UNSIGNED NOT NULL,
+  invoice_id  INT UNSIGNED NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (note_id, invoice_id),
+  KEY idx_purchase_invoice_relations_invoice (invoice_id),
+  CONSTRAINT fk_purchase_invoice_relations_note FOREIGN KEY (note_id)
+    REFERENCES purchase_invoices (id) ON DELETE CASCADE,
+  CONSTRAINT fk_purchase_invoice_relations_invoice FOREIGN KEY (invoice_id)
+    REFERENCES purchase_invoices (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS purchase_invoice_items (

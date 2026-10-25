@@ -52,9 +52,28 @@
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Document details</h2>
-            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? row[doc.numberField] : 'Number assigned on save' %></span>
+            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? row[doc.numberField] : (doc.isInvoice ? t('Enter the invoice number') : 'Number assigned on save') %></span>
           </div>
           <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <% if (doc.isInvoice) { %>
+              <div class="md:col-span-2">
+                <label for="doc-number" class="form-label"><%= doc.kind === 'purchase_invoice' ? t('Bill number') : t('Invoice number') %> <span class="text-error-500">*</span></label>
+                <input id="doc-number" name="<%= doc.numberField %>" type="text" value="<%= row[doc.numberField] || '' %>" class="form-input font-mono <%= errors[doc.numberField] ? 'form-input-error' : '' %>" placeholder="00001-00000001" maxlength="20" data-invoice-number required>
+                <% if (errors[doc.numberField]) { %><p class="form-error"><%= errors[doc.numberField] %></p><% } %>
+                <p class="form-help"><%= t('Format: 00000-00000000 (point of sale and document number). You can type 10-1450.') %></p>
+              </div>
+              <div class="md:col-span-2">
+                <label for="document_type_code" class="form-label"><%= t('Fiscal document type') %> <% if (mode === 'create' || row.document_type_code) { %><span class="text-error-500">*</span><% } %></label>
+                <select id="document_type_code" name="document_type_code" class="form-select <%= errors.document_type_code ? 'form-input-error' : '' %>" data-fiscal-type <%= (mode === 'create' || row.document_type_code) ? 'required' : '' %>>
+                  <option value=""><%= t('Select a fiscal document type…') %></option>
+                  <% fiscalTypes.forEach(type => { %>
+                    <option value="<%= type.code %>" data-family="<%= type.family %>" <%= String(row.document_type_code || '') === String(type.code) ? 'selected' : '' %>><%= type.code %> — <%= type.name %><%= type.active ? '' : ` (${t('inactive')})` %></option>
+                  <% }) %>
+                </select>
+                <% if (errors.document_type_code) { %><p class="form-error"><%= errors.document_type_code %></p><% } %>
+                <p class="form-help"><%= t('Only document types marked active are available. The code is the ARCA code.') %></p>
+              </div>
+            <% } %>
             <div class="md:col-span-2">
               <label for="party_id" class="form-label"><%= doc.party.label %> <span class="text-error-500">*</span></label>
               <select id="party_id" name="<%= doc.party.field %>" class="form-select" required>
@@ -86,12 +105,70 @@
               <label for="doc-due" class="form-label"><%= doc.dueLabel %></label>
               <input id="doc-due" type="date" name="<%= doc.dueField %>" value="<%= String(row[doc.dueField] || '').slice(0,10) %>" class="form-input">
             </div>
-            <div class="md:col-span-2">
+            <% if (doc.kind === 'sales_invoice') { %>
+              <div>
+                <label for="cae" class="form-label"><%= t('CAE number') %></label>
+                <input id="cae" name="cae" type="text" inputmode="numeric" pattern="[0-9]{14}" maxlength="14" value="<%= row.cae || '' %>" class="form-input font-mono <%= errors.cae ? 'form-input-error' : '' %>" placeholder="00000000000000">
+                <% if (errors.cae) { %><p class="form-error"><%= errors.cae %></p><% } %>
+                <p class="form-help"><%= t('14 digits provided by ARCA. Leave blank until the CAE is obtained.') %></p>
+              </div>
+              <div>
+                <label for="cae_expiry_date" class="form-label"><%= t('CAE expiry date') %></label>
+                <input id="cae_expiry_date" name="cae_expiry_date" type="date" value="<%= String(row.cae_expiry_date || '').slice(0,10) %>" class="form-input <%= errors.cae_expiry_date ? 'form-input-error' : '' %>">
+                <% if (errors.cae_expiry_date) { %><p class="form-error"><%= errors.cae_expiry_date %></p><% } %>
+              </div>
+            <% } %>
+            <% if (doc.kind === 'purchase_invoice') { %>
+              <div class="md:col-span-2">
+                <label for="packing_slip_no" class="form-label"><%= t('Supplier remito no.') %></label>
+                <input id="packing_slip_no" name="packing_slip_no" type="text" maxlength="30" value="<%= row.packing_slip_no || '' %>" class="form-input" placeholder="<%= t('Optional supplier packing slip reference') %>">
+              </div>
+            <% } %>
+            <div class="<%= doc.isInvoice ? 'md:col-span-4' : 'md:col-span-2' %>">
               <label for="notes" class="form-label">Notes</label>
               <input id="notes" name="notes" type="text" value="<%= row.notes || '' %>" class="form-input" placeholder="Optional reference, delivery instructions…">
             </div>
           </div>
         </div>
+
+        <% if (doc.isInvoice) {
+          const typeName = row.document_type_name || '';
+          const isNoteDoc = /NOTA DE (CREDITO|DEBITO)/i.test(typeName);
+          const associationsVisible = doc.kind === 'sales_invoice' || isNoteDoc;
+        %>
+          <div id="invoice-associations-card" class="card mt-5 <%= associationsVisible ? '' : 'hidden' %>">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Associations') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= doc.kind === 'sales_invoice' ? t('Link packing slips to invoices, and regular invoices to credit or debit notes.') : t('Link regular invoices to credit or debit notes.') %></p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <% if (doc.kind === 'sales_invoice') { %>
+                <div id="packing-slips-section" class="<%= isNoteDoc ? 'hidden ' : '' %>md:col-span-2">
+                  <label for="delivery_ids" class="form-label"><%= t('Packing slips (remitos)') %></label>
+                  <select id="delivery_ids" name="delivery_ids[]" multiple class="form-input h-auto min-h-[150px] <%= errors.delivery_ids ? 'form-input-error' : '' %>">
+                    <% (deliveryOptions || []).forEach(delivery => { %>
+                      <option value="<%= delivery.id %>" data-customer="<%= delivery.customer_id %>" <%= selectedDeliveryIds.includes(Number(delivery.id)) ? 'selected' : '' %>><%= delivery.packing_slip_no || delivery.delivery_no %> · <%= h.formatDate(delivery.delivery_date) %> · <%= delivery.company_name %></option>
+                    <% }) %>
+                  </select>
+                  <% if (errors.delivery_ids) { %><p class="form-error"><%= errors.delivery_ids %></p><% } %>
+                  <p class="form-help"><%= t('Only packing slips for the selected customer are listed. Hold Ctrl/Cmd to select more than one.') %></p>
+                </div>
+              <% } %>
+              <div id="note-invoices-section" class="<%= isNoteDoc ? '' : 'hidden ' %>md:col-span-2">
+                <label for="note_invoice_ids" class="form-label"><%= t('Related invoices') %></label>
+                <select id="note_invoice_ids" name="note_invoice_ids[]" multiple class="form-input h-auto min-h-[150px] <%= errors.note_invoice_ids ? 'form-input-error' : '' %>">
+                  <% (noteInvoiceOptions || []).forEach(invoice => { %>
+                    <option value="<%= invoice.id %>" data-party="<%= invoice.party_id %>" <%= selectedNoteInvoiceIds.includes(Number(invoice.id)) ? 'selected' : '' %>><%= invoice.number %> · <%= h.formatDate(invoice.invoice_date) %> · <%= invoice.company_name %> · <%= money(invoice.total) %></option>
+                  <% }) %>
+                </select>
+                <% if (errors.note_invoice_ids) { %><p class="form-error"><%= errors.note_invoice_ids %></p><% } %>
+                <p class="form-help"><%= t('Only regular invoices for the selected party are listed. This section applies to credit and debit notes.') %></p>
+              </div>
+            </div>
+          </div>
+        <% } %>
 
         <% if (doc.customerOrder) { %>
           <div class="card mt-5">
@@ -272,6 +349,44 @@
             </div>
           </div>
         </div>
+
+        <% if (doc.kind === 'sales_invoice') { %>
+          <details class="card mt-5" <%= (errors.cbu || errors.transfer_option || errors.payment_expiry_date) ? 'open' : '' %>>
+            <summary class="card-header cursor-pointer list-none">
+              <div>
+                <h2 class="card-title"><%= t('MiPyME credit invoice options') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Optional fields required for certain fiscal document types (FCE).') %></p>
+              </div>
+              <span class="flex items-center gap-2 text-xs text-gray-400">
+                <%= t('CBU, transfer option and payment expiry') %>
+                <%- include('/partials/icon', { name: 'chevron-down', className: 'h-4 w-4' }) %>
+              </span>
+            </summary>
+            <div class="grid grid-cols-1 gap-5 px-5 pb-5 md:grid-cols-3 md:px-6 md:pb-6">
+              <div>
+                <label for="cbu" class="form-label"><%= t('CBU number') %></label>
+                <input id="cbu" name="cbu" type="text" inputmode="numeric" maxlength="22" value="<%= row.cbu || '' %>" class="form-input font-mono <%= errors.cbu ? 'form-input-error' : '' %>" placeholder="0000000000000000000000">
+                <% if (errors.cbu) { %><p class="form-error"><%= errors.cbu %></p><% } %>
+                <p class="form-help"><%= t('22 digits. Optional.') %></p>
+              </div>
+              <div>
+                <label for="transfer_option" class="form-label"><%= t('Transfer option') %></label>
+                <select id="transfer_option" name="transfer_option" class="form-select <%= errors.transfer_option ? 'form-input-error' : '' %>">
+                  <option value="">— <%= t('None') %> —</option>
+                  <option value="ADC" <%= row.transfer_option === 'ADC' ? 'selected' : '' %>>ADC</option>
+                  <option value="SCA" <%= row.transfer_option === 'SCA' ? 'selected' : '' %>>SCA</option>
+                </select>
+                <% if (errors.transfer_option) { %><p class="form-error"><%= errors.transfer_option %></p><% } %>
+              </div>
+              <div>
+                <label for="payment_expiry_date" class="form-label"><%= t('Payment expiry date') %></label>
+                <input id="payment_expiry_date" name="payment_expiry_date" type="date" value="<%= String(row.payment_expiry_date || '').slice(0,10) %>" class="form-input <%= errors.payment_expiry_date ? 'form-input-error' : '' %>">
+                <% if (errors.payment_expiry_date) { %><p class="form-error"><%= errors.payment_expiry_date %></p><% } %>
+                <p class="form-help"><%= t('Usually one week after the document date.') %></p>
+              </div>
+            </div>
+          </details>
+        <% } %>
       </form>
     </div>
   </main>

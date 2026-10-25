@@ -838,10 +838,11 @@ async function main() {
       }
       const status = pick(invoiceStatuses);
       const totalsObj = totals(items, rand() < 0.15 ? 25 : 0);
-      const invoiceNo = `INV-${invoiceDate.slice(0, 4)}-${String(invoiceSeq++).padStart(4, '0')}`;
+      const invoiceNo = `00001-${String(invoiceSeq++).padStart(8, '0')}`;
       const sourceOrder = salesOrders.find((o) => o.customer.id === customer.id && o.status === 'delivered');
       const invoiceId = await insert(conn, 'sales_invoices', {
         invoice_no: invoiceNo,
+        document_type_code: 6,
         sales_order_id: sourceOrder ? sourceOrder.id : null,
         customer_id: customer.id,
         invoice_date: invoiceDate,
@@ -881,11 +882,12 @@ async function main() {
       }
       const status = pick(['draft', 'received', 'received', 'paid', 'paid', 'overdue']);
       const totalsObj = totals(items);
-      const billNo = `BILL-${invoiceDate.slice(0, 4)}-${String(billSeq++).padStart(4, '0')}`;
+      const billNo = `00001-${String(billSeq++).padStart(8, '0')}`;
       const sourceOrder = purchaseOrders.find((o) => o.supplier.id === supplier.id);
       const posted = ['received', 'paid'].includes(status) ? 1 : 0;
       const invoiceId = await insert(conn, 'purchase_invoices', {
         bill_no: billNo,
+        document_type_code: 1,
         purchase_order_id: sourceOrder ? sourceOrder.id : null,
         supplier_id: supplier.id,
         invoice_date: invoiceDate,
