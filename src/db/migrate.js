@@ -141,6 +141,16 @@ async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'production_orders', 'lot_number', 'VARCHAR(60) NULL AFTER product_id');
   await addColumn(conn, dbName, 'production_orders', 'expiry_date', 'DATE NULL AFTER lot_number');
   await addIndex(conn, dbName, 'production_orders', 'idx_production_orders_expiry', 'KEY `idx_production_orders_expiry` (`expiry_date`)');
+
+  // ------------------------------------------------- packing slips and CAI
+  await addColumn(conn, dbName, 'deliveries', 'packing_slip_no', 'VARCHAR(14) NULL AFTER delivery_no');
+  await addColumn(conn, dbName, 'deliveries', 'cai_authorization_id', 'INT UNSIGNED NULL AFTER packing_slip_no');
+  await addColumn(conn, dbName, 'deliveries', 'cai_number', 'VARCHAR(60) NULL AFTER cai_authorization_id');
+  await addColumn(conn, dbName, 'deliveries', 'cot', 'VARCHAR(80) NULL AFTER cai_number');
+  await addIndex(conn, dbName, 'deliveries', 'uq_deliveries_packing_slip', 'UNIQUE KEY `uq_deliveries_packing_slip` (`packing_slip_no`)');
+  await addIndex(conn, dbName, 'deliveries', 'idx_deliveries_cai', 'KEY `idx_deliveries_cai` (`cai_authorization_id`)');
+  await addConstraint(conn, dbName, 'deliveries', 'fk_deliveries_cai',
+    'FOREIGN KEY (`cai_authorization_id`) REFERENCES `cai_authorizations` (`id`) ON DELETE SET NULL');
 }
 
 async function main() {

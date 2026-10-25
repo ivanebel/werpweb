@@ -9,11 +9,16 @@
         const formErrors = errors._form || [];
         const submittedIds = Array.isArray(row.so_item_id) ? row.so_item_id.map(String) : null;
         const submittedQtys = Array.isArray(row.item_quantity) ? row.item_quantity : [];
+        const pageNumber = mode === 'edit' ? (delivery.packing_slip_no || delivery.delivery_no) : null;
+        const packingSlipValue = mode === 'edit'
+          ? (delivery.packing_slip_no || t('Not assigned'))
+          : (nextPackingSlip || t('Not assigned'));
+        const assignedCai = mode === 'edit' ? delivery.cai_number : (activeCai ? activeCai.cai_number : null);
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 class="page-title"><%= mode === 'create' ? t('New delivery') : t('Edit {number}', { number: delivery.delivery_no }) %></h1>
+          <h1 class="page-title"><%= mode === 'create' ? t('New delivery') : t('Edit {number}', { number: pageNumber }) %></h1>
           <p class="page-subtitle">
             <%= mode === 'create' ? t('Ship items from sales order') : t('Update packing details for') %>
             <span class="font-medium text-gray-700 dark:text-gray-300"><%= order.order_no %></span>
@@ -38,6 +43,18 @@
         </div>
       <% } %>
 
+      <% if (mode === 'create' && !activeCai) { %>
+        <div class="mb-5 flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 shrink-0"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <p><%= t('No active CAI authorization with available packing slips. Ask an administrator to add or activate one before creating a delivery.') %></p>
+          </div>
+          <% if (currentUser && currentUser.role === 'admin') { %>
+            <a href="/deliveries/cai" class="btn btn-secondary btn-sm shrink-0"><%= t('Manage CAI') %></a>
+          <% } %>
+        </div>
+      <% } %>
+
       <form method="POST" action="<%= action %>">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="sales_order_id" value="<%= order.id %>">
@@ -45,7 +62,7 @@
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">Delivery details</h2>
-            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? delivery.delivery_no : 'Number assigned on save' %></span>
+            <span class="font-mono text-xs text-gray-400"><%= mode === 'edit' ? packingSlipValue : (nextPackingSlip || t('Not assigned')) %></span>
           </div>
           <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
             <div class="md:col-span-2">
@@ -74,7 +91,27 @@
               <label for="tracking_number" class="form-label">Tracking number</label>
               <input id="tracking_number" name="tracking_number" type="text" value="<%= row.tracking_number || '' %>" class="form-input" placeholder="Optional">
             </div>
-            <div class="md:col-span-2">
+            <div>
+              <label for="cot" class="form-label"><%= t('COT') %></label>
+              <input id="cot" name="cot" type="text" maxlength="80" value="<%= row.cot || '' %>" class="form-input" placeholder="<%= t('Optional merchandise code') %>">
+              <p class="form-help"><%= t('Optional code required for some merchandise.') %></p>
+            </div>
+            <div>
+              <label class="form-label"><%= t('Packing slip number') %></label>
+              <div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm dark:border-gray-700 dark:bg-gray-800">
+                <span class="font-mono <%= packingSlipValue === t('Not assigned') ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300' %>"><%= packingSlipValue %></span>
+              </div>
+              <p class="form-help">
+                <% if (assignedCai) { %>
+                  CAI: <span class="font-mono"><%= assignedCai %></span>
+                <% } else if (mode === 'create') { %>
+                  <span class="text-error-600 dark:text-error-400"><%= t('No active CAI authorization') %></span>
+                <% } else { %>
+                  <%= t('Not assigned') %>
+                <% } %>
+              </p>
+            </div>
+            <div class="md:col-span-4">
               <label for="notes" class="form-label">Notes</label>
               <input id="notes" name="notes" type="text" value="<%= row.notes || '' %>" class="form-input" placeholder="Packing instructions, reference…">
             </div>

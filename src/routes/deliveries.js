@@ -4,9 +4,76 @@ const express = require('express');
 const { query, one, scalar, getPool, withTransaction } = require('../db');
 const { nextNumber } = require('../lib/sequences');
 const { pagination, todayISO, toNumber, statusBadge, statusInfo, formatMoney, forLocale } = require('../lib/helpers');
+const { requireRole } = require('../middleware/web');
+const {
+  formatPackingSlipNo,
+  usedCount,
+  remainingCount,
+  allocatePackingSlip,
+  activeCai,
+} = require('../lib/packingSlips');
 
 const router = express.Router();
 const basePath = '/deliveries';
+
+function caiFormValues(body = {}) {
+  return {
+    cai_number: String(body.cai_number || '').trim(),
+    prefix: String(body.prefix || '').trim(),
+    range_start: String(body.range_start || '').trim(),
+    range_end: String(body.range_end || '').trim(),
+    status: ['active', 'cancelled'].includes(body.status) ? body.status : 'active',
+    notes: String(body.notes || '').trim(),
+  };
+}
+
+async function validateCai(input, existing = null) {
+  const errors = {};
+  if (!input.cai_number) {
+    errors.cai_number = 'CAI number is required.';
+  } else if (input.cai_number.length > 60) {
+    errors.cai_number = 'CAI number is too long.';
+  }
+  if (!/^\d{5}$/.test(input.prefix)) {
+    errors.prefix = 'Prefix must contain exactly five digits.';
+  }
+  const start = Number.parseInt(input.range_start, 10);
+  const end = Number.parseInt(input.range_end, 10);
+  if (!Number.isInteger(start) || start < 1 || start > 99999999) {
+    errors.range_start = 'Range start must be a number between 1 and 99,999,999.';
+  }
+  if (!Number.isInteger(end) || end < 1 || end > 99999999) {
+    errors.range_end = 'Range end must be a number between 1 and 99,999,999.';
+  }
+  if (Number.isInteger(start) && Number.isInteger(end) && start > end) {
+    errors.range_end = 'Range end must be greater than or equal to the start.';
+  }
+  if (!errors.cai_number) {
+    const duplicate = await one(
+      `SELECT id FROM cai_authorizations WHERE cai_number = ? ${existing ? 'AND id <> ?' : ''} LIMIT 1`,
+      existing ? [input.cai_number, existing.id] : [input.cai_number],
+    );
+    if (duplicate) errors.cai_number = 'This CAI number already exists.';
+  }
+  if (!errors.prefix && !errors.range_start && !errors.range_end) {
+    const overlap = await one(
+      `SELECT id FROM cai_authorizations
+        WHERE prefix = ? AND status <> 'cancelled'
+          AND range_start <= ? AND range_end >= ?
+          ${existing ? 'AND id <> ?' : ''}
+        LIMIT 1`,
+      existing ? [input.prefix, end, start, existing.id] : [input.prefix, end, start],
+    );
+    if (overlap) errors.range_start = 'This CAI range overlaps another authorization for the same prefix.';
+  }
+  return errors;
+}
+
+function caiStatusFor(input, nextNumber) {
+  if (input.status === 'cancelled') return 'cancelled';
+  const remaining = Math.max(0, Number(input.range_end) - Number(nextNumber) + 1);
+  return remaining > 0 ? 'active' : 'exhausted';
+}
 
 async function loadOrderItems(orderId, excludeDeliveryId = 0) {
   return query(
@@ -108,8 +175,11 @@ router.get('/', async (req, res, next) => {
     const where = [];
     const params = [];
     if (search) {
-      where.push('(d.delivery_no LIKE ? OR c.company_name LIKE ? OR so.order_no LIKE ? OR so.customer_order_no LIKE ? OR cw.name LIKE ? OR d.tracking_number LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+      where.push('(d.delivery_no LIKE ? OR d.packing_slip_no LIKE ? OR d.cai_number LIKE ? OR d.cot LIKE ? OR c.company_name LIKE ? OR so.order_no LIKE ? OR so.customer_order_no LIKE ? OR cw.name LIKE ? OR d.tracking_number LIKE ?)');
+      params.push(
+        `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
+        `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
+      );
     }
     if (status) {
       where.push('d.status = ?');
@@ -148,6 +218,7 @@ router.get('/', async (req, res, next) => {
               SUM(status = 'delivered') AS delivered
          FROM deliveries`,
     );
+    const currentCai = await activeCai();
 
     res.render('deliveries/index', {
       title: req.t('Deliveries'),
@@ -157,6 +228,7 @@ router.get('/', async (req, res, next) => {
       pagination: pag,
       search,
       activeStatus: status,
+      activeCai: currentCai,
       counts: {
         pending: Number(counts.pending || 0),
         shipped: Number(counts.shipped || 0),
@@ -171,6 +243,7 @@ router.get('/', async (req, res, next) => {
 router.get('/new', async (req, res, next) => {
   try {
     const orderId = Number.parseInt(req.query.sales_order_id, 10);
+    const currentCai = await activeCai();
     if (!orderId) {
       const orders = await query(
         `SELECT so.id, so.order_no, so.customer_order_no, so.order_date, so.status,
@@ -188,6 +261,7 @@ router.get('/new', async (req, res, next) => {
         active: 'deliveries',
         breadcrumbs: [{ label: req.t('Deliveries'), href: basePath }, { label: req.t('New delivery') }],
         orders,
+        activeCai: currentCai,
       });
     }
 
@@ -215,7 +289,9 @@ router.get('/new', async (req, res, next) => {
       mode: 'create',
       action: basePath,
       errors: {},
-      row: { delivery_date: todayISO(), carrier: '', tracking_number: '', notes: '' },
+      activeCai: currentCai,
+      nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
+      row: { delivery_date: todayISO(), carrier: '', tracking_number: '', cot: '', notes: '' },
     });
   } catch (err) {
     next(err);
@@ -269,8 +345,9 @@ router.post('/', async (req, res, next) => {
     const deliveryDate = (req.body.delivery_date || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) errors.push(req.t('A valid delivery date is required.'));
 
-    if (errors.length) {
+    const renderCreateError = async (messages) => {
       const available = (await loadOrderItems(orderId)).filter((i) => remainingOf(i) > 0);
+      const currentCai = await activeCai();
       return res.status(422).render('deliveries/form', {
         title: req.t('New delivery'),
         active: 'deliveries',
@@ -280,43 +357,336 @@ router.post('/', async (req, res, next) => {
         items: available,
         mode: 'create',
         action: basePath,
-        errors: { _form: errors },
+        errors: { _form: messages },
+        activeCai: currentCai,
+        nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
         row: req.body,
       });
-    }
+    };
 
-    const deliveryId = await withTransaction(async (conn) => {
-      const deliveryNo = await nextNumber({
-        prefix: 'DLV',
-        table: 'deliveries',
-        column: 'delivery_no',
-        date: deliveryDate,
-        conn,
-      });
-      const [result] = await conn.query(
-        `INSERT INTO deliveries (delivery_no, sales_order_id, customer_id, delivery_date, carrier, tracking_number, status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
-        [
-          deliveryNo,
-          orderId,
-          order.customer_id,
-          deliveryDate,
-          (req.body.carrier || '').slice(0, 120) || null,
-          (req.body.tracking_number || '').slice(0, 120) || null,
-          (req.body.notes || '').slice(0, 5000) || null,
-        ],
-      );
-      for (const item of items) {
-        await conn.query(
-          'INSERT INTO delivery_items (delivery_id, sales_order_item_id, product_id, quantity) VALUES (?, ?, ?, ?)',
-          [result.insertId, item.so_item_id, item.product_id, item.quantity],
+    if (errors.length) return renderCreateError(errors);
+
+    let deliveryId;
+    try {
+      deliveryId = await withTransaction(async (conn) => {
+        const slip = await allocatePackingSlip(conn);
+        const deliveryNo = await nextNumber({
+          prefix: 'DLV',
+          table: 'deliveries',
+          column: 'delivery_no',
+          date: deliveryDate,
+          conn,
+        });
+        const [result] = await conn.query(
+          `INSERT INTO deliveries
+             (delivery_no, packing_slip_no, cai_authorization_id, cai_number, cot,
+              sales_order_id, customer_id, delivery_date, carrier, tracking_number, status, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+          [
+            deliveryNo,
+            slip.packingSlipNo,
+            slip.id,
+            slip.caiNumber,
+            (req.body.cot || '').slice(0, 80) || null,
+            orderId,
+            order.customer_id,
+            deliveryDate,
+            (req.body.carrier || '').slice(0, 120) || null,
+            (req.body.tracking_number || '').slice(0, 120) || null,
+            (req.body.notes || '').slice(0, 5000) || null,
+          ],
         );
+        for (const item of items) {
+          await conn.query(
+            'INSERT INTO delivery_items (delivery_id, sales_order_item_id, product_id, quantity) VALUES (?, ?, ?, ?)',
+            [result.insertId, item.so_item_id, item.product_id, item.quantity],
+          );
+        }
+        return result.insertId;
+      });
+    } catch (err) {
+      if (err.code === 'NO_ACTIVE_CAI') {
+        return renderCreateError([
+          req.t('No active CAI authorization with available packing slips. Ask an administrator to add or activate one before creating a delivery.'),
+        ]);
       }
-      return result.insertId;
-    });
+      throw err;
+    }
 
     req.flash('success', 'Delivery created. Mark it as shipped to update stock.');
     res.redirect(`${basePath}/${deliveryId}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------------------------------------------ CAI authorizations
+router.get('/cai', requireRole('admin'), async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT c.*, u.name AS created_by_name,
+              (SELECT COUNT(*) FROM deliveries d WHERE d.cai_authorization_id = c.id) AS delivery_count
+         FROM cai_authorizations c
+         LEFT JOIN users u ON u.id = c.created_by
+        ORDER BY c.created_at DESC, c.id DESC`,
+    );
+    const cais = rows.map((c) => {
+      const used = usedCount(c);
+      const remaining = remainingCount(c);
+      return {
+        ...c,
+        used,
+        remaining,
+        rangeStartLabel: formatPackingSlipNo(c.prefix, c.range_start),
+        rangeEndLabel: formatPackingSlipNo(c.prefix, c.range_end),
+        nextSlipLabel: c.status === 'active' && remaining > 0 ? formatPackingSlipNo(c.prefix, c.next_number) : null,
+      };
+    });
+    const stats = {
+      total: cais.length,
+      active: cais.filter((c) => c.status === 'active' && c.remaining > 0).length,
+      available: cais.reduce((sum, c) => sum + (c.status === 'active' ? c.remaining : 0), 0),
+      issued: cais.reduce((sum, c) => sum + c.used, 0),
+    };
+    const currentRow = await activeCai();
+    const currentCai = currentRow ? cais.find((c) => c.id === currentRow.id) || null : null;
+    const unassignedDeliveries = Number(
+      (await scalar('SELECT COUNT(*) FROM deliveries WHERE packing_slip_no IS NULL')) || 0,
+    );
+
+    res.render('deliveries/cai/index', {
+      title: req.t('CAI authorizations'),
+      active: 'deliveries-cai',
+      breadcrumbs: [{ label: req.t('Deliveries'), href: basePath }, { label: req.t('CAI authorizations') }],
+      cais,
+      stats,
+      currentCai,
+      unassignedDeliveries,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/cai/new', requireRole('admin'), (req, res) => {
+  res.render('deliveries/cai/form', {
+    title: req.t('New CAI authorization'),
+    active: 'deliveries-cai',
+    breadcrumbs: [
+      { label: req.t('Deliveries'), href: basePath },
+      { label: req.t('CAI authorizations'), href: `${basePath}/cai` },
+      { label: req.t('New CAI authorization') },
+    ],
+    mode: 'create',
+    action: `${basePath}/cai`,
+    cai: null,
+    row: { cai_number: '', prefix: '00001', range_start: '', range_end: '', status: 'active', notes: '' },
+    errors: {},
+    used: 0,
+    remaining: null,
+    canEditRange: true,
+  });
+});
+
+router.post('/cai', requireRole('admin'), async (req, res, next) => {
+  try {
+    const input = caiFormValues(req.body);
+    const errors = await validateCai(input);
+    if (Object.keys(errors).length) {
+      return res.status(422).render('deliveries/cai/form', {
+        title: req.t('New CAI authorization'),
+        active: 'deliveries-cai',
+        breadcrumbs: [
+          { label: req.t('Deliveries'), href: basePath },
+          { label: req.t('CAI authorizations'), href: `${basePath}/cai` },
+          { label: req.t('New CAI authorization') },
+        ],
+        mode: 'create',
+        action: `${basePath}/cai`,
+        cai: null,
+        row: input,
+        errors,
+        used: 0,
+        remaining: null,
+        canEditRange: true,
+      });
+    }
+
+    const start = Number.parseInt(input.range_start, 10);
+    const end = Number.parseInt(input.range_end, 10);
+    await getPool().query(
+      `INSERT INTO cai_authorizations
+         (cai_number, prefix, range_start, range_end, next_number, status, notes, created_by)
+       VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`,
+      [input.cai_number, input.prefix, start, end, start, input.notes || null, req.session.user.id],
+    );
+    req.flash('success', 'CAI authorization created.');
+    res.redirect(`${basePath}/cai`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/cai/assign-missing', requireRole('admin'), async (req, res, next) => {
+  try {
+    const result = await withTransaction(async (conn) => {
+      const [deliveries] = await conn.query(
+        `SELECT id FROM deliveries
+          WHERE packing_slip_no IS NULL
+          ORDER BY delivery_date ASC, id ASC
+          FOR UPDATE`,
+      );
+      let assigned = 0;
+      for (const delivery of deliveries) {
+        let slip;
+        try {
+          slip = await allocatePackingSlip(conn);
+        } catch (err) {
+          if (err.code === 'NO_ACTIVE_CAI') break;
+          throw err;
+        }
+        await conn.query(
+          'UPDATE deliveries SET packing_slip_no = ?, cai_authorization_id = ?, cai_number = ? WHERE id = ?',
+          [slip.packingSlipNo, slip.id, slip.caiNumber, delivery.id],
+        );
+        assigned += 1;
+      }
+      return { assigned, remaining: deliveries.length - assigned };
+    });
+
+    if (!result.assigned) {
+      req.flash('error', 'No missing packing slips were assigned. Check that an active CAI authorization has numbers available.');
+    } else if (result.remaining > 0) {
+      req.flash('success', 'Assigned {count} missing packing slips. {remaining} deliveries still need an available CAI range.', {
+        count: result.assigned,
+        remaining: result.remaining,
+      });
+    } else {
+      req.flash('success', 'Assigned {count} missing packing slips.', { count: result.assigned });
+    }
+    res.redirect(`${basePath}/cai`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/cai/:id(\\d+)/edit', requireRole('admin'), async (req, res, next) => {
+  try {
+    const cai = await one('SELECT * FROM cai_authorizations WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!cai) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('CAI authorization') })), { status: 404 }));
+    }
+    const used = usedCount(cai);
+    const remaining = remainingCount(cai);
+    res.render('deliveries/cai/form', {
+      title: req.t('Edit CAI authorization'),
+      active: 'deliveries-cai',
+      breadcrumbs: [
+        { label: req.t('Deliveries'), href: basePath },
+        { label: req.t('CAI authorizations'), href: `${basePath}/cai` },
+        { label: req.t('Edit CAI authorization') },
+      ],
+      mode: 'edit',
+      action: `${basePath}/cai/${cai.id}`,
+      cai,
+      row: {
+        ...cai,
+        range_start: String(cai.range_start),
+        range_end: String(cai.range_end),
+      },
+      errors: {},
+      used,
+      remaining,
+      canEditRange: used === 0,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/cai/:id(\\d+)', requireRole('admin'), async (req, res, next) => {
+  try {
+    const existing = await one('SELECT * FROM cai_authorizations WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('CAI authorization') })), { status: 404 }));
+    }
+
+    const used = usedCount(existing);
+    const input = caiFormValues(req.body);
+    const errors = {};
+    if (used > 0) {
+      const start = Number.parseInt(input.range_start, 10);
+      const end = Number.parseInt(input.range_end, 10);
+      if (
+        input.prefix !== existing.prefix
+        || start !== Number(existing.range_start)
+        || end !== Number(existing.range_end)
+      ) {
+        errors._form = ['This CAI has already issued packing slips. Only its number, notes and status can be changed.'];
+      }
+      input.prefix = existing.prefix;
+      input.range_start = String(existing.range_start);
+      input.range_end = String(existing.range_end);
+    }
+    Object.assign(errors, await validateCai(input, existing));
+
+    if (Object.keys(errors).length) {
+      return res.status(422).render('deliveries/cai/form', {
+        title: req.t('Edit CAI authorization'),
+        active: 'deliveries-cai',
+        breadcrumbs: [
+          { label: req.t('Deliveries'), href: basePath },
+          { label: req.t('CAI authorizations'), href: `${basePath}/cai` },
+          { label: req.t('Edit CAI authorization') },
+        ],
+        mode: 'edit',
+        action: `${basePath}/cai/${existing.id}`,
+        cai: existing,
+        row: input,
+        errors,
+        used,
+        remaining: remainingCount(existing),
+        canEditRange: used === 0,
+      });
+    }
+
+    const start = Number.parseInt(input.range_start, 10);
+    const end = Number.parseInt(input.range_end, 10);
+    const nextNumber = used === 0 ? start : existing.next_number;
+    const status = caiStatusFor(input, nextNumber);
+    await getPool().query(
+      `UPDATE cai_authorizations
+          SET cai_number = ?, prefix = ?, range_start = ?, range_end = ?, next_number = ?, status = ?, notes = ?
+        WHERE id = ?`,
+      [input.cai_number, input.prefix, start, end, nextNumber, status, input.notes || null, existing.id],
+    );
+    req.flash('success', 'CAI authorization updated.');
+    res.redirect(`${basePath}/cai`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/cai/:id(\\d+)/delete', requireRole('admin'), async (req, res, next) => {
+  try {
+    const cai = await one('SELECT * FROM cai_authorizations WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!cai) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('CAI authorization') })), { status: 404 }));
+    }
+    if (usedCount(cai) > 0) {
+      req.flash('error', 'This CAI has issued packing slips and cannot be deleted. Cancel it instead.');
+      return res.redirect(`${basePath}/cai`);
+    }
+    const references = Number(
+      (await scalar('SELECT COUNT(*) FROM deliveries WHERE cai_authorization_id = ?', [cai.id])) || 0,
+    );
+    if (references > 0) {
+      req.flash('error', 'This CAI is linked to deliveries and cannot be deleted. Cancel it instead.');
+      return res.redirect(`${basePath}/cai`);
+    }
+    await getPool().query('DELETE FROM cai_authorizations WHERE id = ?', [cai.id]);
+    req.flash('success', 'CAI authorization deleted.');
+    res.redirect(`${basePath}/cai`);
   } catch (err) {
     next(err);
   }
@@ -336,13 +706,16 @@ router.get('/:id(\\d+)', async (req, res, next) => {
       actions.push({ action: 'status', value: 'delivered', label: req.t('Mark as delivered'), tone: 'success' });
       actions.push({ action: 'status', value: 'cancelled', label: req.t('Cancel & restock'), tone: 'danger', confirm: true });
     }
-    actions.push({ href: `${basePath}/${delivery.id}/print`, label: req.t('Print packing slip'), tone: 'secondary' });
+    if (delivery.packing_slip_no) {
+      actions.push({ href: `${basePath}/${delivery.id}/print`, label: req.t('Print packing slip'), tone: 'secondary' });
+    }
     actions.push({ href: `/emails/compose?type=delivery&id=${delivery.id}`, label: req.t('Email'), tone: 'secondary' });
 
+    const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
     res.render('deliveries/show', {
-      title: delivery.delivery_no,
+      title: pageNumber,
       active: 'deliveries',
-      breadcrumbs: [{ label: req.t('Deliveries'), href: basePath }, { label: delivery.delivery_no }],
+      breadcrumbs: [{ label: req.t('Deliveries'), href: basePath }, { label: pageNumber }],
       delivery,
       items,
       actions,
@@ -367,13 +740,15 @@ router.get('/:id(\\d+)/edit', async (req, res, next) => {
     const items = currentItems
       .filter((i) => remainingOf(i) > 0 || bySoItem.has(String(i.so_item_id)))
       .map((i) => ({ ...i, current_qty: bySoItem.get(String(i.so_item_id))?.quantity || 0 }));
+    const currentCai = await activeCai();
+    const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
 
     res.render('deliveries/form', {
-      title: req.t('Edit {number}', { number: delivery.delivery_no }),
+      title: req.t('Edit {number}', { number: pageNumber }),
       active: 'deliveries',
       breadcrumbs: [
         { label: req.t('Deliveries'), href: basePath },
-        { label: delivery.delivery_no, href: `${basePath}/${delivery.id}` },
+        { label: pageNumber, href: `${basePath}/${delivery.id}` },
         { label: req.t('Edit') },
       ],
       delivery,
@@ -382,6 +757,8 @@ router.get('/:id(\\d+)/edit', async (req, res, next) => {
       mode: 'edit',
       action: `${basePath}/${delivery.id}`,
       errors: {},
+      activeCai: currentCai,
+      nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
       row: delivery,
     });
   } catch (err) {
@@ -406,12 +783,14 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       const currentItems = await loadOrderItems(delivery.sales_order_id, delivery.id);
       const deliveredRows = await query('SELECT * FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
       const bySoItem = new Map(deliveredRows.map((d) => [String(d.sales_order_item_id), d]));
+      const currentCai = await activeCai();
+      const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
       return res.status(422).render('deliveries/form', {
-        title: req.t('Edit {number}', { number: delivery.delivery_no }),
+        title: req.t('Edit {number}', { number: pageNumber }),
         active: 'deliveries',
         breadcrumbs: [
           { label: req.t('Deliveries'), href: basePath },
-          { label: delivery.delivery_no, href: `${basePath}/${delivery.id}` },
+          { label: pageNumber, href: `${basePath}/${delivery.id}` },
           { label: req.t('Edit') },
         ],
         delivery,
@@ -422,17 +801,20 @@ router.post('/:id(\\d+)', async (req, res, next) => {
         mode: 'edit',
         action: `${basePath}/${delivery.id}`,
         errors: { _form: errors },
+        activeCai: currentCai,
+        nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
         row: req.body,
       });
     }
 
     await withTransaction(async (conn) => {
       await conn.query(
-        `UPDATE deliveries SET delivery_date = ?, carrier = ?, tracking_number = ?, notes = ? WHERE id = ?`,
+        `UPDATE deliveries SET delivery_date = ?, carrier = ?, tracking_number = ?, cot = ?, notes = ? WHERE id = ?`,
         [
           deliveryDate,
           (req.body.carrier || '').slice(0, 120) || null,
           (req.body.tracking_number || '').slice(0, 120) || null,
+          (req.body.cot || '').slice(0, 80) || null,
           (req.body.notes || '').slice(0, 5000) || null,
           delivery.id,
         ],
@@ -447,6 +829,42 @@ router.post('/:id(\\d+)', async (req, res, next) => {
     });
 
     req.flash('success', 'Delivery updated.');
+    res.redirect(`${basePath}/${delivery.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id(\\d+)/assign-packing-slip', requireRole('admin'), async (req, res, next) => {
+  try {
+    const delivery = await loadDelivery(req.params.id);
+    if (!delivery) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
+    }
+    if (delivery.packing_slip_no) {
+      req.flash('error', 'This delivery already has a packing slip number.');
+      return res.redirect(`${basePath}/${delivery.id}`);
+    }
+
+    let slip;
+    try {
+      slip = await withTransaction(async (conn) => {
+        const allocated = await allocatePackingSlip(conn);
+        await conn.query(
+          'UPDATE deliveries SET packing_slip_no = ?, cai_authorization_id = ?, cai_number = ? WHERE id = ?',
+          [allocated.packingSlipNo, allocated.id, allocated.caiNumber, delivery.id],
+        );
+        return allocated;
+      });
+    } catch (err) {
+      if (err.code === 'NO_ACTIVE_CAI') {
+        req.flash('error', 'No active CAI authorization with available packing slips. Add or activate one first.');
+        return res.redirect(`${basePath}/${delivery.id}`);
+      }
+      throw err;
+    }
+
+    req.flash('success', 'Packing slip {number} assigned.', { number: slip.packingSlipNo });
     res.redirect(`${basePath}/${delivery.id}`);
   } catch (err) {
     next(err);
@@ -562,6 +980,10 @@ router.post('/:id(\\d+)/delete', async (req, res, next) => {
       req.flash('error', 'Only pending or cancelled deliveries can be deleted.');
       return res.redirect(`${basePath}/${delivery.id}`);
     }
+    if (delivery.packing_slip_no) {
+      req.flash('error', 'Deliveries with an assigned packing slip cannot be deleted. Cancel the delivery instead.');
+      return res.redirect(`${basePath}/${delivery.id}`);
+    }
     await getPool().query('DELETE FROM deliveries WHERE id = ?', [delivery.id]);
     req.flash('success', 'Delivery deleted.');
     res.redirect(basePath);
@@ -576,11 +998,15 @@ router.get('/:id(\\d+)/print', async (req, res, next) => {
     if (!delivery) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
     }
+    if (!delivery.packing_slip_no) {
+      req.flash('error', 'This delivery does not have a packing slip number. Assign one before printing.');
+      return res.redirect(`${basePath}/${delivery.id}`);
+    }
     const items = await loadDeliveryItems(delivery, false);
     const settings = await require('../lib/settings').getSettings();
     res.render('deliveries/print', {
       layout: false,
-      title: req.t('Packing slip {number}', { number: delivery.delivery_no }),
+      title: req.t('Packing slip {number}', { number: delivery.packing_slip_no }),
       delivery,
       items,
       settings,

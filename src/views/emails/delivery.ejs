@@ -70,6 +70,22 @@
                         <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Delivery date:') %></td>
                         <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatDate(delivery.delivery_date) %></td>
                       </tr>
+                      <% if (delivery.cai_number) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;">CAI:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;font-family:monospace;"><%= delivery.cai_number %></td>
+                        </tr>
+                      <% } %>
+                      <% if (delivery.cot) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;">COT:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;font-family:monospace;"><%= delivery.cot %></td>
+                        </tr>
+                      <% } %>
+                      <tr>
+                        <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Delivery reference') %>:</td>
+                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;font-family:monospace;"><%= delivery.delivery_no %></td>
+                      </tr>
                       <% if (delivery.order_no) { %>
                         <tr>
                           <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Sales order') %>:</td>

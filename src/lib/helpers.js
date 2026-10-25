@@ -15,6 +15,7 @@ const STATUS = {
   delivered: { label: 'Delivered', tone: 'success' },
   received: { label: 'Received', tone: 'success' },
   cancelled: { label: 'Cancelled', tone: 'error' },
+  exhausted: { label: 'Exhausted', tone: 'warning' },
   // invoices / deliveries
   sent: { label: 'Sent', tone: 'info' },
   paid: { label: 'Paid', tone: 'success' },

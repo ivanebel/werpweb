@@ -164,6 +164,9 @@ function deliveryPlainText(email, message) {
   const signature = email.signature;
   const lines = [message, '', `${email.title} ${email.number}`];
   lines.push(`${t('Delivery date:')} ${h.formatDate(delivery.delivery_date)}`);
+  if (delivery.cai_number) lines.push(`CAI: ${delivery.cai_number}`);
+  if (delivery.cot) lines.push(`COT: ${delivery.cot}`);
+  lines.push(`${t('Delivery reference')}: ${delivery.delivery_no}`);
   lines.push(`${t('Ship to')}: ${email.partyName}`);
   if (email.partyEmail) lines.push(`${t('Email')}: ${email.partyEmail}`);
   lines.push('');
@@ -269,7 +272,7 @@ async function loadEmailDocument(type, id, locale) {
     const delivery = await deliveryRoutes.loadDelivery(id);
     if (!delivery) return null;
     const items = await deliveryRoutes.loadDeliveryItems(delivery, true);
-    const number = String(delivery.delivery_no);
+    const number = String(delivery.packing_slip_no || delivery.delivery_no);
     const email = {
       type,
       view: def.view,

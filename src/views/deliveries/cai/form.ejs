@@ -1,0 +1,161 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1000px]">
+      <%
+        const formErrors = errors._form || [];
+        const fieldErrors = (name) => errors[name];
+        const isEdit = mode === 'edit';
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= isEdit ? t('Edit CAI authorization') : t('New CAI authorization') %></h1>
+          <p class="page-subtitle"><%= t('Each CAI authorizes a contiguous range of packing slip numbers.') %></p>
+        </div>
+        <a href="/deliveries/cai" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Back to CAI authorizations') %>
+        </a>
+      </div>
+
+      <% if (formErrors.length || Object.keys(errors).some(key => key !== '_form')) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the CAI authorization:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% formErrors.forEach(message => { %><li><%= message %></li><% }) %>
+                <% Object.keys(errors).filter(key => key !== '_form').forEach(key => { %><li><%= errors[key] %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (isEdit) { %>
+        <div class="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Issued') %></p>
+            <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(used, 0) %></p>
+          </div>
+          <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Remaining') %></p>
+            <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(remaining, 0) %></p>
+          </div>
+          <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Status') %></p>
+            <div class="mt-2"><%- statusBadge(cai.status) %></div>
+          </div>
+          <div class="card p-4">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Next number') %></p>
+            <p class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">
+              <%= cai.status === 'active' && remaining > 0 ? `${cai.prefix}-${String(cai.next_number).padStart(8, '0')}` : '—' %>
+            </p>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <h2 class="card-title"><%= t('CAI details') %></h2>
+          <% if (isEdit && !canEditRange) { %>
+            <span class="rounded-full bg-warning-50 px-3 py-1.5 text-xs font-medium text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Range locked') %></span>
+          <% } %>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <div class="md:col-span-2">
+            <label for="cai_number" class="form-label"><%= t('CAI number') %> <span class="text-error-500">*</span></label>
+            <input id="cai_number" name="cai_number" type="text" maxlength="60" value="<%= row.cai_number || '' %>" class="form-input" required>
+            <p class="form-help"><%= t('The authorization number provided by the government.') %></p>
+            <% if (fieldErrors('cai_number')) { %><p class="form-error"><%= fieldErrors('cai_number') %></p><% } %>
+          </div>
+
+          <div>
+            <label for="prefix" class="form-label"><%= t('Prefix') %> <span class="text-error-500">*</span></label>
+            <input id="prefix" name="prefix" type="text" inputmode="numeric" maxlength="5" pattern="\d{5}" value="<%= row.prefix || '' %>" class="form-input font-mono" required <%= canEditRange ? '' : 'readonly' %>>
+            <p class="form-help"><%= t('Five-digit series printed before the hyphen.') %></p>
+            <% if (fieldErrors('prefix')) { %><p class="form-error"><%= fieldErrors('prefix') %></p><% } %>
+          </div>
+
+          <div>
+            <label class="form-label"><%= t('Packing slip format') %></label>
+            <div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 font-mono text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+              <%= row.prefix || '00001' %>-########
+            </div>
+          </div>
+
+          <div>
+            <label for="range_start" class="form-label"><%= t('Range start') %> <span class="text-error-500">*</span></label>
+            <input id="range_start" name="range_start" type="number" min="1" max="99999999" step="1" value="<%= row.range_start || '' %>" class="form-input font-mono" required <%= canEditRange ? '' : 'readonly' %>>
+            <p class="form-help"><%= t('First eight-digit number authorized by this CAI.') %></p>
+            <% if (fieldErrors('range_start')) { %><p class="form-error"><%= fieldErrors('range_start') %></p><% } %>
+          </div>
+
+          <div>
+            <label for="range_end" class="form-label"><%= t('Range end') %> <span class="text-error-500">*</span></label>
+            <input id="range_end" name="range_end" type="number" min="1" max="99999999" step="1" value="<%= row.range_end || '' %>" class="form-input font-mono" required <%= canEditRange ? '' : 'readonly' %>>
+            <p class="form-help"><%= t('Last eight-digit number authorized by this CAI.') %></p>
+            <% if (fieldErrors('range_end')) { %><p class="form-error"><%= fieldErrors('range_end') %></p><% } %>
+          </div>
+
+          <div>
+            <label for="status" class="form-label"><%= t('Status') %></label>
+            <% if (isEdit && cai.status === 'exhausted') { %>
+              <div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 dark:border-gray-700 dark:bg-gray-800">
+                <%- statusBadge('exhausted') %>
+              </div>
+              <p class="form-help"><%= t('This CAI has no packing slips left.') %></p>
+            <% } else if (isEdit) { %>
+              <select id="status" name="status" class="form-select">
+                <option value="active" <%= row.status === 'active' ? 'selected' : '' %>><%= t('Active') %></option>
+                <option value="cancelled" <%= row.status === 'cancelled' ? 'selected' : '' %>><%= t('Cancelled') %></option>
+              </select>
+              <p class="form-help"><%= t('Cancelled authorizations cannot be used to issue new packing slips.') %></p>
+            <% } else { %>
+              <div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 dark:border-gray-700 dark:bg-gray-800">
+                <%- statusBadge('active') %>
+              </div>
+              <p class="form-help"><%= t('New authorizations start as active.') %></p>
+            <% } %>
+          </div>
+
+          <div class="md:col-span-2">
+            <label for="notes" class="form-label"><%= t('Notes') %></label>
+            <textarea id="notes" name="notes" rows="3" maxlength="500" class="form-input" placeholder="<%= t('Optional internal notes about this authorization.') %>"><%= row.notes || '' %></textarea>
+          </div>
+
+          <% if (isEdit && !canEditRange) { %>
+            <div class="md:col-span-2 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+              <%= t('This CAI has already issued packing slips. The prefix and authorized range cannot be changed.') %>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+          <a href="/deliveries/cai" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= isEdit ? t('Save changes') : t('Create CAI authorization') %>
+          </button>
+        </div>
+      </form>
+
+      <% if (isEdit && used === 0) { %>
+        <form method="POST" action="/deliveries/cai/<%= cai.id %>/delete" class="mt-5 flex justify-end" data-confirm="<%= t('Delete this CAI authorization? This cannot be undone.') %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn-danger btn-sm">
+            <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+            <%= t('Delete CAI authorization') %>
+          </button>
+        </form>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

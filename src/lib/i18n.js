@@ -624,6 +624,116 @@ const ES = {
   'Packing slip {number}': 'Remito {number}',
   'Shipment': 'Envío',
   'Delete this delivery? This cannot be undone.': '¿Eliminar esta entrega? Esta acción no se puede deshacer.',
+  'CAI authorizations': 'Autorizaciones CAI',
+  'CAI authorization': 'Autorización CAI',
+  'New CAI authorization': 'Nueva autorización CAI',
+  'Edit CAI authorization': 'Editar autorización CAI',
+  'Back to CAI authorizations': 'Volver a autorizaciones CAI',
+  'Manage the government-issued CAI ranges used to number packing slips.':
+    'Administrá los rangos de CAI emitidos por el gobierno que se usan para numerar los remitos.',
+  'Each CAI authorizes a contiguous range of packing slip numbers.':
+    'Cada CAI autoriza un rango continuo de números de remito.',
+  'Authorizations': 'Autorizaciones',
+  'Available packing slips': 'Remitos disponibles',
+  'Issued packing slips': 'Remitos emitidos',
+  'Next packing slip': 'Próximo remito',
+  'remaining': 'restantes',
+  'There is no active CAI authorization with available packing slips. Add one or activate an existing authorization before creating deliveries.':
+    'No hay una autorización CAI activa con remitos disponibles. Agregá una o activá una autorización existente antes de crear entregas.',
+  'CAI number': 'Número de CAI',
+  'Authorized range': 'Rango autorizado',
+  'Next number': 'Próximo número',
+  'Issued': 'Emitidos',
+  'Remaining': 'Restantes',
+  'Prefix': 'Prefijo',
+  'slip': 'remito',
+  'slips': 'remitos',
+  'packing slip': 'remito',
+  'packing slips': 'remitos',
+  'authorization': 'autorización',
+  'authorizations': 'autorizaciones',
+  'No CAI authorizations yet': 'Todavía no hay autorizaciones CAI',
+  'Add a CAI authorization to start issuing valid packing slips.':
+    'Agregá una autorización CAI para empezar a emitir remitos válidos.',
+  'Delete this CAI authorization? This cannot be undone.': '¿Eliminar esta autorización CAI? Esta acción no se puede deshacer.',
+  'Packing slip not assigned': 'Remito sin asignar',
+  'Assign packing slip': 'Asignar remito',
+  'Ask an administrator to assign a packing slip before printing.':
+    'Pedile a un administrador que asigne un remito antes de imprimir.',
+  'Delivery reference': 'Referencia de entrega',
+  'Not assigned': 'Sin asignar',
+  'Please review the CAI authorization:': 'Revisá la autorización CAI:',
+  'CAI details': 'Datos de la CAI',
+  'Range locked': 'Rango bloqueado',
+  'The authorization number provided by the government.': 'El número de autorización provisto por el gobierno.',
+  'Five-digit series printed before the hyphen.': 'Serie de cinco dígitos que se imprime antes del guion.',
+  'Packing slip format': 'Formato del remito',
+  'Range start': 'Inicio del rango',
+  'First eight-digit number authorized by this CAI.': 'Primer número de ocho dígitos autorizado por esta CAI.',
+  'Range end': 'Fin del rango',
+  'Last eight-digit number authorized by this CAI.': 'Último número de ocho dígitos autorizado por esta CAI.',
+  'This CAI has no packing slips left.': 'Esta CAI no tiene remitos disponibles.',
+  'Cancelled authorizations cannot be used to issue new packing slips.':
+    'Las autorizaciones canceladas no se pueden usar para emitir nuevos remitos.',
+  'New authorizations start as active.': 'Las autorizaciones nuevas comienzan activas.',
+  'Optional internal notes about this authorization.': 'Notas internas opcionales sobre esta autorización.',
+  'This CAI has already issued packing slips. The prefix and authorized range cannot be changed.':
+    'Esta CAI ya emitió remitos. El prefijo y el rango autorizado no se pueden modificar.',
+  'Create CAI authorization': 'Crear autorización CAI',
+  'Delete CAI authorization': 'Eliminar autorización CAI',
+  'Packing slip number': 'Número de remito',
+  'Optional merchandise code': 'Código de mercadería opcional',
+  'Optional code required for some merchandise.': 'Código opcional requerido para algunas mercaderías.',
+  'No active CAI authorization': 'Sin autorización CAI activa',
+  'No active CAI authorization with available packing slips. New deliveries cannot be created until an administrator adds or activates one.':
+    'No hay una autorización CAI activa con remitos disponibles. No se pueden crear entregas hasta que un administrador agregue o active una.',
+  'No active CAI authorization with available packing slips. Ask an administrator to add or activate one before creating a delivery.':
+    'No hay una autorización CAI activa con remitos disponibles. Pedile a un administrador que agregue o active una antes de crear una entrega.',
+  'Manage CAI': 'Administrar CAI',
+  'Packing slip no., CAI, COT, customer, order or tracking…':
+    'N.º de remito, CAI, COT, cliente, orden o seguimiento…',
+  'CAI number is required.': 'El número de CAI es obligatorio.',
+  'CAI number is too long.': 'El número de CAI es demasiado largo.',
+  'Prefix must contain exactly five digits.': 'El prefijo debe tener exactamente cinco dígitos.',
+  'Range start must be a number between 1 and 99,999,999.':
+    'El inicio del rango debe ser un número entre 1 y 99.999.999.',
+  'Range end must be a number between 1 and 99,999,999.':
+    'El fin del rango debe ser un número entre 1 y 99.999.999.',
+  'Range end must be greater than or equal to the start.':
+    'El fin del rango debe ser mayor o igual que el inicio.',
+  'This CAI number already exists.': 'Este número de CAI ya existe.',
+  'This CAI range overlaps another authorization for the same prefix.':
+    'Este rango de CAI se superpone con otra autorización del mismo prefijo.',
+  'This CAI has already issued packing slips. Only its number, notes and status can be changed.':
+    'Esta CAI ya emitió remitos. Solo se pueden cambiar su número, notas y estado.',
+  'CAI authorization created.': 'Autorización CAI creada.',
+  'CAI authorization updated.': 'Autorización CAI actualizada.',
+  'CAI authorization deleted.': 'Autorización CAI eliminada.',
+  'This CAI has issued packing slips and cannot be deleted. Cancel it instead.':
+    'Esta CAI emitió remitos y no se puede eliminar. Cancelala en su lugar.',
+  'This CAI is linked to deliveries and cannot be deleted. Cancel it instead.':
+    'Esta CAI está vinculada a entregas y no se puede eliminar. Cancelala en su lugar.',
+  'This delivery already has a packing slip number.': 'Esta entrega ya tiene un número de remito.',
+  'No active CAI authorization with available packing slips. Add or activate one first.':
+    'No hay una autorización CAI activa con remitos disponibles. Agregá o activá una primero.',
+  'Packing slip {number} assigned.': 'Remito {number} asignado.',
+  'Deliveries with an assigned packing slip cannot be deleted. Cancel the delivery instead.':
+    'Las entregas con un remito asignado no se pueden eliminar. Cancelá la entrega en su lugar.',
+  'This delivery does not have a packing slip number. Assign one before printing.':
+    'Esta entrega no tiene número de remito. Asigná uno antes de imprimir.',
+  'Assigned on save': 'Se asigna al guardar',
+  'Exhausted': 'Agotada',
+  'without a packing slip number': 'sin número de remito',
+  'Assigning missing packing slips consumes numbers from the active CAI authorization.':
+    'Asignar remitos faltantes consume números de la autorización CAI activa.',
+  'Assign packing slip numbers to all deliveries that do not have one? This consumes numbers from the active CAI authorization.':
+    '¿Asignar números de remito a todas las entregas que no tienen uno? Esto consume números de la autorización CAI activa.',
+  'Assign missing packing slips': 'Asignar remitos faltantes',
+  'No missing packing slips were assigned. Check that an active CAI authorization has numbers available.':
+    'No se asignó ningún remito faltante. Verificá que una autorización CAI activa tenga números disponibles.',
+  'Assigned {count} missing packing slips. {remaining} deliveries still need an available CAI range.':
+    'Se asignaron {count} remitos faltantes. {remaining} entregas todavía necesitan un rango de CAI disponible.',
+  'Assigned {count} missing packing slips.': 'Se asignaron {count} remitos faltantes.',
 
   // -------------------------------------------- customer warehouses/orders
   'Warehouses': 'Depósitos',

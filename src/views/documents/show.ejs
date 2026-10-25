@@ -203,8 +203,8 @@
                 <% deliveries.forEach(d => { %>
                   <a href="/deliveries/<%= d.id %>" class="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div>
-                      <p class="text-sm font-medium text-gray-800 dark:text-gray-200"><%= d.delivery_no %></p>
-                      <p class="text-xs text-gray-400"><%= h.formatDate(d.delivery_date) %> · <%= h.pluralize(d.item_count, 'item') %></p>
+                      <p class="font-mono text-sm font-medium text-gray-800 dark:text-gray-200"><%= d.packing_slip_no || d.delivery_no %></p>
+                      <p class="text-xs text-gray-400"><%= h.formatDate(d.delivery_date) %> · <%= h.pluralize(d.item_count, 'item') %><% if (d.packing_slip_no) { %> · <%= t('Delivery reference') %> <span class="font-mono"><%= d.delivery_no %></span><% } %></p>
                     </div>
                     <%- statusBadge(d.status) %>
                   </a>

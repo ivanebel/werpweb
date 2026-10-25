@@ -348,28 +348,58 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Government-issued CAI authorizations for packing slips. Each authorization
+-- covers a contiguous numeric range for one five-digit series/prefix.
+CREATE TABLE IF NOT EXISTS cai_authorizations (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  cai_number  VARCHAR(60) NOT NULL,
+  prefix      CHAR(5) NOT NULL,
+  range_start INT UNSIGNED NOT NULL,
+  range_end   INT UNSIGNED NOT NULL,
+  next_number INT UNSIGNED NOT NULL,
+  status      ENUM('active','exhausted','cancelled') NOT NULL DEFAULT 'active',
+  notes       VARCHAR(500) NULL,
+  created_by  INT UNSIGNED NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_cai_authorizations_number (cai_number),
+  KEY idx_cai_authorizations_status (status, created_at),
+  KEY idx_cai_authorizations_range (prefix, range_start, range_end),
+  CONSTRAINT fk_cai_authorizations_user FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS deliveries (
-  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  delivery_no     VARCHAR(30) NOT NULL,
-  sales_order_id  INT UNSIGNED NULL,
-  customer_id     INT UNSIGNED NOT NULL,
-  delivery_date   DATE NOT NULL,
-  carrier         VARCHAR(120) NULL,
-  tracking_number VARCHAR(120) NULL,
-  status          ENUM('pending','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending',
-  stock_posted    TINYINT(1) NOT NULL DEFAULT 0,
-  notes           TEXT NULL,
-  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id                    INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  delivery_no           VARCHAR(30) NOT NULL,
+  packing_slip_no       VARCHAR(14) NULL,
+  cai_authorization_id  INT UNSIGNED NULL,
+  cai_number            VARCHAR(60) NULL,
+  cot                   VARCHAR(80) NULL,
+  sales_order_id        INT UNSIGNED NULL,
+  customer_id           INT UNSIGNED NOT NULL,
+  delivery_date         DATE NOT NULL,
+  carrier               VARCHAR(120) NULL,
+  tracking_number       VARCHAR(120) NULL,
+  status                ENUM('pending','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending',
+  stock_posted          TINYINT(1) NOT NULL DEFAULT 0,
+  notes                 TEXT NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_deliveries_no (delivery_no),
+  UNIQUE KEY uq_deliveries_packing_slip (packing_slip_no),
   KEY idx_deliveries_order (sales_order_id),
   KEY idx_deliveries_customer (customer_id),
   KEY idx_deliveries_status (status),
+  KEY idx_deliveries_cai (cai_authorization_id),
   CONSTRAINT fk_deliveries_order FOREIGN KEY (sales_order_id)
     REFERENCES sales_orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_deliveries_customer FOREIGN KEY (customer_id)
-    REFERENCES customers (id) ON DELETE RESTRICT
+    REFERENCES customers (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_deliveries_cai FOREIGN KEY (cai_authorization_id)
+    REFERENCES cai_authorizations (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS delivery_items (

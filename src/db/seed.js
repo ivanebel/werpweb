@@ -10,6 +10,7 @@ const { initDb, withTransaction, closeDb } = require('./index');
 const { nextNumber } = require('../lib/sequences');
 const { createCheckForPayment, recordHistory, statusEvent } = require('../lib/checks');
 const { lotFromDate } = require('../lib/helpers');
+const { formatPackingSlipNo } = require('../lib/packingSlips');
 const { seedPosDemo } = require('./posSeed');
 
 const FORCE = process.env.FORCE_SEED === '1';
@@ -1150,14 +1151,32 @@ async function main() {
     }
 
     // ------------------------------------------------------------ deliveries
+    const [[caiCount]] = await conn.query('SELECT COUNT(*) AS count FROM cai_authorizations');
+    const caiPrefix = Number(caiCount.count) === 0 ? '00001' : String(Date.now()).slice(-5).padStart(5, '0');
+    const caiNumber = `CAI-DEMO-${Date.now()}`;
+    const caiId = await insert(conn, 'cai_authorizations', {
+      cai_number: caiNumber,
+      prefix: caiPrefix,
+      range_start: 1,
+      range_end: 1000,
+      next_number: 1,
+      status: 'active',
+      notes: 'Demo CAI authorization',
+      created_by: adminId,
+    });
     let deliverySeq = 1;
     const deliverableOrders = salesOrders.filter((o) => ['confirmed', 'partially_delivered', 'delivered'].includes(o.status));
     for (let i = 0; i < Math.min(10, deliverableOrders.length); i++) {
       const order = deliverableOrders[i];
       const status = order.status === 'delivered' ? 'delivered' : pick(['pending', 'shipped', 'shipped']);
       const deliveryDate = addDays(order.orderDate, Math.floor(between(2, 10)));
+      const seq = deliverySeq++;
       const deliveryId = await insert(conn, 'deliveries', {
-        delivery_no: `DLV-${deliveryDate.slice(0, 4)}-${String(deliverySeq++).padStart(4, '0')}`,
+        delivery_no: `DLV-${deliveryDate.slice(0, 4)}-${String(seq).padStart(4, '0')}`,
+        packing_slip_no: formatPackingSlipNo(caiPrefix, seq),
+        cai_authorization_id: caiId,
+        cai_number: caiNumber,
+        cot: i % 3 === 0 ? `COT-${1000 + i}` : null,
         sales_order_id: order.id,
         customer_id: order.customer.id,
         delivery_date: deliveryDate,
@@ -1187,6 +1206,8 @@ async function main() {
         }
       }
     }
+
+    await conn.query('UPDATE cai_authorizations SET next_number = ? WHERE id = ?', [deliverySeq, caiId]);
 
     // ------------------------------------------------------ production orders
     const producibleOrders = salesOrders.filter((o) => o.status === 'confirmed' || o.status === 'partially_delivered').slice(0, 5);
