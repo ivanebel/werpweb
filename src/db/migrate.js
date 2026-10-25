@@ -274,6 +274,10 @@ async function upgradeSchema(conn, dbName) {
       [FISCAL_DOCUMENT_TYPES.map((type) => [type.code, type.name, type.active ? 1 : 0])],
     );
   }
+
+  // ------------------------------------------------------- pallet slips
+  await addColumn(conn, dbName, 'delivery_items', 'lot_number', 'VARCHAR(60) NULL AFTER slip_weight_kg');
+  await addColumn(conn, dbName, 'delivery_items', 'expiry_date', 'DATE NULL AFTER lot_number');
 }
 
 async function main() {

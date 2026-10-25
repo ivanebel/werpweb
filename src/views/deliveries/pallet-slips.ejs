@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= t('Pallet slips {number}', { number: delivery.packing_slip_no || delivery.delivery_no }) %></title>
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: #e5e7eb;
+      color: #111827;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 18px;
+      background: #fff;
+      border-bottom: 1px solid #d1d5db;
+    }
+    .toolbar a, .toolbar button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #fff;
+      color: #111827;
+      font: inherit;
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .toolbar button.primary { background: #465fff; border-color: #465fff; color: #fff; }
+    .toolbar-title { font-size: 13px; color: #4b5563; }
+    .toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .slip {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      width: 210mm;
+      height: 297mm;
+      margin: 8mm auto;
+      padding: 13mm 14mm 11mm;
+      background: #fff;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+      page-break-after: always;
+      break-after: page;
+      overflow: hidden;
+    }
+    .slip:last-child { page-break-after: auto; break-after: auto; }
+
+    .slip-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10mm;
+      padding-bottom: 4mm;
+      border-bottom: 2px solid #111827;
+    }
+    .company { font-size: 11px; line-height: 1.35; color: #374151; }
+    .company strong { display: block; font-size: 13px; color: #111827; letter-spacing: 0.04em; text-transform: uppercase; }
+    .copy {
+      flex: none;
+      padding: 2mm 3mm;
+      border: 1.5px solid #111827;
+      border-radius: 2mm;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .copy span { display: block; font-size: 9px; font-weight: 600; letter-spacing: 0.06em; color: #4b5563; }
+
+    .product { margin-top: 7mm; }
+    .product-brand {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #374151;
+    }
+    .product-name {
+      margin-top: 1.5mm;
+      font-size: 31px;
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+    }
+    .product-codes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4mm 12mm;
+      margin-top: 4mm;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .product-codes .label { color: #6b7280; font-weight: 600; }
+    .product-codes .mono { font-family: Consolas, 'Courier New', monospace; letter-spacing: 0.03em; }
+    .site {
+      margin-top: 3mm;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .middle {
+      display: grid;
+      grid-template-columns: 52mm 1fr;
+      gap: 10mm;
+      align-items: start;
+      align-content: center;
+      margin-top: 9mm;
+      flex: 1;
+    }
+    .qr-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2mm;
+      padding: 4mm;
+      border: 1px solid #d1d5db;
+      border-radius: 2mm;
+    }
+    .qr-box svg { width: 42mm; height: 42mm; display: block; }
+    .qr-caption { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7280; text-align: center; }
+
+    .fields { display: flex; flex-direction: column; gap: 1.5mm; }
+    .field {
+      display: grid;
+      grid-template-columns: 52mm 1fr;
+      gap: 4mm;
+      align-items: baseline;
+      padding: 2.6mm 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .field:first-child { padding-top: 0; }
+    .field-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .field-value { font-size: 20px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+    .field-value.mono { font-family: Consolas, 'Courier New', monospace; }
+    .field-value.small { font-size: 16px; }
+
+    .barcodes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10mm;
+      align-items: end;
+      margin-top: 7mm;
+      padding-top: 5mm;
+      border-top: 2px solid #111827;
+    }
+    .barcode { min-width: 0; text-align: center; }
+    .barcode-label {
+      margin-bottom: 1mm;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #4b5563;
+    }
+    .barcode svg { width: 100%; height: auto; max-height: 26mm; display: block; }
+    .barcode-digits {
+      margin-top: 1mm;
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .slip-foot {
+      display: flex;
+      justify-content: space-between;
+      gap: 6mm;
+      margin-top: 4mm;
+      padding-top: 2.5mm;
+      border-top: 1px solid #e5e7eb;
+      font-size: 9px;
+      color: #6b7280;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .slip {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body data-locale="<%= locale %>">
+  <%
+    const numericDate = (value) => {
+      const raw = String(value || '').slice(0, 10);
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return match ? `${match[3]}/${match[2]}/${match[1]}` : '—';
+    };
+  %>
+  <div class="toolbar no-print">
+    <div>
+      <span class="toolbar-title"><%= t('Pallet slips {number}', { number: delivery.packing_slip_no || delivery.delivery_no }) %></span>
+      <span class="toolbar-title"> · <%= t('{count} pages', { count: slips.length }) %></span>
+    </div>
+    <div class="toolbar-actions">
+      <a href="/deliveries/<%= delivery.id %>"><%= t('Back to delivery') %></a>
+      <a href="/deliveries/<%= delivery.id %>/packing"><%= t('Edit packing quantities') %></a>
+      <a href="/deliveries/<%= delivery.id %>/print"><%= t('Packing slip') %></a>
+      <button type="button" class="primary" onclick="window.print()"><%= t('Print / Save PDF') %></button>
+    </div>
+  </div>
+
+  <% slips.forEach((slip) => { %>
+    <section class="slip">
+      <div class="slip-head">
+        <div class="company">
+          <strong><%= settings.company_name || 'WerpWeb' %></strong>
+          <%= delivery.packing_slip_no ? t('Packing slip') : t('Delivery') %> <span class="mono"><%= delivery.packing_slip_no || delivery.delivery_no %></span>
+          · <%= h.formatDate(delivery.delivery_date) %>
+          <% if (delivery.customer_order_no) { %> · <%= t('Customer order no.') %> <span class="mono"><%= delivery.customer_order_no %></span><% } %>
+        </div>
+        <div class="copy">
+          <%= t('Copy {current} of {total}', { current: slip.copyNo, total: slip.copyCount }) %>
+          <span><%= t('Pallet {current} of {total}', { current: slip.palletNo, total: slip.palletCount }) %></span>
+        </div>
+      </div>
+
+      <div class="product">
+        <% if (slip.item.brand_name) { %>
+          <div class="product-brand"><%= slip.item.brand_name %></div>
+        <% } %>
+        <div class="product-name"><%= slip.item.name %></div>
+        <div class="product-codes">
+          <span><span class="label"><%= t('Code') %>:</span> <span class="mono"><%= slip.item.customer_code || slip.item.sku %></span></span>
+          <span><span class="label">EAN:</span> <span class="mono"><%= slip.ean13 || '—' %></span></span>
+        </div>
+        <% if (delivery.warehouse_name || delivery.warehouse_code) { %>
+          <div class="site">
+            <%= [delivery.warehouse_code, delivery.warehouse_name].filter(Boolean).join(' - ') %>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="middle">
+        <div class="qr-box">
+          <% if (slip.qrSvg) { %>
+            <%- slip.qrSvg %>
+          <% } %>
+          <div class="qr-caption"><%= t('Scan for slip details') %></div>
+        </div>
+
+        <div class="fields">
+          <div class="field">
+            <div class="field-label"><%= t('Customer') %></div>
+            <div class="field-value"><%= delivery.customer_name %></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><%= t('Customer order no.') %></div>
+            <div class="field-value mono"><%= delivery.customer_order_no || '—' %></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><%= t('Units') %></div>
+            <div class="field-value"><%= h.formatQty(totals.units) %></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><%= t('Boxes') %></div>
+            <div class="field-value"><%= h.formatQty(totals.boxes) %></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><%= t('Weight') %></div>
+            <div class="field-value"><%= Number(totals.weight || 0).toFixed(2) %> KG</div>
+          </div>
+          <div class="field">
+            <div class="field-label"><%= t('Lot') %></div>
+            <div class="field-value mono small"><%= slip.lotNumber || '—' %></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><%= t('Expiry') %></div>
+            <div class="field-value mono"><%= slip.expiryDate ? numericDate(slip.expiryDate) : '—' %></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="barcodes">
+        <div class="barcode">
+          <div class="barcode-label">EAN-13</div>
+          <% if (slip.eanSvg) { %>
+            <%- slip.eanSvg %>
+          <% } else { %>
+            <div class="barcode-digits"><%= slip.ean13 || '—' %></div>
+          <% } %>
+        </div>
+        <div class="barcode">
+          <div class="barcode-label">DUN-14</div>
+          <% if (slip.dunSvg) { %>
+            <%- slip.dunSvg %>
+          <% } else { %>
+            <div class="barcode-digits"><%= slip.dun14 || '—' %></div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="slip-foot">
+        <span><%= settings.company_name || 'WerpWeb' %><%= delivery.order_no ? ` · ${t('Sales order')} ${delivery.order_no}` : '' %></span>
+        <span><%= t('Pallet {current} of {total}', { current: slip.palletNo, total: slip.palletCount }) %> · <%= t('Copy {current} of {total}', { current: slip.copyNo, total: slip.copyCount }) %></span>
+      </div>
+    </section>
+  <% }) %>
+</body>
+</html>

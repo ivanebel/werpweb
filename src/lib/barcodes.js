@@ -93,6 +93,27 @@ function renderBarcodeSvg(type, rawCode) {
   return { svg, info };
 }
 
+function dun14FromEan13(rawCode) {
+  const code = normalizeCode(rawCode);
+  if (!/^\d{13}$/.test(code)) return null;
+  const payload = `1${code.slice(0, 12)}`;
+  return `${payload}${checkDigit(payload)}`;
+}
+
+function renderQrSvg(text) {
+  const value = String(text === undefined || text === null ? '' : text).trim();
+  if (!value) return null;
+  return bwipjs.toSVG({
+    bcid: 'qrcode',
+    text: value,
+    scale: 3,
+    paddingwidth: 4,
+    paddingheight: 4,
+    backgroundcolor: 'FFFFFF',
+    barcolor: '000000',
+  });
+}
+
 function barcodeFilename(type, info) {
   const key = String(type || '').toLowerCase();
   const spec = TYPE_SPECS[key];
@@ -108,4 +129,6 @@ module.exports = {
   checkDigit,
   normalizeCode,
   renderBarcodeSvg,
+  dun14FromEan13,
+  renderQrSvg,
 };

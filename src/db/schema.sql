@@ -532,6 +532,8 @@ CREATE TABLE IF NOT EXISTS delivery_items (
   slip_boxes          DECIMAL(14,3) NOT NULL DEFAULT 0,
   slip_units          DECIMAL(14,3) NOT NULL DEFAULT 0,
   slip_weight_kg      DECIMAL(14,3) NOT NULL DEFAULT 0,
+  lot_number          VARCHAR(60) NULL,
+  expiry_date         DATE NULL,
   PRIMARY KEY (id),
   KEY idx_delivery_items_delivery (delivery_id),
   CONSTRAINT fk_di_delivery FOREIGN KEY (delivery_id)

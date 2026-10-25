@@ -162,6 +162,11 @@
                           <%- include('/partials/icon', { name: 'printer', className: 'h-4 w-4' }) %>
                         </a>
                       <% } %>
+                      <% if (row.status !== 'cancelled') { %>
+                        <a href="/deliveries/<%= row.id %>/pallet-slips" class="btn-icon" title="<%= t('Print pallet slips') %>">
+                          <%- include('/partials/icon', { name: 'tag', className: 'h-4 w-4' }) %>
+                        </a>
+                      <% } %>
                     </div>
                   </td>
                 </tr>

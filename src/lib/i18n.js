@@ -2454,6 +2454,22 @@ const ES = {
     'CAE pendiente. Completá los datos fiscales antes de usar este comprobante como factura válida.',
   'Format: 00000-00000000 (point of sale and document number). You can type 10-1450.':
     'Formato: 00000-00000000 (punto de venta y número de documento). Podés escribir 10-1450.',
+
+  // --------------------------------------------------------------- pallet slips
+  'Pallet slips': 'Etiquetas de pallet',
+  'Pallet slips {number}': 'Etiquetas de pallet {number}',
+  'Print pallet slips': 'Imprimir etiquetas de pallet',
+  'Pallet slip': 'Etiqueta de pallet',
+  'These quantities are printed on the packing slip. Changing them does not alter stock or the delivery quantity. Lot and expiry are printed on the pallet slips.':
+    'Estas cantidades se imprimen en el remito. Cambiarlas no modifica el stock ni la cantidad entregada. El lote y el vencimiento se imprimen en las etiquetas de pallet.',
+  'Lot': 'Lote',
+  'Expiry': 'Vencimiento',
+  'Code': 'Código',
+  'Weight': 'Peso',
+  'Copy {current} of {total}': 'Copia {current} de {total}',
+  'Pallet {current} of {total}': 'Pallet {current} de {total}',
+  'Scan for slip details': 'Escanear para ver el detalle',
+  '{count} pages': '{count} páginas',
 };
 
 function normalizeLocale(value) {

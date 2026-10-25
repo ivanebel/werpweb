@@ -31,6 +31,7 @@
     <div class="flex items-center gap-2">
       <span class="text-sm text-gray-500"><%= t('Packing slip {number}', { number: delivery.packing_slip_no }) %></span>
       <a href="/deliveries/<%= delivery.id %>/packing" class="btn btn-secondary btn-sm"><%= t('Edit packing quantities') %></a>
+      <a href="/deliveries/<%= delivery.id %>/pallet-slips" class="btn btn-secondary btn-sm"><%= t('Print pallet slips') %></a>
       <a href="/deliveries/<%= delivery.id %>/transport" class="btn btn-secondary btn-sm"><%= t('Edit transport') %></a>
       <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">Print / Save PDF</button>
     </div>

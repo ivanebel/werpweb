@@ -7,6 +7,12 @@ const { pagination, todayISO, toNumber, statusBadge, statusInfo, formatMoney, fo
 const { requireRole } = require('../middleware/web');
 const { round3, packingDefaults } = require('../lib/packing');
 const {
+  analyzeBarcode,
+  renderBarcodeSvg,
+  renderQrSvg,
+  dun14FromEan13,
+} = require('../lib/barcodes');
+const {
   formatPackingSlipNo,
   usedCount,
   remainingCount,
@@ -173,14 +179,57 @@ async function loadDeliveryItems(delivery, withOrderedQty = false) {
     ? 'LEFT JOIN sales_order_items si ON si.id = di.sales_order_item_id'
     : '';
   return query(
-    `SELECT di.*, p.sku, p.name, p.unit, cpc.code AS customer_code${orderedSelect}
+    `SELECT di.*, p.sku, p.name, p.unit, p.ean13, p.dun14,
+            b.name AS brand_name, cpc.code AS customer_code${orderedSelect}
        FROM delivery_items di
        JOIN products p ON p.id = di.product_id
+       LEFT JOIN brands b ON b.id = p.brand_id
        ${orderedJoin}
        LEFT JOIN customer_product_codes cpc ON cpc.customer_id = ? AND cpc.product_id = di.product_id
       WHERE di.delivery_id = ? ORDER BY di.id`,
     [delivery.customer_id, delivery.id],
   );
+}
+
+function dateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+  }
+  const raw = String(value).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+}
+
+/**
+ * Lot and expiry values captured on completed production for the same sales
+ * order. They are only defaults: the values stored on the delivery item always
+ * win, because the same product can be shipped from more than one batch.
+ */
+async function loadProductionLotDefaults(delivery) {
+  const defaults = new Map();
+  if (!delivery || !delivery.sales_order_id) return defaults;
+  const rows = await query(
+    `SELECT l.product_id, l.lot_number, l.expiry_date
+       FROM production_order_lines l
+       JOIN production_orders po ON po.id = l.production_order_id
+      WHERE po.sales_order_id = ?
+        AND po.status <> 'cancelled'
+        AND (l.lot_number IS NOT NULL OR l.expiry_date IS NOT NULL)
+      ORDER BY (po.status = 'completed') DESC, po.id DESC, l.id DESC`,
+    [delivery.sales_order_id],
+  );
+  for (const row of rows) {
+    const key = String(row.product_id);
+    const current = defaults.get(key) || { lot_number: null, expiry_date: null };
+    if (!current.lot_number && row.lot_number) current.lot_number = String(row.lot_number);
+    if (!current.expiry_date && row.expiry_date) current.expiry_date = dateOnly(row.expiry_date);
+    defaults.set(key, current);
+  }
+  return defaults;
+}
+
+function normalizeLot(value) {
+  return String(value === null || value === undefined ? '' : value).trim().slice(0, 60) || null;
 }
 
 async function loadOrderWithWarehouse(orderId) {
@@ -421,6 +470,12 @@ router.post('/', async (req, res, next) => {
     }
 
     const { items, errors } = await collectItems(req.body, orderId, 0, req.t);
+    const lotDefaults = await loadProductionLotDefaults({ sales_order_id: orderId });
+    for (const item of items) {
+      const fallback = lotDefaults.get(String(item.product_id));
+      item.lot_number = fallback ? fallback.lot_number : null;
+      item.expiry_date = fallback ? fallback.expiry_date : null;
+    }
     const deliveryDate = (req.body.delivery_date || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) errors.push(req.t('A valid delivery date is required.'));
 
@@ -488,8 +543,8 @@ router.post('/', async (req, res, next) => {
           await conn.query(
             `INSERT INTO delivery_items
                (delivery_id, sales_order_item_id, product_id, quantity,
-                slip_pallets, slip_boxes, slip_units, slip_weight_kg)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                slip_pallets, slip_boxes, slip_units, slip_weight_kg, lot_number, expiry_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               result.insertId,
               item.so_item_id,
@@ -499,6 +554,8 @@ router.post('/', async (req, res, next) => {
               item.slip_boxes,
               item.slip_units,
               item.slip_weight_kg,
+              item.lot_number || null,
+              item.expiry_date || null,
             ],
           );
         }
@@ -895,6 +952,12 @@ router.get('/:id(\\d+)/packing', async (req, res, next) => {
         ORDER BY di.id`,
       [delivery.id],
     );
+    const lotDefaults = await loadProductionLotDefaults(delivery);
+    for (const item of items) {
+      const fallback = lotDefaults.get(String(item.product_id));
+      item.suggested_lot_number = item.lot_number || (fallback ? fallback.lot_number : null);
+      item.suggested_expiry_date = dateOnly(item.expiry_date) || (fallback ? fallback.expiry_date : null);
+    }
     const totals = items.reduce((sum, item) => ({
       pallets: sum.pallets + Number(item.slip_pallets || 0),
       boxes: sum.boxes + Number(item.slip_boxes || 0),
@@ -934,6 +997,8 @@ router.post('/:id(\\d+)/packing', async (req, res, next) => {
     const boxes = Array.isArray(req.body.slip_boxes) ? req.body.slip_boxes : [req.body.slip_boxes];
     const units = Array.isArray(req.body.slip_units) ? req.body.slip_units : [req.body.slip_units];
     const weights = Array.isArray(req.body.slip_weight_kg) ? req.body.slip_weight_kg : [req.body.slip_weight_kg];
+    const lots = Array.isArray(req.body.lot_number) ? req.body.lot_number : [req.body.lot_number];
+    const expiries = Array.isArray(req.body.expiry_date) ? req.body.expiry_date : [req.body.expiry_date];
     const valueAt = (list, index) => round3(Math.max(0, toNumber(list[index], 0)));
 
     await withTransaction(async (conn) => {
@@ -942,9 +1007,19 @@ router.post('/:id(\\d+)/packing', async (req, res, next) => {
         if (!itemId || !validIds.has(String(itemId))) continue;
         await conn.query(
           `UPDATE delivery_items
-              SET slip_pallets = ?, slip_boxes = ?, slip_units = ?, slip_weight_kg = ?
+              SET slip_pallets = ?, slip_boxes = ?, slip_units = ?, slip_weight_kg = ?,
+                  lot_number = ?, expiry_date = ?
             WHERE id = ? AND delivery_id = ?`,
-          [valueAt(pallets, i), valueAt(boxes, i), valueAt(units, i), valueAt(weights, i), itemId, delivery.id],
+          [
+            valueAt(pallets, i),
+            valueAt(boxes, i),
+            valueAt(units, i),
+            valueAt(weights, i),
+            normalizeLot(lots[i]),
+            dateOnly(expiries[i]),
+            itemId,
+            delivery.id,
+          ],
         );
       }
     });
@@ -1006,6 +1081,18 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       return res.redirect(`${basePath}/${delivery.id}`);
     }
     const { items, errors } = await collectItems(req.body, delivery.sales_order_id, delivery.id, req.t);
+    const lotDefaults = await loadProductionLotDefaults(delivery);
+    const existingLotRows = await query(
+      'SELECT sales_order_item_id, lot_number, expiry_date FROM delivery_items WHERE delivery_id = ?',
+      [delivery.id],
+    );
+    const existingLot = new Map(existingLotRows.map((row) => [String(row.sales_order_item_id), row]));
+    for (const item of items) {
+      const preserved = existingLot.get(String(item.so_item_id));
+      const fallback = lotDefaults.get(String(item.product_id));
+      item.lot_number = normalizeLot(preserved && preserved.lot_number) || normalizeLot(fallback && fallback.lot_number);
+      item.expiry_date = dateOnly(preserved && preserved.expiry_date) || dateOnly(fallback && fallback.expiry_date);
+    }
     const deliveryDate = (req.body.delivery_date || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) errors.push(req.t('A valid delivery date is required.'));
 
@@ -1065,8 +1152,8 @@ router.post('/:id(\\d+)', async (req, res, next) => {
         await conn.query(
           `INSERT INTO delivery_items
              (delivery_id, sales_order_item_id, product_id, quantity,
-              slip_pallets, slip_boxes, slip_units, slip_weight_kg)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              slip_pallets, slip_boxes, slip_units, slip_weight_kg, lot_number, expiry_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             delivery.id,
             item.so_item_id,
@@ -1076,6 +1163,8 @@ router.post('/:id(\\d+)', async (req, res, next) => {
             item.slip_boxes,
             item.slip_units,
             item.slip_weight_kg,
+            item.lot_number || null,
+            item.expiry_date || null,
           ],
         );
       }
@@ -1240,6 +1329,129 @@ router.post('/:id(\\d+)/delete', async (req, res, next) => {
     await getPool().query('DELETE FROM deliveries WHERE id = ?', [delivery.id]);
     req.flash('success', 'Delivery deleted.');
     res.redirect(basePath);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id(\\d+)/pallet-slips', async (req, res, next) => {
+  try {
+    const delivery = await loadDelivery(req.params.id);
+    if (!delivery) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
+    }
+    const items = await loadDeliveryItems(delivery, false);
+    const lotDefaults = await loadProductionLotDefaults(delivery);
+    const settings = await require('../lib/settings').getSettings();
+    const copiesPerPallet = 2;
+
+    const totals = items.reduce((sum, item) => ({
+      pallets: sum.pallets + Number(item.slip_pallets || 0),
+      boxes: sum.boxes + Number(item.slip_boxes || 0),
+      units: sum.units + Number(item.slip_units ?? item.quantity ?? 0),
+      weight: sum.weight + Number(item.slip_weight_kg || 0),
+    }), { pallets: 0, boxes: 0, units: 0, weight: 0 });
+
+    const barcodeCache = new Map();
+    const resolveBarcodes = (item) => {
+      const key = String(item.id);
+      if (barcodeCache.has(key)) return barcodeCache.get(key);
+
+      let ean13 = null;
+      let dun14 = null;
+      let eanSvg = null;
+      let dunSvg = null;
+
+      const eanInfo = analyzeBarcode('ean13', item.ean13);
+      if (eanInfo.canRender) {
+        ean13 = eanInfo.barcodeCode;
+        try {
+          eanSvg = renderBarcodeSvg('ean13', eanInfo.code).svg;
+        } catch {
+          eanSvg = null;
+        }
+      } else if (eanInfo.code) {
+        ean13 = eanInfo.code;
+      }
+
+      const storedDun = analyzeBarcode('dun14', item.dun14);
+      const derivedDun = dun14FromEan13(ean13);
+      if (storedDun.canRender) {
+        dun14 = storedDun.barcodeCode;
+        try {
+          dunSvg = renderBarcodeSvg('dun14', storedDun.code).svg;
+        } catch {
+          dunSvg = null;
+        }
+      } else if (derivedDun) {
+        const derivedInfo = analyzeBarcode('dun14', derivedDun);
+        dun14 = derivedInfo.canRender ? derivedInfo.barcodeCode : derivedDun;
+        if (derivedInfo.canRender) {
+          try {
+            dunSvg = renderBarcodeSvg('dun14', derivedDun).svg;
+          } catch {
+            dunSvg = null;
+          }
+        }
+      }
+
+      const result = { ean13, dun14, eanSvg, dunSvg };
+      barcodeCache.set(key, result);
+      return result;
+    };
+
+    const slips = [];
+    for (const item of items) {
+      const fallback = lotDefaults.get(String(item.product_id));
+      const lotNumber = item.lot_number || (fallback ? fallback.lot_number : null);
+      const expiryDate = dateOnly(item.expiry_date) || (fallback ? fallback.expiry_date : null);
+      const palletCount = Math.max(1, Math.ceil(Number(item.slip_pallets) || 0));
+      const barcodes = resolveBarcodes(item);
+
+      for (let pallet = 1; pallet <= palletCount; pallet += 1) {
+        const qrLines = [
+          `${item.brand_name ? `${item.brand_name} - ` : ''}${item.name}`,
+          `${req.t('Code')}: ${item.customer_code || item.sku}`,
+          `EAN: ${barcodes.ean13 || '—'}`,
+          `${req.t('Customer')}: ${delivery.customer_name}`,
+          `${req.t('Customer order no.')}: ${delivery.customer_order_no || '—'}`,
+          `${req.t('Units')}: ${round3(totals.units)}`,
+          `${req.t('Boxes')}: ${round3(totals.boxes)}`,
+          `${req.t('Weight (kg)')}: ${Number(totals.weight || 0).toFixed(2)}`,
+          `${req.t('Lot')}: ${lotNumber || '—'}`,
+          `${req.t('Expiry')}: ${expiryDate ? expiryDate.split('-').reverse().join('/') : '—'}`,
+          `${delivery.packing_slip_no ? req.t('Packing slip') : req.t('Delivery')}: ${delivery.packing_slip_no || delivery.delivery_no}`,
+          `${req.t('Pallet')}: ${pallet}/${palletCount}`,
+        ];
+        const qrSvg = renderQrSvg(qrLines.join('\n'));
+
+        for (let copy = 1; copy <= copiesPerPallet; copy += 1) {
+          slips.push({
+            item,
+            palletNo: pallet,
+            palletCount,
+            copyNo: copy,
+            copyCount: copiesPerPallet,
+            lotNumber,
+            expiryDate,
+            ean13: barcodes.ean13,
+            dun14: barcodes.dun14,
+            eanSvg: barcodes.eanSvg,
+            dunSvg: barcodes.dunSvg,
+            qrSvg,
+          });
+        }
+      }
+    }
+
+    res.render('deliveries/pallet-slips', {
+      layout: false,
+      title: req.t('Pallet slips {number}', { number: delivery.packing_slip_no || delivery.delivery_no }),
+      delivery,
+      slips,
+      totals,
+      settings,
+    });
   } catch (err) {
     next(err);
   }

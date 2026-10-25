@@ -14,15 +14,21 @@
             <%= delivery.packing_slip_no || delivery.delivery_no %> · <%= delivery.customer_name %>
           </p>
         </div>
-        <a href="/deliveries/<%= delivery.id %>" class="btn btn-secondary btn-sm">
-          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
-          <%= t('Back to delivery') %>
-        </a>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/deliveries/<%= delivery.id %>/pallet-slips" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'printer', className: 'h-4 w-4' }) %>
+            <%= t('Print pallet slips') %>
+          </a>
+          <a href="/deliveries/<%= delivery.id %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Back to delivery') %>
+          </a>
+        </div>
       </div>
 
       <div class="mb-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
         <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
-        <p><%= t('These quantities are printed on the packing slip. Changing them does not alter stock or the delivery quantity.') %></p>
+        <p><%= t('These quantities are printed on the packing slip. Changing them does not alter stock or the delivery quantity. Lot and expiry are printed on the pallet slips.') %></p>
       </div>
 
       <form method="POST" action="/deliveries/<%= delivery.id %>/packing">
@@ -39,7 +45,7 @@
           </div>
 
           <div class="table-wrap">
-            <table class="table-base min-w-[900px]">
+            <table class="table-base min-w-[1200px]">
               <thead>
                 <tr>
                   <th class="table-th"><%= t('Item') %></th>
@@ -47,6 +53,8 @@
                   <th class="table-th text-right"><%= t('Boxes') %></th>
                   <th class="table-th text-right"><%= t('Units') %></th>
                   <th class="table-th text-right"><%= t('Weight (kg)') %></th>
+                  <th class="table-th"><%= t('Lot') %></th>
+                  <th class="table-th"><%= t('Expiry') %></th>
                   <th class="table-th"></th>
                 </tr>
               </thead>
@@ -82,6 +90,12 @@
                       <input id="packing_weight_<%= index %>" name="slip_weight_kg" type="number" min="0" step="0.001" value="<%= weight %>" class="form-input text-right packing-input" data-field="weight">
                     </td>
                     <td class="table-td">
+                      <input id="packing_lot_<%= index %>" name="lot_number" type="text" maxlength="60" value="<%= item.suggested_lot_number || '' %>" class="form-input font-mono text-xs" placeholder="<%= t('Lot') %>">
+                    </td>
+                    <td class="table-td">
+                      <input id="packing_expiry_<%= index %>" name="expiry_date" type="date" value="<%= String(item.suggested_expiry_date || '').slice(0, 10) %>" class="form-input text-xs">
+                    </td>
+                    <td class="table-td">
                       <button type="button" class="btn btn-ghost btn-sm whitespace-nowrap"
                               data-recalculate-packing
                               data-units-per-pack="<%= Number(item.units_per_pack) || 0 %>"
@@ -103,6 +117,8 @@
                   <td class="px-3 py-3 text-right text-sm font-semibold" data-total="boxes"><%= h.formatQty(totals.boxes) %></td>
                   <td class="px-3 py-3 text-right text-sm font-semibold" data-total="units"><%= h.formatQty(totals.units) %></td>
                   <td class="px-3 py-3 text-right text-sm font-semibold" data-total="weight"><%= h.formatQty(totals.weight) %></td>
+                  <td></td>
+                  <td></td>
                   <td></td>
                 </tr>
               </tfoot>
