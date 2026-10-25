@@ -1,0 +1,126 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+      <%
+        const backUrl = mode === 'edit' ? `/shifts/${shift.id}` : '/shifts';
+        const errorList = Object.values(errors || {}).flat().filter(Boolean);
+        const selectedDays = String(row.work_days || '').split(',').map(day => day.trim()).filter(Boolean);
+        const allDays = [
+          { key: 'mon', label: t('Monday') },
+          { key: 'tue', label: t('Tuesday') },
+          { key: 'wed', label: t('Wednesday') },
+          { key: 'thu', label: t('Thursday') },
+          { key: 'fri', label: t('Friday') },
+          { key: 'sat', label: t('Saturday') },
+          { key: 'sun', label: t('Sunday') },
+        ];
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New shift') : t('Edit shift') %></h1>
+          <p class="page-subtitle"><%= t('Set the schedule and the tolerance used to classify late arrivals and early departures.') %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the shift:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t('Shift details') %></h2>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+            <div class="md:col-span-2">
+              <label for="name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+              <input id="name" name="name" type="text" value="<%= row.name || '' %>" maxlength="120" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Morning shift') %>" required>
+              <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+            </div>
+
+            <div>
+              <label for="start_time" class="form-label"><%= t('Start time') %> <span class="text-error-500">*</span></label>
+              <input id="start_time" name="start_time" type="time" value="<%= h.formatTime(row.start_time) %>" class="form-input <%= errors.start_time ? 'form-input-error' : '' %>" required>
+              <% if (errors.start_time) { %><p class="form-error"><%= errors.start_time %></p><% } %>
+            </div>
+
+            <div>
+              <label for="end_time" class="form-label"><%= t('End time') %> <span class="text-error-500">*</span></label>
+              <input id="end_time" name="end_time" type="time" value="<%= h.formatTime(row.end_time) %>" class="form-input <%= errors.end_time ? 'form-input-error' : '' %>" required>
+              <% if (errors.end_time) { %><p class="form-error"><%= errors.end_time %></p><% } %>
+              <p class="form-help"><%= t('Overnight shifts are supported when the end time is earlier than the start time.') %></p>
+            </div>
+
+            <div class="md:col-span-2">
+              <span class="form-label"><%= t('Working days') %> <span class="text-error-500">*</span></span>
+              <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                <% allDays.forEach(day => { %>
+                  <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]">
+                    <input type="checkbox" name="work_days" value="<%= day.key %>" class="form-checkbox" <%= selectedDays.includes(day.key) ? 'checked' : '' %>>
+                    <%= day.label %>
+                  </label>
+                <% }) %>
+              </div>
+              <% if (errors.work_days) { %><p class="form-error"><%= errors.work_days %></p><% } %>
+            </div>
+
+            <div>
+              <label for="grace_minutes" class="form-label"><%= t('Tardiness grace (minutes)') %></label>
+              <input id="grace_minutes" name="grace_minutes" type="number" min="0" max="1440" step="1" value="<%= row.grace_minutes !== undefined ? row.grace_minutes : 10 %>" class="form-input <%= errors.grace_minutes ? 'form-input-error' : '' %>">
+              <% if (errors.grace_minutes) { %><p class="form-error"><%= errors.grace_minutes %></p><% } %>
+              <p class="form-help"><%= t('Late arrivals within this tolerance are still considered on time.') %></p>
+            </div>
+
+            <div>
+              <label for="early_leave_grace_minutes" class="form-label"><%= t('Early-leave grace (minutes)') %></label>
+              <input id="early_leave_grace_minutes" name="early_leave_grace_minutes" type="number" min="0" max="1440" step="1" value="<%= row.early_leave_grace_minutes !== undefined ? row.early_leave_grace_minutes : 10 %>" class="form-input <%= errors.early_leave_grace_minutes ? 'form-input-error' : '' %>">
+              <% if (errors.early_leave_grace_minutes) { %><p class="form-error"><%= errors.early_leave_grace_minutes %></p><% } %>
+              <p class="form-help"><%= t('Leaving this many minutes before the end time is still considered on time.') %></p>
+            </div>
+
+            <div>
+              <label for="status" class="form-label"><%= t('Status') %></label>
+              <select id="status" name="status" class="form-select">
+                <option value="active" <%= row.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+                <option value="inactive" <%= row.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+              </select>
+            </div>
+
+            <div class="md:col-span-2">
+              <label for="notes" class="form-label"><%= t('Notes') %></label>
+              <textarea id="notes" name="notes" rows="3" maxlength="500" class="form-textarea" placeholder="<%= t('Optional notes about this shift…') %>"><%= row.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+          <a href="<%= backUrl %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= mode === 'create' ? t('Create shift') : t('Save changes') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -16,6 +16,15 @@ const STATUS = {
   received: { label: 'Received', tone: 'success' },
   cancelled: { label: 'Cancelled', tone: 'error' },
   exhausted: { label: 'Exhausted', tone: 'warning' },
+  // attendance
+  on_time: { label: 'On time', tone: 'success' },
+  late: { label: 'Late', tone: 'error' },
+  early_leave: { label: 'Early leave', tone: 'warning' },
+  late_early: { label: 'Late + early leave', tone: 'error' },
+  incomplete: { label: 'Incomplete', tone: 'info' },
+  day_off: { label: 'Day off', tone: 'gray' },
+  unscheduled: { label: 'Unscheduled', tone: 'gray' },
+  absent: { label: 'Absent', tone: 'error' },
   // invoices / deliveries
   sent: { label: 'Sent', tone: 'info' },
   paid: { label: 'Paid', tone: 'success' },
@@ -284,6 +293,29 @@ function paymentState(invoice, locale = DEFAULT_LOCALE) {
   return { label: translate(locale, 'Outstanding'), tone: 'warning' };
 }
 
+function weekStartISO(value = todayISO()) {
+  const raw = String(value || '').slice(0, 10);
+  const date = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return weekStartISO(todayISO());
+  const day = date.getUTCDay();
+  const diff = (day + 6) % 7; // Monday = 0
+  date.setUTCDate(date.getUTCDate() - diff);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDuration(value) {
+  const minutes = Math.max(0, Math.round(Number(value) || 0));
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (!hours) return `${rest}m`;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+function formatTime(value) {
+  const match = String(value || '').match(/(?:^|[T ])(\d{2}):(\d{2})/);
+  return match ? `${match[1]}:${match[2]}` : '';
+}
+
 function forLocale(locale = DEFAULT_LOCALE) {
   return {
     humanize,
@@ -294,6 +326,9 @@ function forLocale(locale = DEFAULT_LOCALE) {
     buildQuery,
     todayISO,
     addDaysISO,
+    weekStartISO,
+    formatDuration,
+    formatTime,
     lotFromDate,
     pagination,
     truncate,
@@ -336,6 +371,9 @@ module.exports = {
   buildQuery,
   todayISO,
   addDaysISO,
+  weekStartISO,
+  formatDuration,
+  formatTime,
   lotFromDate,
   pagination,
   truncate,

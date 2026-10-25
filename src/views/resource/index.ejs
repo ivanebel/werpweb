@@ -21,6 +21,16 @@
               Categories
             </a>
           <% } %>
+          <% if (resource.key === 'employees') { %>
+            <a href="/shifts" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'clock', className: 'h-4 w-4' }) %>
+              <%= t('Shifts') %>
+            </a>
+            <a href="/attendance" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'calendar', className: 'h-4 w-4' }) %>
+              <%= t('Attendance') %>
+            </a>
+          <% } %>
           <a href="<%= resource.basePath %>/new" class="btn btn-primary btn-sm">
             <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
             <%= resource.newLabel %>

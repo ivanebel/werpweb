@@ -18,6 +18,8 @@ const searchRoutes = require('./routes/search');
 const customerRoutes = require('./routes/customers');
 const supplierRoutes = require('./routes/suppliers');
 const employeeRoutes = require('./routes/employees');
+const shiftRoutes = require('./routes/shifts');
+const attendanceRoutes = require('./routes/attendance');
 const productRoutes = require('./routes/products');
 const categoryRoutes = require('./routes/categories');
 const brandRoutes = require('./routes/brands');
@@ -119,6 +121,8 @@ async function createApp() {
   app.use('/customers', customerRoutes);
   app.use('/suppliers', supplierRoutes);
   app.use('/employees', employeeRoutes);
+  app.use('/shifts', shiftRoutes);
+  app.use('/attendance', attendanceRoutes);
   app.use('/products', productRoutes);
   app.use('/product-categories', categoryRoutes);
   app.use('/brands', brandRoutes);

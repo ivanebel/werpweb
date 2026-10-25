@@ -269,6 +269,23 @@
             </div>
           <% } %>
 
+          <% if (resource.key === 'employees') { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Quick actions') %></h2>
+              <div class="mt-4 space-y-2">
+                <a href="/attendance/new?employee_id=<%= row.id %>" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'clock', className: 'h-4 w-4' }) %> <%= t('Record time') %>
+                </a>
+                <a href="/attendance?employee_id=<%= row.id %>" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'calendar', className: 'h-4 w-4' }) %> <%= t('Weekly attendance') %>
+                </a>
+                <a href="/shifts" class="btn btn-secondary w-full justify-start">
+                  <%- include('/partials/icon', { name: 'user-group', className: 'h-4 w-4' }) %> <%= t('Shift assignments') %>
+                </a>
+              </div>
+            </div>
+          <% } %>
+
           <% if (resource.key === 'products') { %>
             <div class="card p-5 md:p-6">
               <h2 class="card-title">Inventory position</h2>

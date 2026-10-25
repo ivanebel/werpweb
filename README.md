@@ -9,7 +9,8 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 ## Features
 
 - **Dashboard** with revenue and purchasing trends, sales by category, production pipeline, low-stock alerts, recent orders and outstanding invoices (ApexCharts).
-- **Contacts** - customers, suppliers and employees with full CRUD, search, filters and detail pages. Customer lists show the outstanding receivable balance and supplier lists show the outstanding payable balance, net of unapplied payment credits.
+- **Contacts** - customers, suppliers and employees with full CRUD, search, filters and detail pages. Customer lists show the outstanding receivable balance and supplier lists show the outstanding payable balance, net of unapplied payment credits. Employee detail pages show current shift assignments and recent attendance.
+- **Shifts and attendance** - define working schedules (start/end time, working days, tardiness and early-leave grace), assign employees with effective dates and per-employee grace overrides, and review a weekly attendance register. Each row is an employee and each column a day; cells show clock-in/out times, worked duration, punctuality color and late/early/overtime badges. The panel navigates between weeks, filters by employee and summarises worked hours, punctuality, tardiness, early leaves, overtime, absences and incomplete records.
 - **Customer receipts and supplier payments** — record cash, bank transfers, customer checks, endorsed third-party checks or a mix in the same payment. Allocate receipts to open sales invoices, credit notes and tax withholdings; allocate supplier payments to purchase invoices, credit notes and debit notes. Partial payments and overpayments are supported, unapplied amounts become party credit, and customer payment orders can be printed or saved as PDF.
 - **Bank accounts** - store our own bank accounts and customer/supplier accounts with bank, account number, CBU, alias and notes. Administrators and managers can manage them from **Treasury → Bank accounts**, and the same accounts appear on the customer and supplier detail pages.
 - **Check portfolio** - track every check received from customers or issued/endorsed to suppliers. Each check has a full lifecycle (**Available**, **Deposited**, **Endorsed**, **Paid**, **Rejected**, **Expired**), its own dates, bank, drawer and supplier, linked payments, and a detailed status history. Customer check receipts automatically create available checks; supplier check payments automatically create issued checks, and an available check can be selected when endorsing a supplier payment.
@@ -63,7 +64,7 @@ Open <http://localhost:3000> and sign in with:
 
 > Change the password and `SESSION_SECRET` before using the app for real data.
 
-The seed script creates a demo company, **Aurora Lighting Works**, with customers and their warehouses, suppliers, employees, products, BOMs, orders (including customer order numbers, destinations, docking stations and reception times), invoices, customer receipts, supplier payments, checks, deliveries, production orders and POS demo shops/sales. It skips seeding when customers already exist; use `FORCE_SEED=1 npm run db:seed` to add another demo data set. `FORCE_SEED=1` also clears the existing POS demo tables before reseeding them.
+The seed script creates a demo company, **Aurora Lighting Works**, with customers and their warehouses, suppliers, employees, shifts and three weeks of attendance, products, BOMs, orders (including customer order numbers, destinations, docking stations and reception times), invoices, customer receipts, supplier payments, checks, deliveries, production orders and POS demo shops/sales. It skips seeding when customers already exist; use `FORCE_SEED=1 npm run db:seed` to add another demo data set. `FORCE_SEED=1` also clears the existing POS demo tables before reseeding them.
 
 To add POS demo data to a database that is already seeded, run `npm run db:seed-pos`. Use `FORCE_SEED=1 npm run db:seed-pos` to replace the current POS locations and sales. This deliberately deletes existing POS records, but never touches products, stock or Unit #1 documents.
 
@@ -207,6 +208,14 @@ The test logs in with the seeded admin account, creates its own customer, suppli
 3. When endorsing a supplier payment, choose an existing available check in the payment method row to reuse the check record instead of creating a duplicate. The check moves to **Endorsed** and keeps its original customer and receipt history.
 4. On the check detail page, use **Change status** to record deposits, endorsements, settlement, rejection or expiry. Every change is written to the check history with its date, user and optional note.
 5. Linked checks appear on the payment page. Reversing a payment detaches its checks; checks created by that payment and not moved further are removed, while checks already deposited or endorsed are kept and, when appropriate, returned to **Available**.
+
+### Shifts and attendance
+
+1. Open **Contacts → Shifts** and create a schedule: name, start/end time, working days, and the tardiness and early-leave grace periods. Overnight schedules are supported when the end time is earlier than the start time.
+2. Open the shift and use **Assign employee** to attach employees. Assignments have an effective period; a new open-ended assignment automatically closes the previous one the day before it starts, and overlapping periods are rejected.
+3. Use the optional grace overrides on an assignment when an employee regularly arrives later or leaves earlier than the rest of the team.
+4. Open **Contacts → Attendance** to see the weekly register. Move between weeks with **Previous week** / **Next week**, filter by employee, and click a day cell to add or edit its clock-in/clock-out record.
+5. Metrics are calculated from the assignment effective on the work date: worked minutes, late minutes, early-leave minutes, overtime, grace snapshots and punctuality. Records with no clock-out are marked **Incomplete**, and scheduled days before today without a record are counted as **Absent**.
 
 ### Manufacturing
 

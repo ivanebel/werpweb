@@ -1,0 +1,128 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1000px]">
+      <%
+        const errorList = Object.values(errors || {}).flat().filter(Boolean);
+        const backUrl = record ? h.buildQuery('/attendance', { week: h.weekStartISO(record.work_date) }) : '/attendance';
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= record ? t('Edit attendance') : t('Record time') %></h1>
+          <p class="page-subtitle"><%= record ? t('Update the clock-in or clock-out for this day.') : t('Register when an employee clocked in and out. Metrics are calculated from the shift assignment.') %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the attendance record:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <h2 class="card-title"><%= t('Clock-in and clock-out') %></h2>
+            </div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div class="md:col-span-2">
+                <label for="employee_id" class="form-label"><%= t('Employee') %> <span class="text-error-500">*</span></label>
+                <select id="employee_id" name="employee_id" class="form-select <%= errors.employee_id ? 'form-input-error' : '' %>" required>
+                  <option value=""><%= t('Select an employee…') %></option>
+                  <% employees.forEach(employee => { %>
+                    <option value="<%= employee.id %>" <%= String(row.employee_id || '') === String(employee.id) ? 'selected' : '' %>><%= employee.last_name %>, <%= employee.first_name %> · <%= employee.employee_no %><%= employee.department ? ' · ' + employee.department : '' %></option>
+                  <% }) %>
+                </select>
+                <% if (errors.employee_id) { %><p class="form-error"><%= errors.employee_id %></p><% } %>
+              </div>
+
+              <div>
+                <label for="clock_in" class="form-label"><%= t('Clock in') %> <span class="text-error-500">*</span></label>
+                <input id="clock_in" name="clock_in" type="datetime-local" value="<%= row.clock_in || '' %>" class="form-input <%= errors.clock_in ? 'form-input-error' : '' %>" required>
+                <% if (errors.clock_in) { %><p class="form-error"><%= errors.clock_in %></p><% } %>
+              </div>
+
+              <div>
+                <label for="clock_out" class="form-label"><%= t('Clock out') %></label>
+                <input id="clock_out" name="clock_out" type="datetime-local" value="<%= row.clock_out || '' %>" class="form-input <%= errors.clock_out ? 'form-input-error' : '' %>">
+                <% if (errors.clock_out) { %><p class="form-error"><%= errors.clock_out %></p><% } %>
+                <p class="form-help"><%= t('Leave blank if the employee has not clocked out yet.') %></p>
+              </div>
+
+              <div class="md:col-span-2">
+                <label for="notes" class="form-label"><%= t('Notes') %></label>
+                <textarea id="notes" name="notes" rows="3" maxlength="500" class="form-textarea" placeholder="<%= t('Optional notes, e.g. medical appointment or overtime approved…') %>"><%= row.notes || '' %></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('How metrics are calculated') %></h2>
+              <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('The shift assignment effective on the work date provides the scheduled start and end times.') %></li>
+                <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Tardiness beyond the grace period is marked as late; leaving before the grace period is marked as an early leave.') %></li>
+                <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Time worked after the scheduled end is stored as overtime.') %></li>
+                <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('If the employee has no assignment for that date, the record is stored as unscheduled.') %></li>
+              </ul>
+            </div>
+
+            <% if (record) { %>
+              <div class="card p-5 md:p-6">
+                <h2 class="card-title"><%= t('Recorded metrics') %></h2>
+                <dl class="mt-4 space-y-3 text-sm">
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Work date') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(record.work_date) %></dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Punctuality') %></dt><dd><%- statusBadge(record.punctuality) %></dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Worked') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= record.worked_minutes !== null ? h.formatDuration(record.worked_minutes) : '—' %></dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Late') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDuration(record.late_minutes) %></dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Early leave') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDuration(record.early_leave_minutes) %></dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Overtime') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDuration(record.overtime_minutes) %></dd></div>
+                </dl>
+                <p class="mt-3 text-xs text-gray-400"><%= t('Metrics are recalculated when you save changes.') %></p>
+              </div>
+            <% } %>
+
+            <div class="card p-5 md:p-6">
+              <div class="flex flex-col gap-2">
+                <button type="submit" class="btn btn-primary">
+                  <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                  <%= record ? t('Save changes') : t('Record attendance') %>
+                </button>
+                <a href="<%= backUrl %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+              </div>
+              <% if (record) { %>
+                <button type="submit" form="attendance-delete" class="btn btn-danger mt-2 w-full">
+                  <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %> <%= t('Delete record') %>
+                </button>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <% if (record) { %>
+        <form id="attendance-delete" method="POST" action="/attendance/<%= record.id %>/delete" class="hidden" data-confirm="<%= t('Delete this attendance record? This cannot be undone.') %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        </form>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

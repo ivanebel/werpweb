@@ -131,6 +131,78 @@ CREATE TABLE IF NOT EXISTS employees (
   KEY idx_employees_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS shifts (
+  id                       INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name                     VARCHAR(120) NOT NULL,
+  start_time               TIME NOT NULL,
+  end_time                 TIME NOT NULL,
+  work_days                SET('mon','tue','wed','thu','fri','sat','sun') NOT NULL,
+  grace_minutes            INT UNSIGNED NOT NULL DEFAULT 10,
+  early_leave_grace_minutes INT UNSIGNED NOT NULL DEFAULT 10,
+  status                   ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  notes                    VARCHAR(500) NULL,
+  created_at               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at               TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_shifts_name (name),
+  KEY idx_shifts_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS employee_shift_assignments (
+  id                              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  employee_id                     INT UNSIGNED NOT NULL,
+  shift_id                        INT UNSIGNED NOT NULL,
+  effective_from                  DATE NOT NULL,
+  effective_to                    DATE NULL,
+  grace_minutes_override          INT UNSIGNED NULL,
+  early_leave_grace_minutes_override INT UNSIGNED NULL,
+  notes                           VARCHAR(500) NULL,
+  created_at                      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_esa_employee_start (employee_id, effective_from),
+  KEY idx_esa_employee (employee_id, effective_from),
+  KEY idx_esa_shift (shift_id),
+  CONSTRAINT fk_esa_employee FOREIGN KEY (employee_id)
+    REFERENCES employees (id) ON DELETE CASCADE,
+  CONSTRAINT fk_esa_shift FOREIGN KEY (shift_id)
+    REFERENCES shifts (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+  id                         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  employee_id                INT UNSIGNED NOT NULL,
+  work_date                  DATE NOT NULL,
+  clock_in                   DATETIME NOT NULL,
+  clock_out                  DATETIME NULL,
+  shift_id                   INT UNSIGNED NULL,
+  shift_name                 VARCHAR(120) NULL,
+  scheduled_start            TIME NULL,
+  scheduled_end              TIME NULL,
+  expected_minutes           INT UNSIGNED NOT NULL DEFAULT 0,
+  worked_minutes             INT UNSIGNED NULL,
+  late_minutes               INT UNSIGNED NOT NULL DEFAULT 0,
+  early_leave_minutes        INT UNSIGNED NOT NULL DEFAULT 0,
+  overtime_minutes           INT UNSIGNED NOT NULL DEFAULT 0,
+  grace_minutes              INT UNSIGNED NOT NULL DEFAULT 0,
+  early_leave_grace_minutes  INT UNSIGNED NOT NULL DEFAULT 0,
+  punctuality                ENUM('on_time','late','early_leave','late_early','incomplete','day_off','unscheduled') NOT NULL DEFAULT 'unscheduled',
+  notes                      VARCHAR(500) NULL,
+  created_by                 INT UNSIGNED NULL,
+  created_at                 TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                 TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_attendance_employee_date (employee_id, work_date),
+  KEY idx_attendance_date (work_date),
+  KEY idx_attendance_shift (shift_id),
+  CONSTRAINT fk_attendance_employee FOREIGN KEY (employee_id)
+    REFERENCES employees (id) ON DELETE CASCADE,
+  CONSTRAINT fk_attendance_shift FOREIGN KEY (shift_id)
+    REFERENCES shifts (id) ON DELETE SET NULL,
+  CONSTRAINT fk_attendance_user FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS product_categories (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   name        VARCHAR(120) NOT NULL,

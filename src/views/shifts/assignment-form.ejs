@@ -1,0 +1,123 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1000px]">
+      <%
+        const backUrl = `/shifts/${shift.id}`;
+        const errorList = Object.values(errors || {}).flat().filter(Boolean);
+        const dateValue = value => value ? String(value).slice(0, 10) : '';
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('Assign employee') : t('Edit assignment') %></h1>
+          <p class="page-subtitle">
+            <%= shift.name %> · <%= h.formatTime(shift.start_time) %> – <%= h.formatTime(shift.end_time) %>
+          </p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the assignment:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <h2 class="card-title"><%= t('Assignment details') %></h2>
+            </div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div class="md:col-span-2">
+                <label for="employee_id" class="form-label"><%= t('Employee') %> <span class="text-error-500">*</span></label>
+                <select id="employee_id" name="employee_id" class="form-select <%= errors.employee_id ? 'form-input-error' : '' %>" required>
+                  <option value=""><%= t('Select an employee…') %></option>
+                  <% employees.forEach(employee => { %>
+                    <option value="<%= employee.id %>" <%= String(row.employee_id || '') === String(employee.id) ? 'selected' : '' %>><%= employee.last_name %>, <%= employee.first_name %> · <%= employee.employee_no %><%= employee.department ? ' · ' + employee.department : '' %></option>
+                  <% }) %>
+                </select>
+                <% if (errors.employee_id) { %><p class="form-error"><%= errors.employee_id %></p><% } %>
+              </div>
+
+              <div>
+                <label for="effective_from" class="form-label"><%= t('Effective from') %> <span class="text-error-500">*</span></label>
+                <input id="effective_from" name="effective_from" type="date" value="<%= dateValue(row.effective_from) %>" class="form-input <%= errors.effective_from ? 'form-input-error' : '' %>" required>
+                <% if (errors.effective_from) { %><p class="form-error"><%= errors.effective_from %></p><% } %>
+              </div>
+
+              <div>
+                <label for="effective_to" class="form-label"><%= t('Effective to') %></label>
+                <input id="effective_to" name="effective_to" type="date" value="<%= dateValue(row.effective_to) %>" class="form-input <%= errors.effective_to ? 'form-input-error' : '' %>">
+                <% if (errors.effective_to) { %><p class="form-error"><%= errors.effective_to %></p><% } %>
+                <p class="form-help"><%= t('Leave blank for an open-ended assignment.') %></p>
+              </div>
+
+              <div>
+                <label for="grace_minutes_override" class="form-label"><%= t('Tardiness grace override (minutes)') %></label>
+                <input id="grace_minutes_override" name="grace_minutes_override" type="number" min="0" max="1440" step="1" value="<%= row.grace_minutes_override !== null && row.grace_minutes_override !== undefined ? row.grace_minutes_override : '' %>" class="form-input <%= errors.grace_minutes_override ? 'form-input-error' : '' %>" placeholder="<%= shift.grace_minutes %>">
+                <% if (errors.grace_minutes_override) { %><p class="form-error"><%= errors.grace_minutes_override %></p><% } %>
+                <p class="form-help"><%= t('Blank uses the shift value. Set this when the employee regularly arrives a little later.') %></p>
+              </div>
+
+              <div>
+                <label for="early_leave_grace_minutes_override" class="form-label"><%= t('Early-leave grace override (minutes)') %></label>
+                <input id="early_leave_grace_minutes_override" name="early_leave_grace_minutes_override" type="number" min="0" max="1440" step="1" value="<%= row.early_leave_grace_minutes_override !== null && row.early_leave_grace_minutes_override !== undefined ? row.early_leave_grace_minutes_override : '' %>" class="form-input <%= errors.early_leave_grace_minutes_override ? 'form-input-error' : '' %>" placeholder="<%= shift.early_leave_grace_minutes %>">
+                <% if (errors.early_leave_grace_minutes_override) { %><p class="form-error"><%= errors.early_leave_grace_minutes_override %></p><% } %>
+                <p class="form-help"><%= t('Blank uses the shift value. Set this when the employee regularly leaves a little earlier.') %></p>
+              </div>
+
+              <div class="md:col-span-2">
+                <label for="notes" class="form-label"><%= t('Notes') %></label>
+                <textarea id="notes" name="notes" rows="3" maxlength="500" class="form-textarea" placeholder="<%= t('Optional notes about this assignment…') %>"><%= row.notes || '' %></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('How assignment periods work') %></h2>
+              <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('A new open-ended assignment automatically closes the previous one the day before it starts.') %></li>
+                <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Overlapping periods for the same employee are not allowed.') %></li>
+                <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Per-assignment grace overrides apply only to attendance recorded within that period.') %></li>
+              </ul>
+            </div>
+
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Shift defaults') %></h2>
+              <dl class="mt-4 space-y-3 text-sm">
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Tardiness grace') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDuration(shift.grace_minutes) %></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Early-leave grace') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDuration(shift.early_leave_grace_minutes) %></dd></div>
+              </dl>
+              <div class="mt-4 flex flex-col gap-2">
+                <button type="submit" class="btn btn-primary">
+                  <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                  <%= mode === 'create' ? t('Assign employee') : t('Save changes') %>
+                </button>
+                <a href="<%= backUrl %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

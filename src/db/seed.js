@@ -12,6 +12,7 @@ const { createCheckForPayment, recordHistory, statusEvent } = require('../lib/ch
 const { lotFromDate } = require('../lib/helpers');
 const { packingDefaults } = require('../lib/packing');
 const { formatPackingSlipNo } = require('../lib/packingSlips');
+const { shiftWorksOn, shiftDurationMinutes, timeToMinutes, computeAttendance } = require('../lib/attendance');
 const { seedPosDemo } = require('./posSeed');
 
 const FORCE = process.env.FORCE_SEED === '1';
@@ -536,8 +537,9 @@ async function main() {
       ['Ben', 'Carter', 'Maintenance Technician', 'Manufacturing', 'contract', 44000, 'inactive'],
     ];
     let enumIdx = 1;
+    const employeeIds = [];
     for (const [first, last, title, dept, type, salary, status] of employeeDefs) {
-      await insert(conn, 'employees', {
+      const employeeId = await insert(conn, 'employees', {
         employee_no: `EMP-${String(enumIdx++).padStart(4, '0')}`,
         first_name: first,
         last_name: last,
@@ -551,6 +553,158 @@ async function main() {
         address: `${Math.floor(between(100, 9800))} ${pick(['Pine St', 'Cedar Ave', 'Grand Ave'])}`,
         status,
       });
+      employeeIds.push(employeeId);
+    }
+
+    // ------------------------------------------------------ shifts/staff
+    const morningShift = {
+      id: await insert(conn, 'shifts', {
+        name: 'Morning shift',
+        start_time: '05:30:00',
+        end_time: '13:30:00',
+        work_days: 'mon,tue,wed,thu,fri,sat',
+        grace_minutes: 10,
+        early_leave_grace_minutes: 10,
+        status: 'active',
+        notes: 'Production floor shift with Saturday coverage.',
+      }),
+      name: 'Morning shift',
+      start_time: '05:30:00',
+      end_time: '13:30:00',
+      work_days: 'mon,tue,wed,thu,fri,sat',
+      grace_minutes: 10,
+      early_leave_grace_minutes: 10,
+    };
+    const officeShift = {
+      id: await insert(conn, 'shifts', {
+        name: 'Office shift',
+        start_time: '10:00:00',
+        end_time: '19:30:00',
+        work_days: 'mon,tue,wed,thu,fri',
+        grace_minutes: 15,
+        early_leave_grace_minutes: 15,
+        status: 'active',
+        notes: 'Administration, sales and design.',
+      }),
+      name: 'Office shift',
+      start_time: '10:00:00',
+      end_time: '19:30:00',
+      work_days: 'mon,tue,wed,thu,fri',
+      grace_minutes: 15,
+      early_leave_grace_minutes: 15,
+    };
+
+    const staffAssignments = [];
+    const assignShift = async (employeeIndex, shift, effectiveFrom, effectiveTo, overrides = {}) => {
+      const graceOverride = overrides.grace_minutes_override ?? null;
+      const earlyOverride = overrides.early_leave_grace_minutes_override ?? null;
+      const id = await insert(conn, 'employee_shift_assignments', {
+        employee_id: employeeIds[employeeIndex],
+        shift_id: shift.id,
+        effective_from: effectiveFrom,
+        effective_to: effectiveTo,
+        grace_minutes_override: graceOverride,
+        early_leave_grace_minutes_override: earlyOverride,
+        notes: overrides.notes || null,
+      });
+      staffAssignments.push({
+        id,
+        shift,
+        employee_id: employeeIds[employeeIndex],
+        effective_from: effectiveFrom,
+        effective_to: effectiveTo,
+        grace_minutes_override: graceOverride,
+        early_leave_grace_minutes_override: earlyOverride,
+      });
+    };
+
+    // Maya moved from the production floor to the office; the old assignment
+    // stays as history and the current one carries a wider early-leave grace.
+    await assignShift(0, morningShift, daysAgo(540), daysAgo(150));
+    await assignShift(0, officeShift, daysAgo(149), null, {
+      grace_minutes_override: 20,
+      early_leave_grace_minutes_override: 30,
+      notes: 'School drop-off; arrives around 10:20 and leaves around 19:00.',
+    });
+
+    await assignShift(1, morningShift, daysAgo(500), null, { grace_minutes_override: 5 });
+    await assignShift(2, morningShift, daysAgo(430), null);
+    await assignShift(3, morningShift, daysAgo(380), null);
+    await assignShift(4, morningShift, daysAgo(320), null, { early_leave_grace_minutes_override: 20 });
+    await assignShift(5, officeShift, daysAgo(410), null);
+    await assignShift(6, officeShift, daysAgo(350), null, { grace_minutes_override: 25 });
+    await assignShift(7, officeShift, daysAgo(300), null);
+    await assignShift(8, officeShift, daysAgo(280), null);
+    await assignShift(9, morningShift, daysAgo(260), null);
+    await assignShift(10, officeShift, daysAgo(220), null, { early_leave_grace_minutes_override: 25 });
+
+    // Three weeks of attendance so the weekly panel and its metrics have data.
+    const insertAttendance = async (assignment, date, clockIn, clockOut) => {
+      const shiftSnapshot = {
+        shift_id: assignment.shift.id,
+        shift_name: assignment.shift.name,
+        start_time: assignment.shift.start_time,
+        end_time: assignment.shift.end_time,
+        work_days: assignment.shift.work_days,
+        grace_minutes: assignment.shift.grace_minutes,
+        early_leave_grace_minutes: assignment.shift.early_leave_grace_minutes,
+        grace_minutes_override: assignment.grace_minutes_override,
+        early_leave_grace_minutes_override: assignment.early_leave_grace_minutes_override,
+      };
+      const clockInIso = clockIn ? `${clockIn.replace(' ', 'T')}Z` : null;
+      const clockOutIso = clockOut ? `${clockOut.replace(' ', 'T')}Z` : null;
+      const metrics = computeAttendance({
+        workDate: date,
+        clockIn: clockInIso,
+        clockOut: clockOutIso,
+        assignment: shiftSnapshot,
+      });
+      if (!metrics) return;
+      await insert(conn, 'attendance_records', {
+        employee_id: assignment.employee_id,
+        work_date: date,
+        clock_in: clockIn,
+        clock_out: clockOut,
+        shift_id: metrics.shift_id,
+        shift_name: metrics.shift_name,
+        scheduled_start: metrics.scheduled_start,
+        scheduled_end: metrics.scheduled_end,
+        expected_minutes: metrics.expected_minutes,
+        worked_minutes: metrics.worked_minutes,
+        late_minutes: metrics.late_minutes,
+        early_leave_minutes: metrics.early_leave_minutes,
+        overtime_minutes: metrics.overtime_minutes,
+        grace_minutes: metrics.grace_minutes,
+        early_leave_grace_minutes: metrics.early_leave_grace_minutes,
+        punctuality: metrics.punctuality,
+        created_by: adminId,
+      });
+    };
+
+    const minutesToStamp = (date, minutes) => {
+      const stamp = new Date(new Date(`${date}T00:00:00Z`).getTime() + minutes * 60000);
+      return stamp.toISOString().replace('T', ' ').slice(0, 19);
+    };
+
+    for (const assignment of staffAssignments) {
+      for (let offset = 24; offset >= 1; offset--) {
+        const date = daysAgo(offset);
+        if (assignment.effective_from > date) continue;
+        if (assignment.effective_to && assignment.effective_to < date) continue;
+        if (!shiftWorksOn(assignment.shift, date)) continue;
+        if (rand() < 0.05) continue; // unrecorded day -> shows as absent
+
+        const startMinutes = timeToMinutes(assignment.shift.start_time);
+        const endMinutes = startMinutes + shiftDurationMinutes(assignment.shift.start_time, assignment.shift.end_time);
+        const lateOffset = Math.round(between(-6, 24));
+        const leaveOffset = Math.round(between(-32, 58));
+        const clockIn = minutesToStamp(date, startMinutes + lateOffset);
+        // Leave one record open so the panel demonstrates incomplete entries.
+        const clockOut = assignment.employee_id === employeeIds[2] && offset === 1
+          ? null
+          : minutesToStamp(date, endMinutes + leaveOffset);
+        await insertAttendance(assignment, date, clockIn, clockOut);
+      }
     }
 
     // --------------------------------------------------------- sales orders

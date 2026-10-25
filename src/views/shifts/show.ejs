@@ -1,0 +1,184 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <%
+        const dayLabels = { mon: t('Mon'), tue: t('Tue'), wed: t('Wed'), thu: t('Thu'), fri: t('Fri'), sat: t('Sat'), sun: t('Sun') };
+        const today = h.todayISO();
+        const activeAssignments = assignments.filter(a => String(a.effective_from).slice(0, 10) <= today && (!a.effective_to || String(a.effective_to).slice(0, 10) >= today));
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= shift.name %></h1>
+            <%- statusBadge(shift.status) %>
+          </div>
+          <p class="page-subtitle">
+            <%= shift.days.map(day => dayLabels[day] || day).join(', ') %>
+            · <%= h.formatTime(shift.start_time) %> – <%= h.formatTime(shift.end_time) %>
+            · <%= h.formatDuration(shift.duration_minutes) %>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/shifts" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+          </a>
+          <a href="/shifts/<%= shift.id %>/assignments/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'user-group', className: 'h-4 w-4' }) %> <%= t('Assign employee') %>
+          </a>
+          <a href="/shifts/<%= shift.id %>/edit" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> <%= t('Edit') %>
+          </a>
+          <form method="POST" action="/shifts/<%= shift.id %>/delete" data-confirm="<%= t('Delete this shift? This cannot be undone.') %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-danger btn-sm">
+              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %> <%= t('Delete') %>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Working days') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= shift.days.length %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= shift.days.map(day => dayLabels[day] || day).join(' · ') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Daily hours') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatDuration(shift.duration_minutes) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= h.formatTime(shift.start_time) %> – <%= h.formatTime(shift.end_time) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Tardiness grace') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatDuration(shift.grace_minutes) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Late arrivals are tolerated up to this point.') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Early-leave grace') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatDuration(shift.early_leave_grace_minutes) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Early departures are tolerated up to this point.') %></p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card overflow-hidden xl:col-span-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Assigned employees') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= h.pluralize(activeAssignments.length, 'active assignment') %></p>
+            </div>
+            <a href="/shifts/<%= shift.id %>/assignments/new" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('Assign employee') %>
+            </a>
+          </div>
+          <% if (assignments.length) { %>
+            <div class="table-wrap">
+              <table class="table-base min-w-[760px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Employee') %></th>
+                    <th class="table-th"><%= t('Effective period') %></th>
+                    <th class="table-th text-right"><%= t('Tardiness grace') %></th>
+                    <th class="table-th text-right"><%= t('Early-leave grace') %></th>
+                    <th class="table-th text-right"><%= t('Actions') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% assignments.forEach(assignment => { %>
+                    <% const isActive = String(assignment.effective_from).slice(0, 10) <= today && (!assignment.effective_to || String(assignment.effective_to).slice(0, 10) >= today); %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <a href="/employees/<%= assignment.employee_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= assignment.first_name %> <%= assignment.last_name %></a>
+                        <span class="mt-0.5 block text-xs text-gray-400"><%= assignment.employee_no %><%= assignment.department ? ' · ' + assignment.department : '' %></span>
+                      </td>
+                      <td class="table-td whitespace-nowrap">
+                        <span class="text-gray-700 dark:text-gray-300"><%= h.formatDate(assignment.effective_from) %></span>
+                        <span class="text-gray-400"> → <%= assignment.effective_to ? h.formatDate(assignment.effective_to) : t('Open-ended') %></span>
+                        <% if (isActive) { %>
+                          <span class="ml-2 rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-700 dark:bg-success-500/15 dark:text-success-400"><%= t('Active') %></span>
+                        <% } %>
+                      </td>
+                      <td class="table-td text-right"><%= assignment.grace_minutes_override !== null ? h.formatDuration(assignment.grace_minutes_override) : t('Shift default') %></td>
+                      <td class="table-td text-right"><%= assignment.early_leave_grace_minutes_override !== null ? h.formatDuration(assignment.early_leave_grace_minutes_override) : t('Shift default') %></td>
+                      <td class="table-td">
+                        <div class="flex items-center justify-end gap-1">
+                          <a href="/shifts/<%= shift.id %>/assignments/<%= assignment.id %>/edit" class="btn-icon" title="<%= t('Edit') %>">
+                            <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                          </a>
+                          <form method="POST" action="/shifts/<%= shift.id %>/assignments/<%= assignment.id %>/delete" class="inline" data-confirm="<%= t('Remove this shift assignment?') %>">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove') %>">
+                              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <div class="px-6 py-14 text-center">
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No employees assigned yet') %></p>
+              <p class="mt-1 text-sm text-gray-400"><%= t('Assign employees so attendance can be compared against this schedule.') %></p>
+              <a href="/shifts/<%= shift.id %>/assignments/new" class="btn btn-primary btn-sm mt-4"><%= t('Assign employee') %></a>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Shift overview') %></h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Schedule') %></dt>
+                <dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= h.formatTime(shift.start_time) %> – <%= h.formatTime(shift.end_time) %></dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Working days') %></dt>
+                <dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= shift.days.map(day => dayLabels[day] || day).join(', ') %></dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Daily hours') %></dt>
+                <dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDuration(shift.duration_minutes) %></dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Assigned employees') %></dt>
+                <dd class="font-medium text-gray-700 dark:text-gray-300"><%= assignments.length %></dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Created') %></dt>
+                <dd class="text-gray-700 dark:text-gray-300"><%= h.formatDateTime(shift.created_at) %></dd>
+              </div>
+            </dl>
+          </div>
+
+          <% if (shift.notes) { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Notes') %></h2>
+              <p class="mt-2 whitespace-pre-line text-sm text-gray-600 dark:text-gray-400"><%= shift.notes %></p>
+            </div>
+          <% } %>
+
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Quick actions') %></h2>
+            <div class="mt-4 space-y-2">
+              <a href="/attendance" class="btn btn-secondary w-full justify-start">
+                <%- include('/partials/icon', { name: 'calendar', className: 'h-4 w-4' }) %> <%= t('Weekly attendance') %>
+              </a>
+              <a href="/employees" class="btn btn-secondary w-full justify-start">
+                <%- include('/partials/icon', { name: 'user-group', className: 'h-4 w-4' }) %> <%= t('Employees') %>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>
