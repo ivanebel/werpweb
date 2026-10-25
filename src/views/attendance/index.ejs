@@ -18,6 +18,16 @@
         };
         const isCurrentWeek = weekStart === thisWeek;
         const filterQuery = employeeFilterId ? { employee_id: employeeFilterId } : {};
+        const punchPairs = (record) => {
+          const punches = Array.isArray(record.punches) && record.punches.length
+            ? record.punches
+            : [record.clock_in, record.clock_out].filter(Boolean);
+          const pairs = [];
+          for (let index = 0; index < punches.length; index += 2) {
+            pairs.push([punches[index], punches[index + 1] || null]);
+          }
+          return pairs;
+        };
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -29,6 +39,10 @@
           <a href="/shifts" class="btn btn-secondary btn-sm">
             <%- include('/partials/icon', { name: 'clock', className: 'h-4 w-4' }) %>
             <%= t('Shifts') %>
+          </a>
+          <a href="/attendance/import" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'upload', className: 'h-4 w-4' }) %>
+            <%= t('Import JSON') %>
           </a>
           <a href="/attendance/new<%= employeeFilterId ? '?employee_id=' + employeeFilterId : '' %>" class="btn btn-primary btn-sm">
             <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
@@ -154,7 +168,7 @@
           <div>
             <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Incomplete records') %></p>
             <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(metrics.incompleteCount, 0) %></p>
-            <p class="text-xs text-gray-400"><%= t('Missing clock-out') %></p>
+            <p class="text-xs text-gray-400"><%= t('Missing punches or no records') %></p>
           </div>
         </div>
       </div>
@@ -210,11 +224,23 @@
                     <% employee.days.forEach(day => { const record = day.record; %>
                       <td class="p-1 align-top <%= day.isToday ? 'bg-brand-50/40 dark:bg-brand-500/[0.06]' : '' %>">
                         <% if (record) { %>
+                          <% const pairs = punchPairs(record); const shownPairs = pairs.slice(0, 3); %>
                           <div class="min-h-[92px] rounded-lg border p-2 <%= cellTone(record.punctuality) %>">
                             <div class="flex items-start justify-between gap-1">
-                              <div class="min-w-0">
-                                <p class="font-mono text-xs font-semibold text-gray-800 dark:text-gray-200"><%= h.formatTime(record.clock_in) %> → <%= record.clock_out ? h.formatTime(record.clock_out) : '—' %></p>
-                                <p class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400"><%= record.worked_minutes !== null ? h.formatDuration(record.worked_minutes) : t('No clock-out') %></p>
+                              <div class="min-w-0 space-y-0.5">
+                                <% if (pairs.length) { %>
+                                  <% shownPairs.forEach(pair => { %>
+                                    <p class="font-mono text-[11px] font-semibold text-gray-800 dark:text-gray-200"><%= h.formatTime(pair[0]) %> → <%= pair[1] ? h.formatTime(pair[1]) : '—' %></p>
+                                  <% }) %>
+                                  <% if (pairs.length > shownPairs.length) { %>
+                                    <p class="text-[10px] text-gray-400"><%= t('+{count} more', { count: pairs.length - shownPairs.length }) %></p>
+                                  <% } %>
+                                <% } else { %>
+                                  <p class="text-[11px] font-semibold text-gray-600 dark:text-gray-300"><%= t('No records') %></p>
+                                <% } %>
+                                <% if (record.worked_minutes !== null) { %>
+                                  <p class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400"><%= h.formatDuration(record.worked_minutes) %></p>
+                                <% } %>
                               </div>
                               <a href="/attendance/<%= record.id %>/edit" class="shrink-0 rounded-md p-1 text-gray-400 hover:bg-white/60 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200" title="<%= t('Edit attendance') %>">
                                 <%- include('/partials/icon', { name: 'pencil', className: 'h-3.5 w-3.5' }) %>

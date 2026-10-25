@@ -2113,6 +2113,7 @@ const ES = {
   'Absent': 'Ausente',
   'Incomplete records': 'Registros incompletos',
   'Missing clock-out': 'Falta la salida',
+  'Missing punches or no records': 'Faltan marcas o registros',
   'Punctuality': 'Puntualidad',
   'On time': 'Puntual',
   'Late / absent': 'Tarde / ausente',
@@ -2202,6 +2203,121 @@ const ES = {
   'Attendance recorded.': 'Asistencia registrada.',
   'Attendance updated.': 'Asistencia actualizada.',
   'Attendance deleted.': 'Asistencia eliminada.',
+
+  // ---------------------------------------------------- attendance clock import
+  'Clock ID': 'ID de reloj',
+  'Identifier used by the time clock. Attendance imports match employees by this value.':
+    'Identificador usado por el reloj. Las importaciones de asistencia vinculan empleados con este valor.',
+  'This Clock ID is already used by another employee.': 'Este ID de reloj ya está asignado a otro empleado.',
+  'Import JSON': 'Importar JSON',
+  'No records': 'Sin registros',
+  '+{count} more': '+{count} más',
+  'Clock punches': 'Marcas de reloj',
+  'Source': 'Origen',
+  'Imported': 'Importado',
+  'Manual': 'Manual',
+  'Saving this form replaces these punches with the single clock-in and clock-out pair shown above.':
+    'Guardar este formulario reemplaza estas marcas por el único par de entrada y salida mostrado arriba.',
+  'punch': 'marca',
+  'punches': 'marcas',
+  'Import attendance': 'Importar asistencia',
+  'Upload a JSON file exported by the time clock. Records are matched to employees by Clock ID.':
+    'Subí un archivo JSON exportado por el reloj. Los registros se vinculan con los empleados mediante el ID de reloj.',
+  'The file could not be imported:': 'No se pudo importar el archivo:',
+  'Some entries were ignored:': 'Se ignoraron algunas entradas:',
+  '+{count} more warnings': '+{count} advertencias más',
+  'Attendance file': 'Archivo de asistencia',
+  'JSON file': 'Archivo JSON',
+  'Choose a .json file exported by the time clock. Maximum size: {size} MB.':
+    'Elegí un archivo .json exportado por el reloj. Tamaño máximo: {size} MB.',
+  'Read file': 'Leer archivo',
+  'Expected file structure': 'Estructura esperada del archivo',
+  'employee_id is the identifier configured in the employee Clock ID field. employee_name is optional.':
+    'employee_id es el identificador configurado en el campo ID de reloj del empleado. employee_name es opcional.',
+  'How imports work': 'Cómo funcionan las importaciones',
+  'Employees are matched by Clock ID, not by name.': 'Los empleados se vinculan por ID de reloj, no por nombre.',
+  'Punches are paired in order: first → second, third → fourth, and so on. Time between pairs is not counted as worked time.':
+    'Las marcas se agrupan en orden: primera → segunda, tercera → cuarta, y así sucesivamente. El tiempo entre pares no se cuenta como trabajado.',
+  'An odd number of punches is marked Incomplete.': 'Una cantidad impar de marcas se marca como incompleta.',
+  'Because the file is complete for its date range, scheduled days without punches are marked Incomplete.':
+    'Como el archivo está completo para su rango de fechas, los días programados sin marcas se marcan como incompletos.',
+  'Active employees with a Clock ID who are missing from the file are also marked Incomplete on their scheduled days.':
+    'Los empleados activos con ID de reloj que no aparecen en el archivo también se marcan como incompletos en sus días programados.',
+  'Existing records for those employees and dates are replaced by the file.':
+    'Los registros existentes para esos empleados y fechas se reemplazan con el archivo.',
+  'Before you upload': 'Antes de subir el archivo',
+  'Set the Clock ID on each employee under Contacts → Employees. Unmatched clock IDs are listed in the preview and are not imported.':
+    'Configurá el ID de reloj de cada empleado en Contactos → Empleados. Los IDs sin coincidencia se muestran en la vista previa y no se importan.',
+  'Set the Clock ID only on employees who use the time clock, under Contacts → Employees. Employees with a Clock ID who are missing from the file will be marked Incomplete on their scheduled days.':
+    'Configurá el ID de reloj solo en los empleados que usan el reloj, en Contactos → Empleados. Los empleados con ID de reloj que no aparecen en el archivo se marcarán como incompletos en sus días programados.',
+  'Import preview': 'Vista previa de importación',
+  'Upload another file': 'Subir otro archivo',
+  'There is nothing to import yet.': 'Todavía no hay nada para importar.',
+  'No employees matched a Clock ID, or the file has no clock records for scheduled days. Review the matching below and try again.':
+    'Ningún empleado coincidió con un ID de reloj, o el archivo no tiene marcas para días programados. Revisá las coincidencias y volvé a intentar.',
+  'File summary': 'Resumen del archivo',
+  'day': 'día',
+  'days': 'días',
+  'Employees in file': 'Empleados en el archivo',
+  'Days with records': 'Días con registros',
+  'Records to write': 'Registros a guardar',
+  'Existing to replace': 'Existentes a reemplazar',
+  'Incomplete days': 'Días incompletos',
+  '{count} matched employees': '{count} empleados coincidentes',
+  'matched employee': 'empleado coincidente',
+  'matched employees': 'empleados coincidentes',
+  'unmatched clock ID': 'ID de reloj sin coincidencia',
+  'unmatched clock IDs': 'IDs de reloj sin coincidencia',
+  'employee missing from file': 'empleado ausente del archivo',
+  'employees missing from file': 'empleados ausentes del archivo',
+  'scheduled day without records': 'día programado sin registros',
+  'scheduled days without records': 'días programados sin registros',
+  '{count} unmatched clock IDs': '{count} IDs de reloj sin coincidencia',
+  '{count} missing from file': '{count} ausentes del archivo',
+  '{count} scheduled days without records': '{count} días programados sin registros',
+  'Employee matching': 'Coincidencia de empleados',
+  '{matched} of {total} matched': '{matched} de {total} coincidentes',
+  'Unmatched clock IDs': 'IDs de reloj sin coincidencia',
+  'Missing from file': 'Ausentes del archivo',
+  'Their scheduled days will be marked Incomplete.': 'Sus días programados se marcarán como incompletos.',
+  'Inactive employees skipped': 'Empleados inactivos omitidos',
+  'All employees in the file matched a Clock ID.': 'Todos los empleados del archivo coincidieron con un ID de reloj.',
+  'Warnings': 'Advertencias',
+  'No warnings. Everything in the file was read successfully.': 'Sin advertencias. Todo el archivo se leyó correctamente.',
+  'Confirm import': 'Confirmar importación',
+  'Nothing has been written yet. Confirming replaces the existing records for the matched employees and dates, and marks scheduled days without punches as Incomplete.':
+    'Todavía no se guardó nada. Al confirmar se reemplazan los registros existentes de los empleados y fechas coincidentes, y los días programados sin marcas se marcan como incompletos.',
+  'Import {count} records': 'Importar {count} registros',
+  'The file must contain a JSON object.': 'El archivo debe contener un objeto JSON.',
+  'date_from is required and must be a valid date (YYYY-MM-DD).':
+    'date_from es obligatorio y debe ser una fecha válida (AAAA-MM-DD).',
+  'date_to is required and must be a valid date (YYYY-MM-DD).':
+    'date_to es obligatorio y debe ser una fecha válida (AAAA-MM-DD).',
+  'date_from cannot be after date_to.': 'date_from no puede ser posterior a date_to.',
+  'The date range cannot exceed 366 days.': 'El rango de fechas no puede superar los 366 días.',
+  'The file must contain an employees array.': 'El archivo debe contener un arreglo employees.',
+  'The file contains too many employees (maximum 500).': 'El archivo contiene demasiados empleados (máximo 500).',
+  'The file contains too many clock punches (maximum 50000).':
+    'El archivo contiene demasiadas marcas de reloj (máximo 50000).',
+  'The uploaded file is not valid JSON.': 'El archivo subido no es JSON válido.',
+  'Choose a JSON file to import.': 'Elegí un archivo JSON para importar.',
+  'The file is too large. Maximum size is 5 MB.': 'El archivo es demasiado grande. El tamaño máximo es 5 MB.',
+  'Could not read the uploaded file.': 'No se pudo leer el archivo subido.',
+  'Import cancelled.': 'Importación cancelada.',
+  'Nothing to import. The file did not contain clock records or scheduled days.':
+    'No hay nada para importar. El archivo no contenía marcas ni días programados.',
+  'This import preview expired. Upload the file again.':
+    'Esta vista previa de importación venció. Subí el archivo nuevamente.',
+  'The import could not be completed. No records were changed.':
+    'No se pudo completar la importación. No se modificó ningún registro.',
+  'Imported {records} records for {employees} employees ({inserted} new, {updated} updated).':
+    'Se importaron {records} registros de {employees} empleados ({inserted} nuevos, {updated} actualizados).',
+  'Imported {records} records for {employees} employees ({inserted} new, {updated} updated). {incomplete} days were marked incomplete and {unmatched} clock IDs were not matched.':
+    'Se importaron {records} registros de {employees} empleados ({inserted} nuevos, {updated} actualizados). {incomplete} días se marcaron como incompletos y {unmatched} IDs de reloj no coincidieron.',
+  'Imported {records} records for {employees} employees ({inserted} new, {updated} updated). {incomplete} days were marked incomplete.':
+    'Se importaron {records} registros de {employees} empleados ({inserted} nuevos, {updated} actualizados). {incomplete} días se marcaron como incompletos.',
+  'Imported {records} records for {employees} employees ({inserted} new, {updated} updated). {unmatched} clock IDs were not matched.':
+    'Se importaron {records} registros de {employees} empleados ({inserted} nuevos, {updated} actualizados). {unmatched} IDs de reloj no coincidieron.',
 };
 
 function normalizeLocale(value) {

@@ -539,8 +539,10 @@ async function main() {
     let enumIdx = 1;
     const employeeIds = [];
     for (const [first, last, title, dept, type, salary, status] of employeeDefs) {
+      const clockId = String(enumIdx);
       const employeeId = await insert(conn, 'employees', {
         employee_no: `EMP-${String(enumIdx++).padStart(4, '0')}`,
+        clock_id: clockId,
         first_name: first,
         last_name: last,
         email: `${first.toLowerCase()}.${last.toLowerCase()}@auroralighting.example`,
@@ -660,7 +662,7 @@ async function main() {
         assignment: shiftSnapshot,
       });
       if (!metrics) return;
-      await insert(conn, 'attendance_records', {
+      const recordId = await insert(conn, 'attendance_records', {
         employee_id: assignment.employee_id,
         work_date: date,
         clock_in: clockIn,
@@ -677,8 +679,17 @@ async function main() {
         grace_minutes: metrics.grace_minutes,
         early_leave_grace_minutes: metrics.early_leave_grace_minutes,
         punctuality: metrics.punctuality,
+        source: 'manual',
+        punch_count: [clockIn, clockOut].filter(Boolean).length,
         created_by: adminId,
       });
+      for (const punch of [clockIn, clockOut].filter(Boolean)) {
+        await insert(conn, 'attendance_punches', {
+          attendance_record_id: recordId,
+          punch_at: punch,
+          source: 'manual',
+        });
+      }
     };
 
     const minutesToStamp = (date, minutes) => {

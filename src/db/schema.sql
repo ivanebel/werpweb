@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
 CREATE TABLE IF NOT EXISTS employees (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   employee_no     VARCHAR(30) NOT NULL,
+  clock_id        VARCHAR(40) NULL,
   first_name      VARCHAR(100) NOT NULL,
   last_name       VARCHAR(100) NOT NULL,
   email           VARCHAR(190) NULL,
@@ -127,6 +128,7 @@ CREATE TABLE IF NOT EXISTS employees (
   updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_employees_no (employee_no),
+  UNIQUE KEY uq_employees_clock_id (clock_id),
   KEY idx_employees_name (last_name, first_name),
   KEY idx_employees_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -173,7 +175,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   id                         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   employee_id                INT UNSIGNED NOT NULL,
   work_date                  DATE NOT NULL,
-  clock_in                   DATETIME NOT NULL,
+  clock_in                   DATETIME NULL,
   clock_out                  DATETIME NULL,
   shift_id                   INT UNSIGNED NULL,
   shift_name                 VARCHAR(120) NULL,
@@ -187,6 +189,8 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   grace_minutes              INT UNSIGNED NOT NULL DEFAULT 0,
   early_leave_grace_minutes  INT UNSIGNED NOT NULL DEFAULT 0,
   punctuality                ENUM('on_time','late','early_leave','late_early','incomplete','day_off','unscheduled') NOT NULL DEFAULT 'unscheduled',
+  source                     ENUM('manual','import') NOT NULL DEFAULT 'manual',
+  punch_count                INT UNSIGNED NOT NULL DEFAULT 0,
   notes                      VARCHAR(500) NULL,
   created_by                 INT UNSIGNED NULL,
   created_at                 TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -201,6 +205,18 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     REFERENCES shifts (id) ON DELETE SET NULL,
   CONSTRAINT fk_attendance_user FOREIGN KEY (created_by)
     REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS attendance_punches (
+  id                    INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  attendance_record_id  INT UNSIGNED NOT NULL,
+  punch_at              DATETIME NOT NULL,
+  source                ENUM('manual','import') NOT NULL DEFAULT 'manual',
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_attendance_punches_record (attendance_record_id, punch_at),
+  CONSTRAINT fk_attendance_punches_record FOREIGN KEY (attendance_record_id)
+    REFERENCES attendance_records (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS product_categories (

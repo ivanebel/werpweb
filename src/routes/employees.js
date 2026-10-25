@@ -1,11 +1,21 @@
 'use strict';
 
 const { makeResourceRouter } = require('./resource');
-const { query } = require('../db');
+const { query, one } = require('../db');
 const { formatDuration, formatTime } = require('../lib/helpers');
+
+async function validateClockId(data, req, existingId = 0) {
+  if (!data.clock_id) return {};
+  const duplicate = await one(
+    'SELECT id FROM employees WHERE clock_id = ? AND id <> ? LIMIT 1',
+    [data.clock_id, existingId],
+  );
+  return duplicate ? { clock_id: req.t('This Clock ID is already used by another employee.') } : {};
+}
 
 const fields = [
   { name: 'employee_no', label: 'Employee no.', type: 'text', section: 'Employee', help: 'Leave blank to generate automatically.', maxLength: 30 },
+  { name: 'clock_id', label: 'Clock ID', type: 'text', section: 'Employee', help: 'Identifier used by the time clock. Attendance imports match employees by this value.', maxLength: 40 },
   { name: 'status', label: 'Status', type: 'select', default: 'active', section: 'Employee', options: [
     { value: 'active', label: 'Active' },
     { value: 'on_leave', label: 'On leave' },
@@ -39,7 +49,7 @@ module.exports = makeResourceRouter({
   numberField: 'employee_no',
   number: { prefix: 'EMP', year: false, pad: 4 },
   titleField: 'full_name',
-  searchFields: ['t.employee_no', 't.first_name', 't.last_name', 't.email', 't.job_title', 't.department'],
+  searchFields: ['t.employee_no', 't.clock_id', 't.first_name', 't.last_name', 't.email', 't.job_title', 't.department'],
   filters: [{ name: 'status', label: 'Status', options: [
     { value: 'active', label: 'Active' },
     { value: 'on_leave', label: 'On leave' },
@@ -48,8 +58,11 @@ module.exports = makeResourceRouter({
   orderBy: 't.last_name ASC, t.first_name ASC',
   select: "t.*, CONCAT(t.first_name, ' ', t.last_name) AS full_name",
   fields,
+  beforeCreate: (data, req) => validateClockId(data, req),
+  beforeUpdate: (data, req, existing) => validateClockId(data, req, existing.id),
   columns: [
     { key: 'full_name', label: 'Employee', type: 'primary', sub: 'employee_no' },
+    { key: 'clock_id', label: 'Clock ID' },
     { key: 'job_title', label: 'Job title' },
     { key: 'department', label: 'Department' },
     { key: 'employment_type', label: 'Type', type: 'status' },

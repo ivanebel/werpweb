@@ -108,6 +108,8 @@ async function createApp() {
 
   app.use(locale);
   app.use(sessionFlash);
+  // Multipart bodies must be parsed before the CSRF middleware can read _csrf.
+  app.use('/attendance/import/preview', attendanceRoutes.importUpload);
   app.use(csrf);
   app.use(webLocals);
   app.use(localizeResponses);

@@ -51,15 +51,41 @@ function assignmentForDate(assignments, dateISO) {
     .sort((a, b) => String(b.effective_from).localeCompare(String(a.effective_from)))[0] || null;
 }
 
-function computeAttendance({ workDate, clockIn, clockOut, assignment }) {
-  const inDate = new Date(clockIn);
-  const outDate = clockOut ? new Date(clockOut) : null;
-  if (Number.isNaN(inDate.getTime())) return null;
-  if (outDate && Number.isNaN(outDate.getTime())) return null;
+function parsePunchDate(value) {
+  if (value instanceof Date) return value;
+  const raw = String(value === undefined || value === null ? '' : value).trim();
+  if (!raw) return new Date(Number.NaN);
+  // The application stores and compares attendance times as UTC. Database
+  // datetime strings have no zone, so add Z before parsing.
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(raw)) {
+    return new Date(`${raw.replace(' ', 'T')}Z`);
+  }
+  return new Date(raw);
+}
 
-  const workedMinutes = outDate
-    ? Math.max(0, Math.round((outDate.getTime() - inDate.getTime()) / 60000))
-    : null;
+function computeAttendanceFromPunches({ workDate, punches, assignment }) {
+  const values = Array.isArray(punches) ? punches : [];
+  const dates = values
+    .map((value) => parsePunchDate(value))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (values.length && dates.length !== values.length) return null;
+
+  const punchCount = dates.length;
+  const complete = punchCount >= 2 && punchCount % 2 === 0;
+  let workedMinutes = null;
+  if (punchCount >= 2) {
+    workedMinutes = 0;
+    for (let index = 0; index + 1 < punchCount; index += 2) {
+      workedMinutes += Math.max(0, Math.round((dates[index + 1].getTime() - dates[index].getTime()) / 60000));
+    }
+  }
+
+  const clockIn = punchCount ? dates[0] : null;
+  const lastCompletedIndex = Math.floor(punchCount / 2) * 2 - 1;
+  const clockOut = lastCompletedIndex >= 0 ? dates[lastCompletedIndex] : null;
+  const clockInIso = clockIn ? clockIn.toISOString() : null;
+  const clockOutIso = clockOut ? clockOut.toISOString() : null;
 
   if (!assignment) {
     return {
@@ -71,10 +97,13 @@ function computeAttendance({ workDate, clockIn, clockOut, assignment }) {
       worked_minutes: workedMinutes,
       late_minutes: 0,
       early_leave_minutes: 0,
-      overtime_minutes: workedMinutes || 0,
+      overtime_minutes: complete ? (workedMinutes || 0) : 0,
       grace_minutes: 0,
       early_leave_grace_minutes: 0,
-      punctuality: workedMinutes === null ? 'incomplete' : 'unscheduled',
+      punctuality: complete ? 'unscheduled' : 'incomplete',
+      clock_in: clockInIso,
+      clock_out: clockOutIso,
+      punch_count: punchCount,
     };
   }
 
@@ -91,18 +120,19 @@ function computeAttendance({ workDate, clockIn, clockOut, assignment }) {
       : assignment.early_leave_grace_minutes,
   ) || 0;
 
-  const lateMinutes = isWorkDay
-    ? Math.max(0, Math.round((inDate.getTime() - window.start.getTime()) / 60000))
-    : 0;
-  const earlyLeaveMinutes = isWorkDay && outDate
-    ? Math.max(0, Math.round((window.end.getTime() - outDate.getTime()) / 60000))
-    : 0;
-  const overtimeMinutes = outDate
-    ? Math.max(0, Math.round((outDate.getTime() - window.end.getTime()) / 60000))
-    : 0;
+  let lateMinutes = 0;
+  let earlyLeaveMinutes = 0;
+  let overtimeMinutes = 0;
+  if (complete && isWorkDay) {
+    lateMinutes = Math.max(0, Math.round((clockIn.getTime() - window.start.getTime()) / 60000));
+    earlyLeaveMinutes = Math.max(0, Math.round((window.end.getTime() - clockOut.getTime()) / 60000));
+    overtimeMinutes = Math.max(0, Math.round((clockOut.getTime() - window.end.getTime()) / 60000));
+  } else if (complete) {
+    overtimeMinutes = workedMinutes || 0;
+  }
 
   let punctuality;
-  if (workedMinutes === null) {
+  if (!complete) {
     punctuality = 'incomplete';
   } else if (!isWorkDay) {
     punctuality = 'day_off';
@@ -125,11 +155,22 @@ function computeAttendance({ workDate, clockIn, clockOut, assignment }) {
     worked_minutes: workedMinutes,
     late_minutes: lateMinutes,
     early_leave_minutes: earlyLeaveMinutes,
-    overtime_minutes: isWorkDay ? overtimeMinutes : (workedMinutes || 0),
+    overtime_minutes: overtimeMinutes,
     grace_minutes: grace,
     early_leave_grace_minutes: earlyGrace,
     punctuality,
+    clock_in: clockInIso,
+    clock_out: clockOutIso,
+    punch_count: punchCount,
   };
+}
+
+function computeAttendance({ workDate, clockIn, clockOut, assignment }) {
+  return computeAttendanceFromPunches({
+    workDate,
+    punches: [clockIn, clockOut].filter(Boolean),
+    assignment,
+  });
 }
 
 module.exports = {
@@ -141,4 +182,5 @@ module.exports = {
   scheduledWindow,
   assignmentForDate,
   computeAttendance,
+  computeAttendanceFromPunches,
 };

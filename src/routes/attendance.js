@@ -1,17 +1,48 @@
 'use strict';
 
 const express = require('express');
-const { query, one } = require('../db');
+const multer = require('multer');
+const { query, one, withTransaction } = require('../db');
 const { todayISO, weekStartISO, addDaysISO } = require('../lib/helpers');
 const {
   assignmentForDate,
   computeAttendance,
+  computeAttendanceFromPunches,
   scheduledWindow,
   shiftWorksOn,
 } = require('../lib/attendance');
+const {
+  dateRange,
+  normalizeTime,
+  parseAttendanceFile,
+  planAttendanceImport,
+} = require('../lib/attendanceImport');
 
 const router = express.Router();
 const basePath = '/attendance';
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+const IMPORT_SESSION_MAX_AGE = 60 * 60 * 1000;
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMPORT_BYTES, files: 1 },
+});
+
+/**
+ * Parses multipart bodies before the global CSRF middleware so the _csrf field
+ * is available for the upload POST. Mounted by app.js on the preview path.
+ */
+function importUpload(req, res, next) {
+  if (!req.session || !req.session.user) return res.redirect('/login');
+  upload.single('file')(req, res, (err) => {
+    if (!err) return next();
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'The file is too large. Maximum size is 5 MB.'
+      : 'Could not read the uploaded file.';
+    req.flash('error', message);
+    return res.redirect(`${basePath}/import`);
+  });
+}
 
 function validDate(value) {
   const raw = String(value || '').slice(0, 10);
@@ -40,6 +71,117 @@ function normalizeDateTime(value) {
 function datetimeLocalValue(value) {
   const raw = String(value || '').replace('T', ' ').slice(0, 19);
   return raw.length >= 16 ? `${raw.slice(0, 10)}T${raw.slice(11, 16)}` : '';
+}
+
+function toDbDateTime(value) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().replace('T', ' ').slice(0, 19);
+}
+
+async function savePunches(conn, recordId, punches, source) {
+  await conn.query('DELETE FROM attendance_punches WHERE attendance_record_id = ?', [recordId]);
+  if (!punches.length) return;
+  await conn.query(
+    'INSERT INTO attendance_punches (attendance_record_id, punch_at, source) VALUES ?',
+    [punches.map((punch) => [recordId, punch, source])],
+  );
+}
+
+async function writeImportedRecord(conn, { employeeId, date, metrics, punches, existingId, userId }) {
+  const clockIn = toDbDateTime(metrics.clock_in);
+  const clockOut = toDbDateTime(metrics.clock_out);
+  const punchCount = punches.length;
+  let recordId = existingId;
+  let inserted = false;
+
+  if (recordId) {
+    await conn.query(
+      `UPDATE attendance_records
+          SET clock_in = ?, clock_out = ?, shift_id = ?, shift_name = ?,
+              scheduled_start = ?, scheduled_end = ?, expected_minutes = ?,
+              worked_minutes = ?, late_minutes = ?, early_leave_minutes = ?,
+              overtime_minutes = ?, grace_minutes = ?, early_leave_grace_minutes = ?,
+              punctuality = ?, source = 'import', punch_count = ?
+        WHERE id = ?`,
+      [
+        clockIn,
+        clockOut,
+        metrics.shift_id,
+        metrics.shift_name,
+        metrics.scheduled_start,
+        metrics.scheduled_end,
+        metrics.expected_minutes,
+        metrics.worked_minutes,
+        metrics.late_minutes,
+        metrics.early_leave_minutes,
+        metrics.overtime_minutes,
+        metrics.grace_minutes,
+        metrics.early_leave_grace_minutes,
+        metrics.punctuality,
+        punchCount,
+        recordId,
+      ],
+    );
+  } else {
+    const [result] = await conn.query(
+      `INSERT INTO attendance_records
+         (employee_id, work_date, clock_in, clock_out, shift_id, shift_name,
+          scheduled_start, scheduled_end, expected_minutes, worked_minutes,
+          late_minutes, early_leave_minutes, overtime_minutes,
+          grace_minutes, early_leave_grace_minutes, punctuality,
+          source, punch_count, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'import', ?, ?)`,
+      [
+        employeeId,
+        date,
+        clockIn,
+        clockOut,
+        metrics.shift_id,
+        metrics.shift_name,
+        metrics.scheduled_start,
+        metrics.scheduled_end,
+        metrics.expected_minutes,
+        metrics.worked_minutes,
+        metrics.late_minutes,
+        metrics.early_leave_minutes,
+        metrics.overtime_minutes,
+        metrics.grace_minutes,
+        metrics.early_leave_grace_minutes,
+        metrics.punctuality,
+        punchCount,
+        userId,
+      ],
+    );
+    recordId = result.insertId;
+    inserted = true;
+  }
+
+  await savePunches(conn, recordId, punches, 'import');
+  return { recordId, inserted };
+}
+
+async function assignmentsForEmployees(ids, dateFrom, dateTo, conn = null) {
+  const map = new Map();
+  if (!ids.length) return map;
+  const placeholders = ids.map(() => '?').join(',');
+  const sql = `SELECT a.*, s.name AS shift_name, s.start_time, s.end_time, s.work_days,
+                      s.grace_minutes, s.early_leave_grace_minutes
+                 FROM employee_shift_assignments a
+                 JOIN shifts s ON s.id = a.shift_id
+                WHERE a.employee_id IN (${placeholders})
+                  AND a.effective_from <= ?
+                  AND (a.effective_to IS NULL OR a.effective_to >= ?)
+                ORDER BY a.effective_from`;
+  const params = [...ids, dateTo, dateFrom];
+  const rows = conn ? (await conn.query(sql, params))[0] : await query(sql, params);
+  for (const assignment of rows) {
+    const key = String(assignment.employee_id);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(assignment);
+  }
+  return map;
 }
 
 async function employeeOptions(includeId = null) {
@@ -82,6 +224,20 @@ async function renderForm(req, res, status, options) {
     record: options.record || null,
     errors: options.errors || {},
     employees,
+  });
+}
+
+function renderImportPage(req, res, status, options = {}) {
+  return res.status(status).render('attendance/import', {
+    title: req.t('Import attendance'),
+    active: 'attendance',
+    breadcrumbs: [
+      { label: req.t('Attendance'), href: basePath },
+      { label: req.t('Import attendance') },
+    ],
+    errors: options.errors || [],
+    warnings: options.warnings || [],
+    maxFileSizeMb: Math.round(MAX_IMPORT_BYTES / (1024 * 1024)),
   });
 }
 
@@ -158,6 +314,26 @@ router.get('/', async (req, res, next) => {
         [...employeeIds, weekStart, weekEnd],
       )
       : [];
+    const punchRows = employeeIds.length
+      ? await query(
+        `SELECT p.attendance_record_id, p.punch_at
+           FROM attendance_punches p
+           JOIN attendance_records r ON r.id = p.attendance_record_id
+          WHERE r.employee_id IN (${placeholders})
+            AND r.work_date BETWEEN ? AND ?
+          ORDER BY p.punch_at, p.id`,
+        [...employeeIds, weekStart, weekEnd],
+      )
+      : [];
+    const punchesByRecord = new Map();
+    for (const punch of punchRows) {
+      const key = String(punch.attendance_record_id);
+      if (!punchesByRecord.has(key)) punchesByRecord.set(key, []);
+      punchesByRecord.get(key).push(punch.punch_at);
+    }
+    for (const record of attendance) {
+      record.punches = punchesByRecord.get(String(record.id)) || [];
+    }
 
     const assignmentsByEmployee = new Map();
     for (const assignment of assignments) {
@@ -201,7 +377,7 @@ router.get('/', async (req, res, next) => {
     );
     const overtimeMinutes = attendance.reduce((sum, record) => sum + Number(record.overtime_minutes || 0), 0);
     const absentCount = grid.reduce((sum, employee) => sum + employee.days.filter((day) => day.absent).length, 0);
-    const scheduledAttendance = attendance.filter((record) => Number(record.expected_minutes) > 0).length;
+    const completeScheduledAttendance = attendance.filter((record) => ['on_time', 'late', 'early_leave', 'late_early'].includes(record.punctuality)).length;
     const onTimeCount = attendance.filter((record) => record.punctuality === 'on_time').length;
     const incompleteCount = attendance.filter((record) => record.punctuality === 'incomplete').length;
     const selectedEmployee = selectedEmployeeId
@@ -234,8 +410,8 @@ router.get('/', async (req, res, next) => {
         absentCount,
         onTimeCount,
         incompleteCount,
-        scheduledCount: scheduledAttendance,
-        onTimeRate: scheduledAttendance ? (onTimeCount / scheduledAttendance) * 100 : 0,
+        scheduledCount: completeScheduledAttendance,
+        onTimeRate: completeScheduledAttendance ? (onTimeCount / completeScheduledAttendance) * 100 : 0,
       },
     });
   } catch (err) {
@@ -285,34 +461,40 @@ router.post('/', async (req, res, next) => {
       clockOut: data.clock_out_iso,
       assignment,
     });
-    await query(
-      `INSERT INTO attendance_records
-         (employee_id, work_date, clock_in, clock_out, shift_id, shift_name,
-          scheduled_start, scheduled_end, expected_minutes, worked_minutes,
-          late_minutes, early_leave_minutes, overtime_minutes,
-          grace_minutes, early_leave_grace_minutes, punctuality, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        data.employee_id,
-        data.work_date,
-        data.clock_in,
-        data.clock_out,
-        metrics.shift_id,
-        metrics.shift_name,
-        metrics.scheduled_start,
-        metrics.scheduled_end,
-        metrics.expected_minutes,
-        metrics.worked_minutes,
-        metrics.late_minutes,
-        metrics.early_leave_minutes,
-        metrics.overtime_minutes,
-        metrics.grace_minutes,
-        metrics.early_leave_grace_minutes,
-        metrics.punctuality,
-        data.notes,
-        req.session.user.id,
-      ],
-    );
+    const punches = [data.clock_in, data.clock_out].filter(Boolean);
+    await withTransaction(async (conn) => {
+      const [result] = await conn.query(
+        `INSERT INTO attendance_records
+           (employee_id, work_date, clock_in, clock_out, shift_id, shift_name,
+            scheduled_start, scheduled_end, expected_minutes, worked_minutes,
+            late_minutes, early_leave_minutes, overtime_minutes,
+            grace_minutes, early_leave_grace_minutes, punctuality,
+            source, punch_count, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?)`,
+        [
+          data.employee_id,
+          data.work_date,
+          data.clock_in,
+          data.clock_out,
+          metrics.shift_id,
+          metrics.shift_name,
+          metrics.scheduled_start,
+          metrics.scheduled_end,
+          metrics.expected_minutes,
+          metrics.worked_minutes,
+          metrics.late_minutes,
+          metrics.early_leave_minutes,
+          metrics.overtime_minutes,
+          metrics.grace_minutes,
+          metrics.early_leave_grace_minutes,
+          metrics.punctuality,
+          punches.length,
+          data.notes,
+          req.session.user.id,
+        ],
+      );
+      await savePunches(conn, result.insertId, punches, 'manual');
+    });
     req.flash('success', 'Attendance recorded.');
     res.redirect(`${basePath}?week=${weekStartISO(data.work_date)}&employee_id=${data.employee_id}`);
   } catch (err) {
@@ -324,12 +506,279 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+router.get('/import', (req, res) => {
+  renderImportPage(req, res, 200);
+});
+
+router.post('/import/preview', async (req, res, next) => {
+  try {
+    const file = req.file;
+    if (!file || !file.buffer) {
+      req.flash('error', 'Choose a JSON file to import.');
+      return res.redirect(`${basePath}/import`);
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(file.buffer.toString('utf8').replace(/^\uFEFF/, ''));
+    } catch {
+      return renderImportPage(req, res, 422, {
+        errors: ['The uploaded file is not valid JSON.'],
+      });
+    }
+
+    const parsed = parseAttendanceFile(payload);
+    if (parsed.errors.length) {
+      return renderImportPage(req, res, 422, {
+        errors: parsed.errors,
+        warnings: parsed.warnings,
+      });
+    }
+
+    const clockEmployees = await query(
+      `SELECT id, employee_no, first_name, last_name, status, clock_id
+         FROM employees
+        WHERE clock_id IS NOT NULL AND clock_id <> ''
+        ORDER BY last_name, first_name`,
+    );
+    const employeeIds = clockEmployees.map((employee) => employee.id);
+    const assignmentsByEmployee = await assignmentsForEmployees(employeeIds, parsed.dateFrom, parsed.dateTo);
+    let existingKeys = new Set();
+    if (employeeIds.length) {
+      const placeholders = employeeIds.map(() => '?').join(',');
+      const existing = await query(
+        `SELECT employee_id, work_date FROM attendance_records
+          WHERE employee_id IN (${placeholders})
+            AND work_date BETWEEN ? AND ?`,
+        [...employeeIds, parsed.dateFrom, parsed.dateTo],
+      );
+      existingKeys = new Set(existing.map((record) => `${record.employee_id}:${String(record.work_date).slice(0, 10)}`));
+    }
+
+    const plan = planAttendanceImport({
+      parsed,
+      employees: clockEmployees,
+      assignmentsByEmployee,
+      existingKeys,
+    });
+
+    req.session.attendanceImport = {
+      dateFrom: parsed.dateFrom,
+      dateTo: parsed.dateTo,
+      fileName: file.originalname || 'attendance.json',
+      uploadedAt: Date.now(),
+      matched: plan.matched.map((entry) => ({
+        employeeId: entry.employee.id,
+        records: entry.records,
+      })),
+      missingEmployeeIds: plan.missing.map((entry) => entry.employee.id),
+      unmatchedCount: plan.stats.unmatchedCount,
+    };
+
+    res.render('attendance/import-preview', {
+      title: req.t('Import preview'),
+      active: 'attendance',
+      breadcrumbs: [
+        { label: req.t('Attendance'), href: basePath },
+        { label: req.t('Import attendance'), href: `${basePath}/import` },
+        { label: req.t('Preview') },
+      ],
+      fileName: file.originalname || 'attendance.json',
+      plan,
+      warnings: parsed.warnings,
+      canImport: plan.stats.matchedCount > 0 && plan.stats.recordsToWrite > 0,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/import/confirm', async (req, res) => {
+  const payload = req.session.attendanceImport;
+  if (!payload || !Array.isArray(payload.matched) || !payload.dateFrom || !payload.dateTo) {
+    req.flash('error', 'This import preview expired. Upload the file again.');
+    return res.redirect(`${basePath}/import`);
+  }
+  if (!payload.uploadedAt || Date.now() - payload.uploadedAt > IMPORT_SESSION_MAX_AGE) {
+    delete req.session.attendanceImport;
+    req.flash('error', 'This import preview expired. Upload the file again.');
+    return res.redirect(`${basePath}/import`);
+  }
+
+  try {
+    const employeeIds = [...new Set([
+      ...payload.matched.map((entry) => entry.employeeId),
+      ...(payload.missingEmployeeIds || []),
+    ])];
+    const employees = employeeIds.length
+      ? await query(
+        `SELECT id, status FROM employees WHERE id IN (${employeeIds.map(() => '?').join(',')})`,
+        employeeIds,
+      )
+      : [];
+    const activeIds = new Set(employees.filter((employee) => employee.status !== 'inactive').map((employee) => employee.id));
+    const assignmentsByEmployee = await assignmentsForEmployees(employeeIds, payload.dateFrom, payload.dateTo);
+    const dates = dateRange(payload.dateFrom, payload.dateTo);
+    const userId = req.session.user.id;
+
+    const result = await withTransaction(async (conn) => {
+      let existingRows = [];
+      if (employeeIds.length) {
+        const [rows] = await conn.query(
+          `SELECT id, employee_id, work_date FROM attendance_records
+            WHERE employee_id IN (${employeeIds.map(() => '?').join(',')})
+              AND work_date BETWEEN ? AND ?`,
+          [...employeeIds, payload.dateFrom, payload.dateTo],
+        );
+        existingRows = rows;
+      }
+      const existingByKey = new Map(
+        existingRows.map((record) => [`${record.employee_id}:${String(record.work_date).slice(0, 10)}`, record.id]),
+      );
+      const touchedEmployees = new Set();
+      const touchedDays = new Set();
+      let recordsWritten = 0;
+      let inserted = 0;
+      let updated = 0;
+      let incomplete = 0;
+
+      const write = async (employeeId, date, times, assignment) => {
+        if (times.length) {
+          const metrics = computeAttendanceFromPunches({
+            workDate: date,
+            punches: times.map((time) => `${date}T${time}Z`),
+            assignment,
+          });
+          if (!metrics) return;
+          const key = `${employeeId}:${date}`;
+          const written = await writeImportedRecord(conn, {
+            employeeId,
+            date,
+            metrics,
+            punches: times.map((time) => `${date} ${time}`),
+            existingId: existingByKey.get(key),
+            userId,
+          });
+          if (written.inserted) {
+            inserted += 1;
+            existingByKey.set(key, written.recordId);
+          } else {
+            updated += 1;
+          }
+          recordsWritten += 1;
+          if (metrics.punctuality === 'incomplete') incomplete += 1;
+          touchedEmployees.add(employeeId);
+          touchedDays.add(date);
+          return;
+        }
+
+        const metrics = computeAttendanceFromPunches({ workDate: date, punches: [], assignment });
+        if (!metrics) return;
+        const key = `${employeeId}:${date}`;
+        const written = await writeImportedRecord(conn, {
+          employeeId,
+          date,
+          metrics,
+          punches: [],
+          existingId: existingByKey.get(key),
+          userId,
+        });
+        if (written.inserted) {
+          inserted += 1;
+          existingByKey.set(key, written.recordId);
+        } else {
+          updated += 1;
+        }
+        recordsWritten += 1;
+        incomplete += 1;
+        touchedEmployees.add(employeeId);
+        touchedDays.add(date);
+      };
+
+      for (const entry of payload.matched) {
+        if (!activeIds.has(entry.employeeId)) continue;
+        const assignments = assignmentsByEmployee.get(String(entry.employeeId)) || [];
+        for (const date of dates) {
+          const assignment = assignmentForDate(assignments, date);
+          const scheduled = assignment ? shiftWorksOn(assignment, date) : false;
+          const times = ((entry.records && entry.records[date]) || [])
+            .map((time) => normalizeTime(time))
+            .filter(Boolean)
+            .sort();
+          if (!times.length && !scheduled) continue;
+          await write(entry.employeeId, date, times, assignment);
+        }
+      }
+
+      for (const employeeId of payload.missingEmployeeIds || []) {
+        if (!activeIds.has(employeeId)) continue;
+        const assignments = assignmentsByEmployee.get(String(employeeId)) || [];
+        for (const date of dates) {
+          const assignment = assignmentForDate(assignments, date);
+          if (!assignment || !shiftWorksOn(assignment, date)) continue;
+          await write(employeeId, date, [], assignment);
+        }
+      }
+
+      return {
+        recordsWritten,
+        inserted,
+        updated,
+        incomplete,
+        employees: touchedEmployees.size,
+        days: touchedDays.size,
+      };
+    });
+
+    delete req.session.attendanceImport;
+
+    if (!result.recordsWritten) {
+      req.flash('warning', 'Nothing to import. The file did not contain clock records or scheduled days.');
+      return res.redirect(`${basePath}/import`);
+    }
+
+    const unmatched = Number(payload.unmatchedCount || 0);
+    let message = 'Imported {records} records for {employees} employees ({inserted} new, {updated} updated).';
+    if (result.incomplete && unmatched) {
+      message = 'Imported {records} records for {employees} employees ({inserted} new, {updated} updated). {incomplete} days were marked incomplete and {unmatched} clock IDs were not matched.';
+    } else if (result.incomplete) {
+      message = 'Imported {records} records for {employees} employees ({inserted} new, {updated} updated). {incomplete} days were marked incomplete.';
+    } else if (unmatched) {
+      message = 'Imported {records} records for {employees} employees ({inserted} new, {updated} updated). {unmatched} clock IDs were not matched.';
+    }
+    req.flash('success', message, {
+      records: result.recordsWritten,
+      employees: result.employees,
+      inserted: result.inserted,
+      updated: result.updated,
+      incomplete: result.incomplete,
+      unmatched,
+    });
+    return res.redirect(`${basePath}?week=${weekStartISO(payload.dateFrom)}`);
+  } catch (err) {
+    console.error('[attendance import]', err);
+    req.flash('error', 'The import could not be completed. No records were changed.');
+    return res.redirect(`${basePath}/import`);
+  }
+});
+
+router.post('/import/cancel', (req, res) => {
+  delete req.session.attendanceImport;
+  req.flash('info', 'Import cancelled.');
+  res.redirect(`${basePath}/import`);
+});
+
 router.get('/:id(\\d+)/edit', async (req, res, next) => {
   try {
     const record = await one('SELECT * FROM attendance_records WHERE id = ? LIMIT 1', [req.params.id]);
     if (!record) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Attendance record') })), { status: 404 }));
     }
+    const punches = await query(
+      'SELECT punch_at FROM attendance_punches WHERE attendance_record_id = ? ORDER BY punch_at, id',
+      [record.id],
+    );
+    record.punches = punches.map((punch) => punch.punch_at);
     await renderForm(req, res, 200, {
       title: req.t('Edit attendance'),
       mode: 'edit',
@@ -371,35 +820,41 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       clockOut: data.clock_out_iso,
       assignment,
     });
-    await query(
-      `UPDATE attendance_records
-          SET employee_id = ?, work_date = ?, clock_in = ?, clock_out = ?,
-              shift_id = ?, shift_name = ?, scheduled_start = ?, scheduled_end = ?,
-              expected_minutes = ?, worked_minutes = ?, late_minutes = ?,
-              early_leave_minutes = ?, overtime_minutes = ?, grace_minutes = ?,
-              early_leave_grace_minutes = ?, punctuality = ?, notes = ?
-        WHERE id = ?`,
-      [
-        data.employee_id,
-        data.work_date,
-        data.clock_in,
-        data.clock_out,
-        metrics.shift_id,
-        metrics.shift_name,
-        metrics.scheduled_start,
-        metrics.scheduled_end,
-        metrics.expected_minutes,
-        metrics.worked_minutes,
-        metrics.late_minutes,
-        metrics.early_leave_minutes,
-        metrics.overtime_minutes,
-        metrics.grace_minutes,
-        metrics.early_leave_grace_minutes,
-        metrics.punctuality,
-        data.notes,
-        record.id,
-      ],
-    );
+    const punches = [data.clock_in, data.clock_out].filter(Boolean);
+    await withTransaction(async (conn) => {
+      await conn.query(
+        `UPDATE attendance_records
+            SET employee_id = ?, work_date = ?, clock_in = ?, clock_out = ?,
+                shift_id = ?, shift_name = ?, scheduled_start = ?, scheduled_end = ?,
+                expected_minutes = ?, worked_minutes = ?, late_minutes = ?,
+                early_leave_minutes = ?, overtime_minutes = ?, grace_minutes = ?,
+                early_leave_grace_minutes = ?, punctuality = ?,
+                source = 'manual', punch_count = ?, notes = ?
+          WHERE id = ?`,
+        [
+          data.employee_id,
+          data.work_date,
+          data.clock_in,
+          data.clock_out,
+          metrics.shift_id,
+          metrics.shift_name,
+          metrics.scheduled_start,
+          metrics.scheduled_end,
+          metrics.expected_minutes,
+          metrics.worked_minutes,
+          metrics.late_minutes,
+          metrics.early_leave_minutes,
+          metrics.overtime_minutes,
+          metrics.grace_minutes,
+          metrics.early_leave_grace_minutes,
+          metrics.punctuality,
+          punches.length,
+          data.notes,
+          record.id,
+        ],
+      );
+      await savePunches(conn, record.id, punches, 'manual');
+    });
     req.flash('success', 'Attendance updated.');
     res.redirect(`${basePath}?week=${weekStartISO(data.work_date)}&employee_id=${data.employee_id}`);
   } catch (err) {
@@ -426,3 +881,4 @@ router.post('/:id(\\d+)/delete', async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.importUpload = importUpload;

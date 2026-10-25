@@ -1,0 +1,112 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Import attendance') %></h1>
+          <p class="page-subtitle"><%= t('Upload a JSON file exported by the time clock. Records are matched to employees by Clock ID.') %></p>
+        </div>
+        <a href="/attendance" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+        </a>
+      </div>
+
+      <% if (errors && errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('The file could not be imported:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errors.forEach(message => { %><li><%= t(message) %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (warnings && warnings.length) { %>
+        <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-warning-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-warning-700 dark:text-warning-400"><%= t('Some entries were ignored:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-warning-600 dark:text-warning-400">
+                <% warnings.slice(0, 10).forEach(message => { %><li><%= t(message) %></li><% }) %>
+              </ul>
+              <% if (warnings.length > 10) { %><p class="mt-1 text-xs text-warning-600 dark:text-warning-400"><%= t('+{count} more warnings', { count: warnings.length - 10 }) %></p><% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card xl:col-span-2">
+          <div class="card-header">
+            <h2 class="card-title"><%= t('Attendance file') %></h2>
+          </div>
+          <form method="POST" action="/attendance/import/preview" enctype="multipart/form-data" class="p-5 md:p-6">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label for="file" class="form-label"><%= t('JSON file') %> <span class="text-error-500">*</span></label>
+            <input id="file" name="file" type="file" accept=".json,application/json" required class="form-input h-auto py-2.5 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 dark:file:bg-brand-500/15 dark:file:text-brand-300">
+            <p class="form-help"><%= t('Choose a .json file exported by the time clock. Maximum size: {size} MB.', { size: maxFileSizeMb }) %></p>
+
+            <div class="mt-5 flex flex-wrap items-center gap-2">
+              <button type="submit" class="btn btn-primary">
+                <%- include('/partials/icon', { name: 'upload', className: 'h-4 w-4' }) %>
+                <%= t('Read file') %>
+              </button>
+              <a href="/attendance" class="btn btn-secondary"><%= t('Cancel') %></a>
+            </div>
+          </form>
+
+          <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">
+            <details>
+              <summary class="cursor-pointer text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"><%= t('Expected file structure') %></summary>
+              <pre class="mt-3 overflow-x-auto rounded-lg bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600 dark:bg-white/[0.03] dark:text-gray-400">{
+  "date_from": "2026-08-01",
+  "date_to": "2026-08-31",
+  "employees": [
+    {
+      "employee_id": "CLOCK-ID",
+      "employee_name": "OPTIONAL NAME",
+      "records": {
+        "2026-08-03": { "daily_record": ["05:27", "13:27"] },
+        "2026-08-04": { "daily_record": ["05:16", "13:44", "15:00", "15:20"] }
+      }
+    }
+  ]
+}</pre>
+              <p class="mt-2 text-xs text-gray-400"><%= t('employee_id is the identifier configured in the employee Clock ID field. employee_name is optional.') %></p>
+            </details>
+          </div>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('How imports work') %></h2>
+            <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+              <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Employees are matched by Clock ID, not by name.') %></li>
+              <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Punches are paired in order: first → second, third → fourth, and so on. Time between pairs is not counted as worked time.') %></li>
+              <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('An odd number of punches is marked Incomplete.') %></li>
+              <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Because the file is complete for its date range, scheduled days without punches are marked Incomplete.') %></li>
+              <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Active employees with a Clock ID who are missing from the file are also marked Incomplete on their scheduled days.') %></li>
+              <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500"></span><%= t('Existing records for those employees and dates are replaced by the file.') %></li>
+            </ul>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Before you upload') %></h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400"><%= t('Set the Clock ID only on employees who use the time clock, under Contacts → Employees. Employees with a Clock ID who are missing from the file will be marked Incomplete on their scheduled days.') %></p>
+            <a href="/employees" class="btn btn-secondary btn-sm mt-3"><%= t('Employees') %></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

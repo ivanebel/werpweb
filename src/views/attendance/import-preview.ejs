@@ -1,0 +1,171 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <%
+        const stats = plan.stats;
+        const missingWithDays = plan.missing.filter((entry) => entry.days.length);
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <h1 class="page-title"><%= t('Import preview') %></h1>
+          <p class="page-subtitle"><%= fileName %> · <%= h.formatDate(stats.dateFrom) %> – <%= h.formatDate(stats.dateTo) %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/attendance/import" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Upload another file') %>
+          </a>
+          <a href="/attendance" class="btn btn-ghost btn-sm"><%= t('Cancel') %></a>
+        </div>
+      </div>
+
+      <% if (!canImport) { %>
+        <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-warning-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-warning-700 dark:text-warning-400"><%= t('There is nothing to import yet.') %></p>
+              <p class="mt-1 text-sm text-warning-600 dark:text-warning-400"><%= t('No employees matched a Clock ID, or the file has no clock records for scheduled days. Review the matching below and try again.') %></p>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('File summary') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= h.formatDate(stats.dateFrom) %> – <%= h.formatDate(stats.dateTo) %> · <%= h.pluralize(stats.days, 'day') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= fileName %></span>
+        </div>
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-4 p-5 sm:grid-cols-3 xl:grid-cols-6 md:p-6">
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Employees in file') %></dt>
+            <dd class="mt-1 text-xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.employeesInFile, 0) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Clock punches') %></dt>
+            <dd class="mt-1 text-xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.totalPunches, 0) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Days with records') %></dt>
+            <dd class="mt-1 text-xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.daysWithRecords, 0) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Records to write') %></dt>
+            <dd class="mt-1 text-xl font-bold text-brand-600 dark:text-brand-400"><%= h.formatNumber(stats.recordsToWrite, 0) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Existing to replace') %></dt>
+            <dd class="mt-1 text-xl font-bold text-warning-600 dark:text-warning-400"><%= h.formatNumber(stats.existingToOverwrite, 0) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Incomplete days') %></dt>
+            <dd class="mt-1 text-xl font-bold text-blue-light-600 dark:text-blue-light-400"><%= h.formatNumber(stats.incompleteDays, 0) %></dd>
+          </div>
+        </dl>
+        <div class="flex flex-wrap gap-x-6 gap-y-2 border-t border-gray-100 px-5 py-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400 md:px-6">
+          <span><%= h.pluralize(stats.matchedCount, 'matched employee', 'matched employees') %></span>
+          <span><%= h.pluralize(stats.unmatchedCount, 'unmatched clock ID', 'unmatched clock IDs') %></span>
+          <span><%= h.pluralize(stats.missingCount, 'employee missing from file', 'employees missing from file') %></span>
+          <span><%= h.pluralize(stats.missingScheduledDays, 'scheduled day without records', 'scheduled days without records') %></span>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t('Employee matching') %></h2>
+            <span class="text-xs text-gray-400"><%= t('{matched} of {total} matched', { matched: stats.matchedCount, total: stats.employeesInFile }) %></span>
+          </div>
+          <div class="divide-y divide-gray-100 dark:divide-gray-800">
+            <% if (plan.unmatched.length) { %>
+              <div class="p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-error-600 dark:text-error-400"><%= t('Unmatched clock IDs') %> (<%= plan.unmatched.length %>)</p>
+                <ul class="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <% plan.unmatched.slice(0, 8).forEach(entry => { %>
+                    <li><span class="font-mono font-medium text-gray-800 dark:text-gray-200"><%= entry.clockId %></span><%= entry.name ? ' · ' + entry.name : '' %></li>
+                  <% }) %>
+                  <% if (plan.unmatched.length > 8) { %><li class="text-xs text-gray-400"><%= t('+{count} more', { count: plan.unmatched.length - 8 }) %></li><% } %>
+                </ul>
+              </div>
+            <% } %>
+            <% if (missingWithDays.length) { %>
+              <div class="p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-warning-600 dark:text-warning-400"><%= t('Missing from file') %> (<%= missingWithDays.length %>)</p>
+                <p class="mt-1 text-xs text-gray-400"><%= t('Their scheduled days will be marked Incomplete.') %></p>
+                <ul class="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <% missingWithDays.slice(0, 8).forEach(entry => { %>
+                    <li><%= entry.employee.first_name %> <%= entry.employee.last_name %> <span class="font-mono text-xs text-gray-400">· <%= entry.employee.clock_id %></span></li>
+                  <% }) %>
+                  <% if (missingWithDays.length > 8) { %><li class="text-xs text-gray-400"><%= t('+{count} more', { count: missingWithDays.length - 8 }) %></li><% } %>
+                </ul>
+              </div>
+            <% } %>
+            <% if (plan.inactive.length) { %>
+              <div class="p-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"><%= t('Inactive employees skipped') %> (<%= plan.inactive.length %>)</p>
+                <ul class="mt-2 space-y-1 text-sm text-gray-500 dark:text-gray-400">
+                  <% plan.inactive.slice(0, 5).forEach(entry => { %>
+                    <li><%= entry.employee.first_name %> <%= entry.employee.last_name %> <span class="font-mono text-xs text-gray-400">· <%= entry.clockId %></span></li>
+                  <% }) %>
+                </ul>
+              </div>
+            <% } %>
+            <% if (!plan.unmatched.length && !missingWithDays.length && !plan.inactive.length) { %>
+              <p class="px-5 py-8 text-center text-sm text-gray-400"><%= t('All employees in the file matched a Clock ID.') %></p>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t('Warnings') %></h2>
+            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= warnings.length %></span>
+          </div>
+          <% if (warnings.length) { %>
+            <ul class="max-h-64 space-y-2 overflow-y-auto p-5 text-sm text-warning-700 dark:text-warning-400">
+              <% warnings.slice(0, 20).forEach(message => { %><li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning-500"></span><span><%= t(message) %></span></li><% }) %>
+              <% if (warnings.length > 20) { %><li class="text-xs text-gray-400"><%= t('+{count} more warnings', { count: warnings.length - 20 }) %></li><% } %>
+            </ul>
+          <% } else { %>
+            <p class="px-5 py-8 text-center text-sm text-gray-400"><%= t('No warnings. Everything in the file was read successfully.') %></p>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card p-5 md:p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 class="card-title"><%= t('Confirm import') %></h2>
+            <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+              <%= t('Nothing has been written yet. Confirming replaces the existing records for the matched employees and dates, and marks scheduled days without punches as Incomplete.') %>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <form method="POST" action="/attendance/import/cancel">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn btn-secondary"><%= t('Cancel') %></button>
+            </form>
+            <% if (canImport) { %>
+              <form method="POST" action="/attendance/import/confirm">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-primary">
+                  <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                  <%= t('Import {count} records', { count: stats.recordsToWrite }) %>
+                </button>
+              </form>
+            <% } else { %>
+              <a href="/attendance/import" class="btn btn-primary"><%= t('Upload another file') %></a>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

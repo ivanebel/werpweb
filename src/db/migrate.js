@@ -212,6 +212,43 @@ async function upgradeSchema(conn, dbName) {
     );
     console.log('[migrate] backfilled packing slip quantities');
   }
+
+  // ------------------------------------------------- attendance clock import
+  await addColumn(conn, dbName, 'employees', 'clock_id', 'VARCHAR(40) NULL AFTER employee_no');
+  await addIndex(conn, dbName, 'employees', 'uq_employees_clock_id', 'UNIQUE KEY `uq_employees_clock_id` (`clock_id`)');
+  await makeNullable(conn, dbName, 'attendance_records', 'clock_in', 'DATETIME NULL');
+  await addColumn(conn, dbName, 'attendance_records', 'source', "ENUM('manual','import') NOT NULL DEFAULT 'manual' AFTER punctuality");
+  await addColumn(conn, dbName, 'attendance_records', 'punch_count', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER source');
+
+  // Existing attendance records predate the punch table. Copy their clock-in
+  // and clock-out values so every record has the same representation.
+  await conn.query(
+    `INSERT INTO attendance_punches (attendance_record_id, punch_at, source)
+     SELECT r.id, r.clock_in, 'manual'
+       FROM attendance_records r
+      WHERE r.clock_in IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM attendance_punches p
+           WHERE p.attendance_record_id = r.id AND p.punch_at = r.clock_in
+        )`,
+  );
+  await conn.query(
+    `INSERT INTO attendance_punches (attendance_record_id, punch_at, source)
+     SELECT r.id, r.clock_out, 'manual'
+       FROM attendance_records r
+      WHERE r.clock_out IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM attendance_punches p
+           WHERE p.attendance_record_id = r.id AND p.punch_at = r.clock_out
+        )`,
+  );
+  await conn.query(
+    `UPDATE attendance_records r
+        SET r.punch_count = (
+          SELECT COUNT(*) FROM attendance_punches p WHERE p.attendance_record_id = r.id
+        )
+      WHERE r.punch_count = 0`,
+  );
 }
 
 async function main() {
