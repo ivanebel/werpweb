@@ -1,0 +1,163 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Packing quantities') %></h1>
+            <%- statusBadge(delivery.status) %>
+          </div>
+          <p class="page-subtitle">
+            <%= delivery.packing_slip_no || delivery.delivery_no %> · <%= delivery.customer_name %>
+          </p>
+        </div>
+        <a href="/deliveries/<%= delivery.id %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Back to delivery') %>
+        </a>
+      </div>
+
+      <div class="mb-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+        <p><%= t('These quantities are printed on the packing slip. Changing them does not alter stock or the delivery quantity.') %></p>
+      </div>
+
+      <form method="POST" action="/deliveries/<%= delivery.id %>/packing">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Packing breakdown') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Adjust pallets, boxes, units or weight for any line.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              <%= h.pluralize(items.length, 'line') %>
+            </span>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table-base min-w-[900px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Item') %></th>
+                  <th class="table-th text-right"><%= t('Pallets') %></th>
+                  <th class="table-th text-right"><%= t('Boxes') %></th>
+                  <th class="table-th text-right"><%= t('Units') %></th>
+                  <th class="table-th text-right"><%= t('Weight (kg)') %></th>
+                  <th class="table-th"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% items.forEach((item, index) => {
+                  const def = packingDefaults(item.quantity, item);
+                  const pallets = item.slip_pallets !== null && item.slip_pallets !== undefined ? Number(item.slip_pallets) : def.pallets;
+                  const boxes = item.slip_boxes !== null && item.slip_boxes !== undefined ? Number(item.slip_boxes) : def.boxes;
+                  const units = item.slip_units !== null && item.slip_units !== undefined ? Number(item.slip_units) : def.units;
+                  const weight = item.slip_weight_kg !== null && item.slip_weight_kg !== undefined ? Number(item.slip_weight_kg) : def.weight;
+                %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <input type="hidden" name="delivery_item_id" value="<%= item.id %>">
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
+                      <p class="text-xs text-gray-400"><%= item.sku %> · <%= h.formatQty(item.quantity) %> <%= item.unit %></p>
+                      <p class="mt-0.5 text-[11px] text-gray-400">
+                        <%= t('Units per pack') %>: <%= item.units_per_pack || '—' %>
+                        · <%= t('Packs per pallet') %>: <%= item.packs_per_pallet || '—' %>
+                        · <%= t('Weight (kg)') %>: <%= item.weight_kg || 0 %>
+                      </p>
+                    </td>
+                    <td class="table-td">
+                      <input id="packing_pallets_<%= index %>" name="slip_pallets" type="number" min="0" step="0.001" value="<%= pallets %>" class="form-input text-right packing-input" data-field="pallets">
+                    </td>
+                    <td class="table-td">
+                      <input id="packing_boxes_<%= index %>" name="slip_boxes" type="number" min="0" step="0.001" value="<%= boxes %>" class="form-input text-right packing-input" data-field="boxes">
+                    </td>
+                    <td class="table-td">
+                      <input id="packing_units_<%= index %>" name="slip_units" type="number" min="0" step="0.001" value="<%= units %>" class="form-input text-right packing-input" data-field="units">
+                    </td>
+                    <td class="table-td">
+                      <input id="packing_weight_<%= index %>" name="slip_weight_kg" type="number" min="0" step="0.001" value="<%= weight %>" class="form-input text-right packing-input" data-field="weight">
+                    </td>
+                    <td class="table-td">
+                      <button type="button" class="btn btn-ghost btn-sm whitespace-nowrap"
+                              data-recalculate-packing
+                              data-units-per-pack="<%= Number(item.units_per_pack) || 0 %>"
+                              data-packs-per-pallet="<%= Number(item.packs_per_pallet) || 0 %>"
+                              data-unit-weight="<%= Number(item.weight_kg) || 0 %>"
+                              data-quantity="<%= Number(item.quantity) || 0 %>"
+                              data-row-index="<%= index %>">
+                        <%- include('/partials/icon', { name: 'refresh', className: 'h-4 w-4' }) %>
+                        <%= t('Recalculate') %>
+                      </button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200"><%= t('Totals') %></td>
+                  <td class="px-3 py-3 text-right text-sm font-semibold" data-total="pallets"><%= h.formatQty(totals.pallets) %></td>
+                  <td class="px-3 py-3 text-right text-sm font-semibold" data-total="boxes"><%= h.formatQty(totals.boxes) %></td>
+                  <td class="px-3 py-3 text-right text-sm font-semibold" data-total="units"><%= h.formatQty(totals.units) %></td>
+                  <td class="px-3 py-3 text-right text-sm font-semibold" data-total="weight"><%= h.formatQty(totals.weight) %></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+            <a href="/deliveries/<%= delivery.id %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              <%= t('Save changes') %>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+    (function () {
+      const round3 = (value) => Math.round((Number(value) + Number.EPSILON) * 1000) / 1000;
+      const numberValue = (input) => Math.max(0, Number(input && input.value) || 0);
+
+      function updateTotals() {
+        const totals = { pallets: 0, boxes: 0, units: 0, weight: 0 };
+        document.querySelectorAll('.packing-input').forEach((input) => {
+          totals[input.dataset.field] += numberValue(input);
+        });
+        Object.keys(totals).forEach((key) => {
+          const cell = document.querySelector(`[data-total="${key}"]`);
+          if (cell) cell.textContent = new Intl.NumberFormat(document.documentElement.lang || 'en-US', { maximumFractionDigits: 3 }).format(totals[key]);
+        });
+      }
+
+      document.querySelectorAll('[data-recalculate-packing]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const index = button.dataset.rowIndex;
+          const quantity = Number(button.dataset.quantity) || 0;
+          const perPack = Number(button.dataset.unitsPerPack) || 0;
+          const perPallet = Number(button.dataset.packsPerPallet) || 0;
+          const unitWeight = Number(button.dataset.unitWeight) || 0;
+          const boxes = perPack > 0 ? round3(quantity / perPack) : 0;
+          const pallets = perPack > 0 && perPallet > 0 ? round3(quantity / perPack / perPallet) : 0;
+          document.getElementById('packing_pallets_' + index).value = pallets;
+          document.getElementById('packing_boxes_' + index).value = boxes;
+          document.getElementById('packing_units_' + index).value = round3(quantity);
+          document.getElementById('packing_weight_' + index).value = round3(quantity * unitWeight);
+          updateTotals();
+        });
+      });
+
+      document.querySelectorAll('.packing-input').forEach((input) => {
+        input.addEventListener('input', updateTotals);
+      });
+    })();
+  </script>
+</div>

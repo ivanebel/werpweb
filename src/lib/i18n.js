@@ -422,6 +422,7 @@ const ES = {
   'Units per pack': 'Unidades por paquete',
   'Packs per pallet': 'Paquetes por pallet',
   'Sold / bought by weight': 'Vendido / comprado por peso',
+  'Weight (kg)': 'Peso (kg)',
   'Packaging': 'Empaque',
   'Pricing': 'Precios',
   'Default supplier': 'Proveedor predeterminado',
@@ -468,8 +469,14 @@ const ES = {
   'Retail barcode. Leave blank when the product has none.': 'Código de barras minorista. Dejalo en blanco si el producto no tiene.',
   'Case / pallet barcode. Leave blank when the product has none.': 'Código de barras de caja / pallet. Dejalo en blanco si el producto no tiene.',
   'Number of selling units in one supplier pack.': 'Cantidad de unidades de venta en un paquete del proveedor.',
+  'Number of selling units in one box/pack. Used to calculate packing slip boxes.':
+    'Cantidad de unidades de venta en una caja/paquete. Se usa para calcular las cajas del remito.',
   'Number of packs on a full pallet.': 'Cantidad de paquetes en un pallet completo.',
+  'Number of boxes/packs on a full pallet. Used to calculate packing slip pallets.':
+    'Cantidad de cajas/paquetes en un pallet completo. Se usa para calcular los pallets del remito.',
   'Allows decimal quantities and indicates a weight-based product (kg / g).': 'Permite cantidades decimales e indica un producto vendido por peso (kg / g).',
+  'Weight of one selling unit. Used to calculate packing slip totals.':
+    'Peso de una unidad de venta. Se usa para calcular los totales del remito.',
   'Selecting a supplier fills the cost VAT and levy rates from its defaults.': 'Al seleccionar un proveedor se completan las tasas de IVA y contribución desde sus valores predeterminados.',
   'Levies vary by supplier; the default comes from the selected supplier.': 'Las contribuciones varían según el proveedor; el valor predeterminado proviene del proveedor seleccionado.',
   'Calculated as gross + VAT + levies. Used for stock valuation and purchasing.': 'Se calcula como bruto + IVA + contribuciones. Se usa para valuar stock y compras.',
@@ -734,6 +741,20 @@ const ES = {
   'Assigned {count} missing packing slips. {remaining} deliveries still need an available CAI range.':
     'Se asignaron {count} remitos faltantes. {remaining} entregas todavía necesitan un rango de CAI disponible.',
   'Assigned {count} missing packing slips.': 'Se asignaron {count} remitos faltantes.',
+  'Packing quantities': 'Cantidades de embalaje',
+  'Packing breakdown': 'Desglose de embalaje',
+  'Edit packing quantities': 'Editar cantidades de embalaje',
+  'Packing quantities updated.': 'Cantidades de embalaje actualizadas.',
+  'Recalculate': 'Recalcular',
+  'Totals': 'Totales',
+  'Packing quantities are prefilled from product packaging data. Adjust them if needed.':
+    'Las cantidades de embalaje se completan con los datos del producto. Ajustalas si es necesario.',
+  'The ship quantity controls stock. Packing quantities are printed on the packing slip.':
+    'La cantidad a enviar controla el stock. Las cantidades de embalaje se imprimen en el remito.',
+  'These quantities are printed on the packing slip. Changing them does not alter stock or the delivery quantity.':
+    'Estas cantidades se imprimen en el remito. Modificarlas no altera el stock ni la cantidad de la entrega.',
+  'Adjust pallets, boxes, units or weight for any line.':
+    'Ajustá pallets, cajas, unidades o peso en cualquier línea.',
 
   // -------------------------------------------- customer warehouses/orders
   'Warehouses': 'Depósitos',

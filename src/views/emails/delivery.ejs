@@ -1,7 +1,12 @@
 <%
   const companyName = settings.company_name || 'WerpWeb';
   const companyInitial = String(companyName).charAt(0).toUpperCase();
-  const totalQty = items.reduce((sum, item) => sum + Number(item.quantity), 0);
+  const packingTotals = items.reduce((sum, item) => ({
+    pallets: sum.pallets + Number(item.slip_pallets || 0),
+    boxes: sum.boxes + Number(item.slip_boxes || 0),
+    units: sum.units + Number(item.slip_units ?? item.quantity ?? 0),
+    weight: sum.weight + Number(item.slip_weight_kg || 0),
+  }), { pallets: 0, boxes: 0, units: 0, weight: 0 });
 %>
 <!DOCTYPE html>
 <html lang="<%= locale %>">
@@ -106,7 +111,7 @@
                       <% } %>
                       <tr>
                         <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Total units') %>:</td>
-                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatQty(totalQty) %></td>
+                        <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= h.formatQty(packingTotals.units) %></td>
                       </tr>
                     </table>
                   </td>
@@ -121,9 +126,10 @@
                 <thead>
                   <tr style="background:#f9fafb;">
                     <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Item') %></th>
-                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Ordered') %></th>
-                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Shipped') %></th>
-                    <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Unit') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Pallets') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Boxes') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Units') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Weight (kg)') %></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -133,12 +139,22 @@
                         <div style="font-weight:bold;"><%= item.name %></div>
                         <div style="font-size:11px;color:#98a2b3;"><%= item.sku %><%= item.customer_code ? ' · ' + t('Customer code') + ': ' + item.customer_code : '' %></div>
                       </td>
-                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#667085;white-space:nowrap;"><%= item.ordered_qty !== null && item.ordered_qty !== undefined ? h.formatQty(item.ordered_qty) : '—' %></td>
-                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;"><%= h.formatQty(item.quantity) %></td>
-                      <td style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;"><%= item.unit || '' %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;white-space:nowrap;"><%= h.formatQty(item.slip_pallets || 0) %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;white-space:nowrap;"><%= h.formatQty(item.slip_boxes || 0) %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;"><%= h.formatQty(item.slip_units ?? item.quantity) %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;white-space:nowrap;"><%= h.formatQty(item.slip_weight_kg || 0) %></td>
                     </tr>
                   <% }) %>
                 </tbody>
+                <tfoot>
+                  <tr style="background:#f9fafb;font-weight:bold;">
+                    <td style="padding:10px 8px;border-top:2px solid #eaecf0;font-size:12px;color:#1d2939;"><%= t('Totals') %></td>
+                    <td align="right" style="padding:10px 8px;border-top:2px solid #eaecf0;font-size:12px;color:#1d2939;"><%= h.formatQty(packingTotals.pallets) %></td>
+                    <td align="right" style="padding:10px 8px;border-top:2px solid #eaecf0;font-size:12px;color:#1d2939;"><%= h.formatQty(packingTotals.boxes) %></td>
+                    <td align="right" style="padding:10px 8px;border-top:2px solid #eaecf0;font-size:12px;color:#1d2939;"><%= h.formatQty(packingTotals.units) %></td>
+                    <td align="right" style="padding:10px 8px;border-top:2px solid #eaecf0;font-size:12px;color:#1d2939;"><%= h.formatQty(packingTotals.weight) %></td>
+                  </tr>
+                </tfoot>
               </table>
             </td>
           </tr>

@@ -99,6 +99,10 @@ async function applyPricingAndRules(data, existing = null) {
   data.brand_id = data.brand_id ? Number.parseInt(data.brand_id, 10) : null;
   data.supplier_id = data.supplier_id ? Number.parseInt(data.supplier_id, 10) : null;
   data.sold_by_weight = Number(data.sold_by_weight) === 1 ? 1 : 0;
+  const weight = Number(data.weight_kg);
+  data.weight_kg = Number.isFinite(weight) && weight >= 0
+    ? Math.round((weight + Number.EPSILON) * 1000) / 1000
+    : 0;
 
   if (data.ean13 && !/^\d{13}$/.test(data.ean13)) {
     errors.ean13 = 'EAN-13 must contain exactly 13 digits.';
@@ -170,9 +174,10 @@ const fields = [
   { name: 'ean13', label: 'EAN-13', type: 'text', section: 'Identifiers', maxLength: 13, placeholder: '13 digits, optional', help: 'Retail barcode. Leave blank when the product has none.' },
   { name: 'dun14', label: 'DUN-14', type: 'text', section: 'Identifiers', maxLength: 14, placeholder: '14 digits, optional', help: 'Case / pallet barcode. Leave blank when the product has none.' },
   { name: 'plu', label: 'PLU', type: 'number', min: 0, max: 4294967295, integer: true, section: 'Identifiers', placeholder: 'Numeric PLU code, optional', help: 'Price look-up code used to identify manufactured products. Must be unique.' },
-  { name: 'units_per_pack', label: 'Units per pack', type: 'number', min: 0, integer: true, section: 'Packaging', help: 'Number of selling units in one supplier pack.' },
-  { name: 'packs_per_pallet', label: 'Packs per pallet', type: 'number', min: 0, integer: true, section: 'Packaging', help: 'Number of packs on a full pallet.' },
+  { name: 'units_per_pack', label: 'Units per pack', type: 'number', min: 0, integer: true, section: 'Packaging', help: 'Number of selling units in one box/pack. Used to calculate packing slip boxes.' },
+  { name: 'packs_per_pallet', label: 'Packs per pallet', type: 'number', min: 0, integer: true, section: 'Packaging', help: 'Number of boxes/packs on a full pallet. Used to calculate packing slip pallets.' },
   { name: 'sold_by_weight', label: 'Sold / bought by weight', type: 'checkbox', default: 0, section: 'Packaging', help: 'Allows decimal quantities and indicates a weight-based product (kg / g).' },
+  { name: 'weight_kg', label: 'Weight (kg)', type: 'decimal', min: 0, default: 0, section: 'Packaging', help: 'Weight of one selling unit. Used to calculate packing slip totals.' },
 
   { name: 'supplier_id', label: 'Default supplier', type: 'select', section: 'Pricing', optionsFrom: supplierOptions, help: 'Selecting a supplier fills the cost VAT and levy rates from its defaults.' },
   { name: 'cost_gross_price', label: 'Cost gross price', type: 'decimal', min: 0, default: 0, section: 'Pricing' },

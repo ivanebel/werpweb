@@ -5,6 +5,7 @@ const { query, one, scalar, getPool, withTransaction } = require('../db');
 const { nextNumber } = require('../lib/sequences');
 const { pagination, todayISO, toNumber, statusBadge, statusInfo, formatMoney, forLocale } = require('../lib/helpers');
 const { requireRole } = require('../middleware/web');
+const { round3, packingDefaults } = require('../lib/packing');
 const {
   formatPackingSlipNo,
   usedCount,
@@ -78,7 +79,7 @@ function caiStatusFor(input, nextNumber) {
 async function loadOrderItems(orderId, excludeDeliveryId = 0) {
   return query(
     `SELECT i.id AS so_item_id, i.product_id, i.quantity, i.delivered_qty,
-            p.sku, p.name, p.unit,
+            p.sku, p.name, p.unit, p.units_per_pack, p.packs_per_pallet, p.weight_kg,
             COALESCE((
               SELECT SUM(di.quantity)
                 FROM delivery_items di
@@ -97,6 +98,23 @@ async function loadOrderItems(orderId, excludeDeliveryId = 0) {
 
 function remainingOf(item) {
   return Number(item.quantity) - Number(item.delivered_qty) - Number(item.reserved || 0);
+}
+
+function withCurrentPacking(items, deliveredRows) {
+  const bySoItem = new Map(deliveredRows.map((d) => [String(d.sales_order_item_id), d]));
+  return items
+    .filter((i) => remainingOf(i) > 0 || bySoItem.has(String(i.so_item_id)))
+    .map((i) => {
+      const current = bySoItem.get(String(i.so_item_id));
+      return {
+        ...i,
+        current_qty: current ? Number(current.quantity) : 0,
+        current_pallets: current ? Number(current.slip_pallets) : null,
+        current_boxes: current ? Number(current.slip_boxes) : null,
+        current_units: current ? Number(current.slip_units) : null,
+        current_weight: current ? Number(current.slip_weight_kg) : null,
+      };
+    });
 }
 
 async function loadDelivery(id) {
@@ -291,6 +309,7 @@ router.get('/new', async (req, res, next) => {
       errors: {},
       activeCai: currentCai,
       nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
+      packingDefaults,
       row: { delivery_date: todayISO(), carrier: '', tracking_number: '', cot: '', notes: '' },
     });
   } catch (err) {
@@ -301,10 +320,19 @@ router.get('/new', async (req, res, next) => {
 async function collectItems(body, orderId, excludeDeliveryId = 0, t = (value) => value) {
   const ids = Array.isArray(body.so_item_id) ? body.so_item_id : [body.so_item_id];
   const qtys = Array.isArray(body.item_quantity) ? body.item_quantity : [body.item_quantity];
+  const pallets = Array.isArray(body.slip_pallets) ? body.slip_pallets : [body.slip_pallets];
+  const boxes = Array.isArray(body.slip_boxes) ? body.slip_boxes : [body.slip_boxes];
+  const units = Array.isArray(body.slip_units) ? body.slip_units : [body.slip_units];
+  const weights = Array.isArray(body.slip_weight_kg) ? body.slip_weight_kg : [body.slip_weight_kg];
   const available = await loadOrderItems(orderId, excludeDeliveryId);
   const byId = new Map(available.map((i) => [String(i.so_item_id), i]));
   const items = [];
   const errors = [];
+  const packingValue = (list, index, fallback) => {
+    const raw = list[index];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+    return round3(Math.max(0, toNumber(raw, fallback)));
+  };
   for (let i = 0; i < ids.length; i++) {
     const soItemId = Number.parseInt(ids[i], 10);
     if (!soItemId) continue;
@@ -322,7 +350,16 @@ async function collectItems(body, orderId, excludeDeliveryId = 0, t = (value) =>
       }));
       continue;
     }
-    items.push({ so_item_id: soItemId, product_id: line.product_id, quantity: qty });
+    const defaultPacking = packingDefaults(qty, line);
+    items.push({
+      so_item_id: soItemId,
+      product_id: line.product_id,
+      quantity: qty,
+      slip_pallets: packingValue(pallets, i, defaultPacking.pallets),
+      slip_boxes: packingValue(boxes, i, defaultPacking.boxes),
+      slip_units: packingValue(units, i, defaultPacking.units),
+      slip_weight_kg: packingValue(weights, i, defaultPacking.weight),
+    });
   }
   if (!items.length) errors.push(t('Add at least one item with a quantity greater than zero.'));
   return { items, errors };
@@ -360,6 +397,7 @@ router.post('/', async (req, res, next) => {
         errors: { _form: messages },
         activeCai: currentCai,
         nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
+        packingDefaults,
         row: req.body,
       });
     };
@@ -398,8 +436,20 @@ router.post('/', async (req, res, next) => {
         );
         for (const item of items) {
           await conn.query(
-            'INSERT INTO delivery_items (delivery_id, sales_order_item_id, product_id, quantity) VALUES (?, ?, ?, ?)',
-            [result.insertId, item.so_item_id, item.product_id, item.quantity],
+            `INSERT INTO delivery_items
+               (delivery_id, sales_order_item_id, product_id, quantity,
+                slip_pallets, slip_boxes, slip_units, slip_weight_kg)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              result.insertId,
+              item.so_item_id,
+              item.product_id,
+              item.quantity,
+              item.slip_pallets,
+              item.slip_boxes,
+              item.slip_units,
+              item.slip_weight_kg,
+            ],
           );
         }
         return result.insertId;
@@ -709,6 +759,7 @@ router.get('/:id(\\d+)', async (req, res, next) => {
     if (delivery.packing_slip_no) {
       actions.push({ href: `${basePath}/${delivery.id}/print`, label: req.t('Print packing slip'), tone: 'secondary' });
     }
+    actions.push({ href: `${basePath}/${delivery.id}/packing`, label: req.t('Edit packing quantities'), tone: 'secondary' });
     actions.push({ href: `/emails/compose?type=delivery&id=${delivery.id}`, label: req.t('Email'), tone: 'secondary' });
 
     const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
@@ -725,6 +776,81 @@ router.get('/:id(\\d+)', async (req, res, next) => {
   }
 });
 
+router.get('/:id(\\d+)/packing', async (req, res, next) => {
+  try {
+    const delivery = await loadDelivery(req.params.id);
+    if (!delivery) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
+    }
+    const items = await query(
+      `SELECT di.*, p.sku, p.name, p.unit, p.units_per_pack, p.packs_per_pallet, p.weight_kg
+         FROM delivery_items di
+         JOIN products p ON p.id = di.product_id
+        WHERE di.delivery_id = ?
+        ORDER BY di.id`,
+      [delivery.id],
+    );
+    const totals = items.reduce((sum, item) => ({
+      pallets: sum.pallets + Number(item.slip_pallets || 0),
+      boxes: sum.boxes + Number(item.slip_boxes || 0),
+      units: sum.units + Number(item.slip_units || 0),
+      weight: sum.weight + Number(item.slip_weight_kg || 0),
+    }), { pallets: 0, boxes: 0, units: 0, weight: 0 });
+    const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
+
+    res.render('deliveries/packing', {
+      title: req.t('Packing quantities'),
+      active: 'deliveries',
+      breadcrumbs: [
+        { label: req.t('Deliveries'), href: basePath },
+        { label: pageNumber, href: `${basePath}/${delivery.id}` },
+        { label: req.t('Packing quantities') },
+      ],
+      delivery,
+      items,
+      totals,
+      packingDefaults,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id(\\d+)/packing', async (req, res, next) => {
+  try {
+    const delivery = await loadDelivery(req.params.id);
+    if (!delivery) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
+    }
+    const rows = await query('SELECT id FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
+    const validIds = new Set(rows.map((row) => String(row.id)));
+    const ids = Array.isArray(req.body.delivery_item_id) ? req.body.delivery_item_id : [req.body.delivery_item_id];
+    const pallets = Array.isArray(req.body.slip_pallets) ? req.body.slip_pallets : [req.body.slip_pallets];
+    const boxes = Array.isArray(req.body.slip_boxes) ? req.body.slip_boxes : [req.body.slip_boxes];
+    const units = Array.isArray(req.body.slip_units) ? req.body.slip_units : [req.body.slip_units];
+    const weights = Array.isArray(req.body.slip_weight_kg) ? req.body.slip_weight_kg : [req.body.slip_weight_kg];
+    const valueAt = (list, index) => round3(Math.max(0, toNumber(list[index], 0)));
+
+    await withTransaction(async (conn) => {
+      for (let i = 0; i < ids.length; i++) {
+        const itemId = Number.parseInt(ids[i], 10);
+        if (!itemId || !validIds.has(String(itemId))) continue;
+        await conn.query(
+          `UPDATE delivery_items
+              SET slip_pallets = ?, slip_boxes = ?, slip_units = ?, slip_weight_kg = ?
+            WHERE id = ? AND delivery_id = ?`,
+          [valueAt(pallets, i), valueAt(boxes, i), valueAt(units, i), valueAt(weights, i), itemId, delivery.id],
+        );
+      }
+    });
+
+    req.flash('success', 'Packing quantities updated.');
+    res.redirect(`${basePath}/${delivery.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:id(\\d+)/edit', async (req, res, next) => {
   try {
     const delivery = await loadDelivery(req.params.id);
@@ -736,10 +862,7 @@ router.get('/:id(\\d+)/edit', async (req, res, next) => {
     const order = await loadOrderWithWarehouse(delivery.sales_order_id);
     const currentItems = await loadOrderItems(delivery.sales_order_id, delivery.id);
     const delivered = await query('SELECT * FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
-    const bySoItem = new Map(delivered.map((d) => [String(d.sales_order_item_id), d]));
-    const items = currentItems
-      .filter((i) => remainingOf(i) > 0 || bySoItem.has(String(i.so_item_id)))
-      .map((i) => ({ ...i, current_qty: bySoItem.get(String(i.so_item_id))?.quantity || 0 }));
+    const items = withCurrentPacking(currentItems, delivered);
     const currentCai = await activeCai();
     const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
 
@@ -759,6 +882,7 @@ router.get('/:id(\\d+)/edit', async (req, res, next) => {
       errors: {},
       activeCai: currentCai,
       nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
+      packingDefaults,
       row: delivery,
     });
   } catch (err) {
@@ -782,7 +906,7 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       const order = await loadOrderWithWarehouse(delivery.sales_order_id);
       const currentItems = await loadOrderItems(delivery.sales_order_id, delivery.id);
       const deliveredRows = await query('SELECT * FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
-      const bySoItem = new Map(deliveredRows.map((d) => [String(d.sales_order_item_id), d]));
+      const items = withCurrentPacking(currentItems, deliveredRows);
       const currentCai = await activeCai();
       const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
       return res.status(422).render('deliveries/form', {
@@ -795,14 +919,13 @@ router.post('/:id(\\d+)', async (req, res, next) => {
         ],
         delivery,
         order,
-        items: currentItems
-          .filter((i) => remainingOf(i) > 0 || bySoItem.has(String(i.so_item_id)))
-          .map((i) => ({ ...i, current_qty: bySoItem.get(String(i.so_item_id))?.quantity || 0 })),
+        items,
         mode: 'edit',
         action: `${basePath}/${delivery.id}`,
         errors: { _form: errors },
         activeCai: currentCai,
         nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
+        packingDefaults,
         row: req.body,
       });
     }
@@ -822,8 +945,20 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       await conn.query('DELETE FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
       for (const item of items) {
         await conn.query(
-          'INSERT INTO delivery_items (delivery_id, sales_order_item_id, product_id, quantity) VALUES (?, ?, ?, ?)',
-          [delivery.id, item.so_item_id, item.product_id, item.quantity],
+          `INSERT INTO delivery_items
+             (delivery_id, sales_order_item_id, product_id, quantity,
+              slip_pallets, slip_boxes, slip_units, slip_weight_kg)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            delivery.id,
+            item.so_item_id,
+            item.product_id,
+            item.quantity,
+            item.slip_pallets,
+            item.slip_boxes,
+            item.slip_units,
+            item.slip_weight_kg,
+          ],
         );
       }
     });

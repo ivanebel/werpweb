@@ -170,9 +170,27 @@ function deliveryPlainText(email, message) {
   lines.push(`${t('Ship to')}: ${email.partyName}`);
   if (email.partyEmail) lines.push(`${t('Email')}: ${email.partyEmail}`);
   lines.push('');
+  const packingTotals = items.reduce((sum, item) => ({
+    pallets: sum.pallets + Number(item.slip_pallets || 0),
+    boxes: sum.boxes + Number(item.slip_boxes || 0),
+    units: sum.units + Number(item.slip_units ?? item.quantity ?? 0),
+    weight: sum.weight + Number(item.slip_weight_kg || 0),
+  }), { pallets: 0, boxes: 0, units: 0, weight: 0 });
   for (const item of items) {
-    lines.push(`- ${item.name} (${item.sku}) x ${h.formatQty(item.quantity)} ${item.unit || ''}`);
+    lines.push(
+      `- ${item.name} (${item.sku}) · ${t('Pallets')}: ${h.formatQty(item.slip_pallets || 0)}`
+      + ` · ${t('Boxes')}: ${h.formatQty(item.slip_boxes || 0)}`
+      + ` · ${t('Units')}: ${h.formatQty(item.slip_units ?? item.quantity)}`
+      + ` · ${t('Weight (kg)')}: ${h.formatQty(item.slip_weight_kg || 0)}`,
+    );
   }
+  lines.push(
+    '',
+    `${t('Totals')} · ${t('Pallets')}: ${h.formatQty(packingTotals.pallets)}`
+    + ` · ${t('Boxes')}: ${h.formatQty(packingTotals.boxes)}`
+    + ` · ${t('Units')}: ${h.formatQty(packingTotals.units)}`
+    + ` · ${t('Weight (kg)')}: ${h.formatQty(packingTotals.weight)}`,
+  );
   if (delivery.carrier) lines.push('', `${t('Carrier:')} ${delivery.carrier}`);
   if (delivery.tracking_number) lines.push(`${t('Tracking:')} ${delivery.tracking_number}`);
   if (delivery.notes) lines.push('', `${t('Notes')}: ${delivery.notes}`);

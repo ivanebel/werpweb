@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS products (
   units_per_pack   INT UNSIGNED NULL,
   packs_per_pallet INT UNSIGNED NULL,
   sold_by_weight   TINYINT(1) NOT NULL DEFAULT 0,
+  weight_kg        DECIMAL(14,3) NOT NULL DEFAULT 0,
   type          ENUM('finished_good','raw_material','consumable','service') NOT NULL DEFAULT 'finished_good',
   unit          VARCHAR(20) NOT NULL DEFAULT 'pcs',
   cost_gross_price DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -408,6 +409,10 @@ CREATE TABLE IF NOT EXISTS delivery_items (
   sales_order_item_id INT UNSIGNED NULL,
   product_id          INT UNSIGNED NOT NULL,
   quantity            DECIMAL(14,3) NOT NULL DEFAULT 0,
+  slip_pallets        DECIMAL(14,3) NOT NULL DEFAULT 0,
+  slip_boxes          DECIMAL(14,3) NOT NULL DEFAULT 0,
+  slip_units          DECIMAL(14,3) NOT NULL DEFAULT 0,
+  slip_weight_kg      DECIMAL(14,3) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_delivery_items_delivery (delivery_id),
   CONSTRAINT fk_di_delivery FOREIGN KEY (delivery_id)

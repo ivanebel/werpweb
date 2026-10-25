@@ -10,6 +10,7 @@ const { initDb, withTransaction, closeDb } = require('./index');
 const { nextNumber } = require('../lib/sequences');
 const { createCheckForPayment, recordHistory, statusEvent } = require('../lib/checks');
 const { lotFromDate } = require('../lib/helpers');
+const { packingDefaults } = require('../lib/packing');
 const { formatPackingSlipNo } = require('../lib/packingSlips');
 const { seedPosDemo } = require('./posSeed');
 
@@ -266,6 +267,24 @@ async function main() {
         unitsPerPack: null, packsPerPallet: null, weighted: 0,
       },
     ];
+    const productWeights = {
+      'AUR-P100': 1.8,
+      'AUR-L200': 2.4,
+      'AUR-D50': 1.2,
+      'AUR-S300': 0.8,
+      'AL-6061': 1.2,
+      'LED-2835': 0.25,
+      'PSU-24V': 0.35,
+      'DIF-OPAL': 0.6,
+      'PCB-LED': 0.15,
+      'CBL-2C': 0.2,
+      'SCR-M3': 0.05,
+      'PKG-BOX': 0.08,
+      'CON-TAPE': 0.1,
+      'RAW-SOLDER': 1.0,
+      'SRV-INST': 0,
+      'SRV-DESIGN': 0,
+    };
     const prod = {};
     const prodPrices = {};
     const prodCosts = {};
@@ -291,6 +310,7 @@ async function main() {
         units_per_pack: p.unitsPerPack,
         packs_per_pallet: p.packsPerPallet,
         sold_by_weight: p.weighted,
+        weight_kg: productWeights[p.sku] || 0,
         type: p.type,
         unit: p.unit,
         cost_gross_price: costGross,
@@ -1187,10 +1207,20 @@ async function main() {
         notes: null,
       });
       for (const item of order.items) {
+        const def = productDefs.find((p) => p.sku === item.sku);
+        const packing = packingDefaults(item.quantity, {
+          units_per_pack: def?.unitsPerPack,
+          packs_per_pallet: def?.packsPerPallet,
+          weight_kg: productWeights[item.sku] || 0,
+        });
         await insert(conn, 'delivery_items', {
           delivery_id: deliveryId,
           product_id: prod[item.sku],
           quantity: item.quantity,
+          slip_pallets: packing.pallets,
+          slip_boxes: packing.boxes,
+          slip_units: packing.units,
+          slip_weight_kg: packing.weight,
         });
         if (status !== 'pending') {
           await insert(conn, 'stock_movements', {

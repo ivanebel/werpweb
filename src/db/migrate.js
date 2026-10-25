@@ -82,6 +82,7 @@ async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'products', 'units_per_pack', 'INT UNSIGNED NULL AFTER plu');
   await addColumn(conn, dbName, 'products', 'packs_per_pallet', 'INT UNSIGNED NULL AFTER units_per_pack');
   await addColumn(conn, dbName, 'products', 'sold_by_weight', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER packs_per_pallet');
+  await addColumn(conn, dbName, 'products', 'weight_kg', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER sold_by_weight');
   const addedCostGross = await addColumn(conn, dbName, 'products', 'cost_gross_price', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER unit');
   await addColumn(conn, dbName, 'products', 'cost_vat_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER cost_gross_price');
   await addColumn(conn, dbName, 'products', 'cost_levy_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER cost_vat_rate');
@@ -151,6 +152,30 @@ async function upgradeSchema(conn, dbName) {
   await addIndex(conn, dbName, 'deliveries', 'idx_deliveries_cai', 'KEY `idx_deliveries_cai` (`cai_authorization_id`)');
   await addConstraint(conn, dbName, 'deliveries', 'fk_deliveries_cai',
     'FOREIGN KEY (`cai_authorization_id`) REFERENCES `cai_authorizations` (`id`) ON DELETE SET NULL');
+
+  // --------------------------------------------------- packing slip breakdown
+  await addColumn(conn, dbName, 'delivery_items', 'slip_pallets', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER quantity');
+  await addColumn(conn, dbName, 'delivery_items', 'slip_boxes', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER slip_pallets');
+  const addedSlipUnits = await addColumn(conn, dbName, 'delivery_items', 'slip_units', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER slip_boxes');
+  await addColumn(conn, dbName, 'delivery_items', 'slip_weight_kg', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER slip_units');
+  if (addedSlipUnits) {
+    await conn.query(
+      `UPDATE delivery_items di
+         JOIN products p ON p.id = di.product_id
+          SET di.slip_units = di.quantity,
+              di.slip_boxes = CASE
+                WHEN p.units_per_pack > 0 THEN ROUND(di.quantity / p.units_per_pack, 3)
+                ELSE 0
+              END,
+              di.slip_pallets = CASE
+                WHEN p.units_per_pack > 0 AND p.packs_per_pallet > 0
+                  THEN ROUND(di.quantity / p.units_per_pack / p.packs_per_pallet, 3)
+                ELSE 0
+              END,
+              di.slip_weight_kg = ROUND(di.quantity * COALESCE(p.weight_kg, 0), 3)`,
+    );
+    console.log('[migrate] backfilled packing slip quantities');
+  }
 }
 
 async function main() {

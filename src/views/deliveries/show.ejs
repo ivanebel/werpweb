@@ -6,7 +6,12 @@
     <div class="mx-auto max-w-[1400px]">
       <%
         const toneClass = { primary: 'btn-primary', secondary: 'btn-secondary', danger: 'btn-danger', success: 'btn-success' };
-        const totalQty = items.reduce((sum, item) => sum + Number(item.quantity), 0);
+        const packingTotals = items.reduce((sum, item) => ({
+          pallets: sum.pallets + Number(item.slip_pallets || 0),
+          boxes: sum.boxes + Number(item.slip_boxes || 0),
+          units: sum.units + Number(item.slip_units ?? item.quantity ?? 0),
+          weight: sum.weight + Number(item.slip_weight_kg || 0),
+        }), { pallets: 0, boxes: 0, units: 0, weight: 0 });
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -99,7 +104,7 @@
                 <div class="flex justify-between gap-4 sm:justify-end"><dt class="text-gray-500 dark:text-gray-400">Carrier</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= delivery.carrier || '—' %></dd></div>
                 <div class="flex justify-between gap-4 sm:justify-end"><dt class="text-gray-500 dark:text-gray-400">Tracking</dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= delivery.tracking_number || '—' %></dd></div>
                 <div class="flex justify-between gap-4 sm:justify-end"><dt class="text-gray-500 dark:text-gray-400">Lines</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= items.length %></dd></div>
-                <div class="flex justify-between gap-4 sm:justify-end"><dt class="text-gray-500 dark:text-gray-400">Total units</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatQty(totalQty) %></dd></div>
+                <div class="flex justify-between gap-4 sm:justify-end"><dt class="text-gray-500 dark:text-gray-400">Total units</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatQty(packingTotals.units) %></dd></div>
                 <% if (delivery.order_no) { %>
                   <div class="flex justify-between gap-4 sm:justify-end"><dt class="text-gray-500 dark:text-gray-400">Sales order</dt><dd><a href="/sales-orders/<%= delivery.sales_order_id %>" class="link"><%= delivery.order_no %></a></dd></div>
                 <% } %>
@@ -120,13 +125,16 @@
           </div>
 
           <div class="table-wrap border-t border-gray-100 dark:border-gray-800">
-            <table class="table-base min-w-[620px]">
+            <table class="table-base min-w-[900px]">
               <thead>
                 <tr>
                   <th class="table-th">Item</th>
                   <th class="table-th">Customer code</th>
                   <th class="table-th text-right">Ordered</th>
-                  <th class="table-th text-right">Shipped</th>
+                  <th class="table-th text-right"><%= t('Pallets') %></th>
+                  <th class="table-th text-right"><%= t('Boxes') %></th>
+                  <th class="table-th text-right"><%= t('Units') %></th>
+                  <th class="table-th text-right"><%= t('Weight (kg)') %></th>
                   <th class="table-th">Unit</th>
                 </tr>
               </thead>
@@ -139,11 +147,24 @@
                     </td>
                     <td class="table-td font-mono text-xs text-gray-600 dark:text-gray-300"><%= item.customer_code || '—' %></td>
                     <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= item.ordered_qty !== null && item.ordered_qty !== undefined ? h.formatQty(item.ordered_qty) : '—' %></td>
-                    <td class="table-td text-right font-medium"><%= h.formatQty(item.quantity) %></td>
+                    <td class="table-td text-right"><%= h.formatQty(item.slip_pallets || 0) %></td>
+                    <td class="table-td text-right"><%= h.formatQty(item.slip_boxes || 0) %></td>
+                    <td class="table-td text-right font-medium"><%= h.formatQty(item.slip_units ?? item.quantity) %></td>
+                    <td class="table-td text-right"><%= h.formatQty(item.slip_weight_kg || 0) %></td>
                     <td class="table-td text-gray-500 dark:text-gray-400"><%= item.unit %></td>
                   </tr>
                 <% }) %>
               </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200" colspan="3"><%= t('Totals') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= h.formatQty(packingTotals.pallets) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= h.formatQty(packingTotals.boxes) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= h.formatQty(packingTotals.units) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= h.formatQty(packingTotals.weight) %></td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 

@@ -18,10 +18,19 @@
   </style>
 </head>
 <body class="bg-gray-100 font-outfit text-gray-800" data-locale="<%= locale %>">
+  <%
+    const packingTotals = items.reduce((sum, item) => ({
+      pallets: sum.pallets + Number(item.slip_pallets || 0),
+      boxes: sum.boxes + Number(item.slip_boxes || 0),
+      units: sum.units + Number(item.slip_units ?? item.quantity ?? 0),
+      weight: sum.weight + Number(item.slip_weight_kg || 0),
+    }), { pallets: 0, boxes: 0, units: 0, weight: 0 });
+  %>
   <div class="no-print sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
     <a href="/deliveries/<%= delivery.id %>" class="btn btn-secondary btn-sm">Back to delivery</a>
     <div class="flex items-center gap-2">
       <span class="text-sm text-gray-500"><%= t('Packing slip {number}', { number: delivery.packing_slip_no }) %></span>
+      <a href="/deliveries/<%= delivery.id %>/packing" class="btn btn-secondary btn-sm"><%= t('Edit packing quantities') %></a>
       <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">Print / Save PDF</button>
     </div>
   </div>
@@ -94,7 +103,10 @@
           <th class="px-2 py-2.5 font-semibold">Item</th>
           <th class="px-2 py-2.5 font-semibold">SKU</th>
           <th class="px-2 py-2.5 font-semibold">Customer code</th>
-          <th class="py-2.5 pl-2 pr-3 text-right font-semibold">Quantity</th>
+          <th class="py-2.5 pl-2 pr-2 text-right font-semibold"><%= t('Pallets') %></th>
+          <th class="px-2 py-2.5 text-right font-semibold"><%= t('Boxes') %></th>
+          <th class="px-2 py-2.5 text-right font-semibold"><%= t('Units') %></th>
+          <th class="py-2.5 pl-2 pr-3 text-right font-semibold"><%= t('Weight (kg)') %></th>
         </tr>
       </thead>
       <tbody>
@@ -104,10 +116,22 @@
             <td class="px-2 py-3 font-medium text-gray-800"><%= item.name %></td>
             <td class="px-2 py-3 font-mono text-xs text-gray-500"><%= item.sku %></td>
             <td class="px-2 py-3 font-mono text-xs text-gray-500"><%= item.customer_code || '—' %></td>
-            <td class="py-3 pl-2 pr-3 text-right whitespace-nowrap"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
+            <td class="px-2 py-3 text-right whitespace-nowrap"><%= h.formatQty(item.slip_pallets || 0) %></td>
+            <td class="px-2 py-3 text-right whitespace-nowrap"><%= h.formatQty(item.slip_boxes || 0) %></td>
+            <td class="px-2 py-3 text-right whitespace-nowrap font-medium"><%= h.formatQty(item.slip_units ?? item.quantity) %></td>
+            <td class="py-3 pl-2 pr-3 text-right whitespace-nowrap"><%= h.formatQty(item.slip_weight_kg || 0) %></td>
           </tr>
         <% }) %>
       </tbody>
+      <tfoot>
+        <tr class="border-y-2 border-gray-300 bg-gray-50 font-semibold text-gray-700">
+          <td class="py-2.5 pl-3 pr-2" colspan="4"><%= t('Totals') %></td>
+          <td class="px-2 py-2.5 text-right whitespace-nowrap"><%= h.formatQty(packingTotals.pallets) %></td>
+          <td class="px-2 py-2.5 text-right whitespace-nowrap"><%= h.formatQty(packingTotals.boxes) %></td>
+          <td class="px-2 py-2.5 text-right whitespace-nowrap"><%= h.formatQty(packingTotals.units) %></td>
+          <td class="py-2.5 pl-2 pr-3 text-right whitespace-nowrap"><%= h.formatQty(packingTotals.weight) %></td>
+        </tr>
+      </tfoot>
     </table>
 
     <% if (delivery.notes) { %>
