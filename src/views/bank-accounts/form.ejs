@@ -1,0 +1,119 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[900px]">
+      <%
+        const isEdit = mode === 'edit';
+        const formErrors = errors._form || [];
+        const fieldErrors = (name) => errors[name];
+        const owner = row.owner || 'company';
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= isEdit ? t('Edit bank account') : t('New bank account') %></h1>
+          <p class="page-subtitle"><%= t('Keep bank, CBU, alias and transfer notes in one place.') %></p>
+        </div>
+        <a href="/bank-accounts" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Back to bank accounts') %>
+        </a>
+      </div>
+
+      <% if (formErrors.length || Object.keys(errors).some(key => key !== '_form')) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the bank account:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% formErrors.forEach(message => { %><li><%= message %></li><% }) %>
+                <% Object.keys(errors).filter(key => key !== '_form').forEach(key => { %><li><%= errors[key] %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <h2 class="card-title"><%= t('Bank account details') %></h2>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <div class="md:col-span-2">
+            <label for="owner" class="form-label"><%= t('Account owner') %> <span class="text-error-500">*</span></label>
+            <select id="owner" name="owner" class="form-select" required>
+              <option value="company" <%= owner === 'company' ? 'selected' : '' %>><%= t('Our company') %></option>
+              <optgroup label="<%= t('Customers') %>">
+                <% owners.customers.forEach(customer => { %>
+                  <option value="customer:<%= customer.id %>" <%= owner === `customer:${customer.id}` ? 'selected' : '' %>><%= customer.company_name %></option>
+                <% }) %>
+              </optgroup>
+              <optgroup label="<%= t('Suppliers') %>">
+                <% owners.suppliers.forEach(supplier => { %>
+                  <option value="supplier:<%= supplier.id %>" <%= owner === `supplier:${supplier.id}` ? 'selected' : '' %>><%= supplier.company_name %></option>
+                <% }) %>
+              </optgroup>
+            </select>
+            <p class="form-help"><%= t('Choose our company or one of its customers or suppliers.') %></p>
+            <% if (fieldErrors('owner')) { %><p class="form-error"><%= fieldErrors('owner') %></p><% } %>
+          </div>
+
+          <div class="md:col-span-2">
+            <label for="bank_name" class="form-label"><%= t('Bank') %> <span class="text-error-500">*</span></label>
+            <input id="bank_name" name="bank_name" type="text" maxlength="120" value="<%= row.bank_name || '' %>" class="form-input" required>
+            <% if (fieldErrors('bank_name')) { %><p class="form-error"><%= fieldErrors('bank_name') %></p><% } %>
+          </div>
+
+          <div>
+            <label for="account_number" class="form-label"><%= t('Account number') %></label>
+            <input id="account_number" name="account_number" type="text" maxlength="60" value="<%= row.account_number || '' %>" class="form-input font-mono">
+            <% if (fieldErrors('account_number')) { %><p class="form-error"><%= fieldErrors('account_number') %></p><% } %>
+          </div>
+
+          <div>
+            <label for="cbu" class="form-label"><%= t('CBU') %></label>
+            <input id="cbu" name="cbu" type="text" inputmode="numeric" maxlength="30" value="<%= row.cbu || '' %>" class="form-input font-mono" placeholder="22 digits">
+            <p class="form-help"><%= t('22 digits, optional.') %></p>
+            <% if (fieldErrors('cbu')) { %><p class="form-error"><%= fieldErrors('cbu') %></p><% } %>
+          </div>
+
+          <div>
+            <label for="alias" class="form-label"><%= t('Alias') %></label>
+            <input id="alias" name="alias" type="text" maxlength="60" value="<%= row.alias || '' %>" class="form-input font-mono">
+            <p class="form-help"><%= t('Optional alias that replaces the CBU.') %></p>
+            <% if (fieldErrors('alias')) { %><p class="form-error"><%= fieldErrors('alias') %></p><% } %>
+          </div>
+
+          <div class="md:col-span-2">
+            <label for="notes" class="form-label"><%= t('Notes') %></label>
+            <textarea id="notes" name="notes" rows="3" maxlength="500" class="form-input" placeholder="<%= t('Optional notes about this account.') %>"><%= row.notes || '' %></textarea>
+          </div>
+        </div>
+
+        <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+          <a href="/bank-accounts" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= isEdit ? t('Save changes') : t('Create bank account') %>
+          </button>
+        </div>
+      </form>
+
+      <% if (isEdit) { %>
+        <form method="POST" action="/bank-accounts/<%= account.id %>/delete" class="mt-5 flex justify-end" data-confirm="<%= t('Delete this bank account? This cannot be undone.') %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn-danger btn-sm">
+            <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+            <%= t('Delete bank account') %>
+          </button>
+        </form>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

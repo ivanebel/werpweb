@@ -422,6 +422,30 @@ async function main() {
       customers.push({ id, name, contact, email, phone, address, city, state, postal, status });
     }
 
+    // ----------------------------------------------------------- bank accounts
+    const bankTag = String(Date.now()).slice(-6);
+    const bankCbu = (offset) => `000000${String(Date.now() + offset).padStart(16, '0')}`.slice(0, 22);
+    const bankAccountDefs = [
+      {
+        owner_type: 'company', owner_id: null, bank_name: 'Bank of America',
+        account_number: '1234567890', cbu: bankCbu(0), alias: `aurora.${bankTag}`,
+        notes: 'Main operating account',
+      },
+      {
+        owner_type: 'customer', owner_id: customers[0].id, bank_name: 'Wells Fargo',
+        account_number: '9876543210', cbu: bankCbu(1), alias: `brookfield.${bankTag}`,
+        notes: 'Customer transfers',
+      },
+      {
+        owner_type: 'supplier', owner_id: suppliers[0].id, bank_name: 'Chase',
+        account_number: '5555666677', cbu: bankCbu(2), alias: `voltway.${bankTag}`,
+        notes: 'Supplier payments',
+      },
+    ];
+    for (const def of bankAccountDefs) {
+      await insert(conn, 'bank_accounts', def);
+    }
+
     // ------------------------------------------------- customer warehouses
     // Customers receive purchases at their own warehouses, which are
     // independent from the billing address stored on the customer record.

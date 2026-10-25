@@ -66,7 +66,7 @@ const router = makeResourceRouter({
     - (SELECT COALESCE(SUM(p.unapplied_amount), 0)
          FROM payments p
         WHERE p.direction = 'customer' AND p.customer_id = t.id) AS current_balance`,
-  relatedLoader: async (row) => {
+  relatedLoader: async (row, req) => {
     const orders = await query(
       `SELECT id, order_no, order_date, status, total FROM sales_orders WHERE customer_id = ? ORDER BY order_date DESC LIMIT 6`,
       [row.id],
@@ -98,7 +98,17 @@ const router = makeResourceRouter({
         WHERE cpc.customer_id = ? ORDER BY p.name`,
       [row.id],
     );
-    return [
+    const canManageBankAccounts = req.session.user && ['admin', 'manager'].includes(req.session.user.role);
+    const bankAccounts = canManageBankAccounts
+      ? await query(
+        `SELECT id, bank_name, account_number, cbu, alias, notes
+           FROM bank_accounts
+          WHERE owner_type = 'customer' AND owner_id = ?
+          ORDER BY bank_name, id`,
+        [row.id],
+      )
+      : [];
+    const sections = [
       {
         title: 'Recent sales orders',
         href: `/sales-orders?q=${encodeURIComponent(row.company_name)}`,
@@ -163,6 +173,25 @@ const router = makeResourceRouter({
         emptyText: 'No customer-specific product codes have been assigned yet.',
       },
     ];
+    if (canManageBankAccounts) {
+      sections.push({
+        title: 'Bank accounts',
+        href: `/bank-accounts?owner_type=customer&q=${encodeURIComponent(row.company_name)}`,
+        columns: [
+          { key: 'bank_name', label: 'Bank' },
+          { key: 'account_number', label: 'Account number' },
+          { key: 'cbu', label: 'CBU' },
+          { key: 'alias', label: 'Alias' },
+          { key: 'notes', label: 'Notes' },
+        ],
+        rows: bankAccounts,
+        emptyText: 'No bank accounts have been added for this customer yet.',
+      });
+    }
+    return sections;
+  },
+  afterDelete: async (row) => {
+    await query("DELETE FROM bank_accounts WHERE owner_type = 'customer' AND owner_id = ?", [row.id]);
   },
 });
 

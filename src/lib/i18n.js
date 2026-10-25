@@ -780,6 +780,56 @@ const ES = {
   'Transport details updated.': 'Datos del transporte actualizados.',
   'These details are printed on the packing slip.': 'Estos datos se imprimen en el remito.',
 
+  // --------------------------------------------------------- bank accounts
+  'Bank accounts': 'Cuentas bancarias',
+  'Bank account': 'Cuenta bancaria',
+  'bank account': 'cuenta bancaria',
+  'bank accounts': 'cuentas bancarias',
+  'New bank account': 'Nueva cuenta bancaria',
+  'Edit bank account': 'Editar cuenta bancaria',
+  'Back to bank accounts': 'Volver a cuentas bancarias',
+  'Store our own bank accounts and the accounts of customers and suppliers.':
+    'Guardá nuestras cuentas bancarias y las de clientes y proveedores.',
+  'Keep bank, CBU, alias and transfer notes in one place.':
+    'Tené banco, CBU, alias y notas de transferencia en un solo lugar.',
+  'Search bank accounts…': 'Buscar cuentas bancarias…',
+  'Owner type': 'Tipo de titular',
+  'All owners': 'Todos los titulares',
+  'Owner': 'Titular',
+  'Account owner': 'Titular de la cuenta',
+  'Our company': 'Nuestra empresa',
+  'Account number': 'Número de cuenta',
+  'CBU': 'CBU',
+  'Alias': 'Alias',
+  'Unknown owner': 'Titular desconocido',
+  'No bank accounts yet': 'Todavía no hay cuentas bancarias',
+  'Add a bank account to keep transfer details in one place.':
+    'Agregá una cuenta bancaria para tener los datos de transferencia en un solo lugar.',
+  'Delete this bank account? This cannot be undone.': '¿Eliminar esta cuenta bancaria? Esta acción no se puede deshacer.',
+  'Please review the bank account:': 'Revisá la cuenta bancaria:',
+  'Bank account details': 'Datos de la cuenta bancaria',
+  'Choose our company or one of its customers or suppliers.':
+    'Elegí nuestra empresa o uno de sus clientes o proveedores.',
+  '22 digits, optional.': '22 dígitos, opcional.',
+  'Optional alias that replaces the CBU.': 'Alias opcional que reemplaza al CBU.',
+  'Optional notes about this account.': 'Notas opcionales sobre esta cuenta.',
+  'Create bank account': 'Crear cuenta bancaria',
+  'Delete bank account': 'Eliminar cuenta bancaria',
+  'Bank name is required.': 'El nombre del banco es obligatorio.',
+  'CBU must contain exactly 22 digits.': 'El CBU debe contener exactamente 22 dígitos.',
+  'Enter an account number, CBU or alias.': 'Ingresá un número de cuenta, CBU o alias.',
+  'This CBU is already registered.': 'Este CBU ya está registrado.',
+  'This alias is already registered.': 'Este alias ya está registrado.',
+  'Choose the account owner.': 'Elegí el titular de la cuenta.',
+  'The selected owner was not found.': 'El titular seleccionado no existe.',
+  'Bank account created.': 'Cuenta bancaria creada.',
+  'Bank account updated.': 'Cuenta bancaria actualizada.',
+  'Bank account deleted.': 'Cuenta bancaria eliminada.',
+  'No bank accounts have been added for this customer yet.':
+    'Todavía no se agregaron cuentas bancarias para este cliente.',
+  'No bank accounts have been added for this supplier yet.':
+    'Todavía no se agregaron cuentas bancarias para este proveedor.',
+
   // -------------------------------------------- customer warehouses/orders
   'Warehouses': 'Depósitos',
   'Warehouse': 'Depósito',

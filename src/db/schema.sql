@@ -695,6 +695,26 @@ CREATE TABLE IF NOT EXISTS check_history (
     REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Bank accounts for our own company and for customers/suppliers. The owner is
+-- polymorphic because one table stores all three kinds of account.
+CREATE TABLE IF NOT EXISTS bank_accounts (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  owner_type     ENUM('company','customer','supplier') NOT NULL,
+  owner_id       INT UNSIGNED NULL,
+  bank_name      VARCHAR(120) NOT NULL,
+  account_number VARCHAR(60) NULL,
+  cbu            VARCHAR(22) NULL,
+  alias          VARCHAR(60) NULL,
+  notes          VARCHAR(500) NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_bank_accounts_cbu (cbu),
+  UNIQUE KEY uq_bank_accounts_alias (alias),
+  KEY idx_bank_accounts_owner (owner_type, owner_id),
+  KEY idx_bank_accounts_bank (bank_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS production_orders (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_no  VARCHAR(30) NOT NULL,

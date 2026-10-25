@@ -66,7 +66,7 @@ module.exports = makeResourceRouter({
     - (SELECT COALESCE(SUM(p.unapplied_amount), 0)
          FROM payments p
         WHERE p.direction = 'supplier' AND p.supplier_id = t.id) AS current_balance`,
-  relatedLoader: async (row) => {
+  relatedLoader: async (row, req) => {
     const orders = await query(
       `SELECT id, order_no, order_date, status, total FROM purchase_orders WHERE supplier_id = ? ORDER BY order_date DESC LIMIT 6`,
       [row.id],
@@ -83,7 +83,17 @@ module.exports = makeResourceRouter({
         LIMIT 6`,
       [row.id],
     );
-    return [
+    const canManageBankAccounts = req.session.user && ['admin', 'manager'].includes(req.session.user.role);
+    const bankAccounts = canManageBankAccounts
+      ? await query(
+        `SELECT id, bank_name, account_number, cbu, alias, notes
+           FROM bank_accounts
+          WHERE owner_type = 'supplier' AND owner_id = ?
+          ORDER BY bank_name, id`,
+        [row.id],
+      )
+      : [];
+    const sections = [
       {
         title: 'Recent purchase orders',
         href: `/purchase-orders?q=${encodeURIComponent(row.company_name)}`,
@@ -123,5 +133,24 @@ module.exports = makeResourceRouter({
         emptyText: 'No supplier payments have been recorded yet.',
       },
     ];
+    if (canManageBankAccounts) {
+      sections.push({
+        title: 'Bank accounts',
+        href: `/bank-accounts?owner_type=supplier&q=${encodeURIComponent(row.company_name)}`,
+        columns: [
+          { key: 'bank_name', label: 'Bank' },
+          { key: 'account_number', label: 'Account number' },
+          { key: 'cbu', label: 'CBU' },
+          { key: 'alias', label: 'Alias' },
+          { key: 'notes', label: 'Notes' },
+        ],
+        rows: bankAccounts,
+        emptyText: 'No bank accounts have been added for this supplier yet.',
+      });
+    }
+    return sections;
+  },
+  afterDelete: async (row) => {
+    await query("DELETE FROM bank_accounts WHERE owner_type = 'supplier' AND owner_id = ?", [row.id]);
   },
 });
