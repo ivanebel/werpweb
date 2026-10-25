@@ -1,0 +1,442 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+      <%
+        const basePath = meta.isCustomer ? '/customers' : '/suppliers';
+        const detailPath = `${basePath}/${party.id}`;
+        const editPath = `${detailPath}/edit`;
+        const netTone = summary.netBalance > 0
+          ? 'text-warning-600 dark:text-warning-400'
+          : summary.netBalance < 0
+            ? 'text-success-600 dark:text-success-400'
+            : 'text-gray-900 dark:text-white';
+        const agingTones = {
+          current: 'bg-success-500',
+          d1_30: 'bg-blue-light-500',
+          d31_60: 'bg-warning-500',
+          d61_90: 'bg-orange-500',
+          d90_plus: 'bg-error-500',
+        };
+        const trendInvoiced = trend.invoices.reduce((sum, value) => sum + Number(value || 0), 0);
+        const trendPayments = trend.payments.reduce((sum, value) => sum + Number(value || 0), 0);
+        const topMax = Math.max(...topProducts.map((product) => Number(product.amount || 0)), 1);
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div class="flex items-start gap-4">
+          <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            <%- include('/partials/icon', { name: meta.isCustomer ? 'users' : 'truck', className: 'h-6 w-6' }) %>
+          </span>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="page-title"><%= party.company_name %></h1>
+              <%- statusBadge(party.status) %>
+              <span class="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400"><%= t(meta.partyLabel) %></span>
+            </div>
+            <p class="page-subtitle">
+              <span class="font-mono text-xs"><%= meta.isCustomer ? party.customer_no : party.supplier_no %></span>
+              <% if (party.contact_name) { %> · <%= party.contact_name %><% } %>
+              <% if (party.email) { %> · <%= party.email %><% } %>
+              · <%= t('Payment terms') %>: <%= party.payment_terms %>
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="<%= detailPath %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+          </a>
+          <a href="<%= meta.newInvoiceHref %>" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: meta.isCustomer ? 'receipt' : 'clipboard', className: 'h-4 w-4' }) %>
+            <%= meta.isCustomer ? t('New invoice') : t('New bill') %>
+          </a>
+          <a href="<%= meta.newPaymentHref %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %>
+            <%= meta.isCustomer ? t('Record customer payment') : t('Record supplier payment') %>
+          </a>
+          <a href="<%= editPath %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> <%= t('Edit') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t(summary.netBalance < 0 ? 'Credit balance' : meta.balanceLabel) %></p>
+            <p class="mt-1 text-2xl font-bold <%= netTone %>"><%= money(summary.netBalance) %></p>
+            <p class="truncate text-xs text-gray-400"><%= money(summary.outstanding) %> <%= t('outstanding') %> · <%= money(summary.unappliedCredit) %> <%= t('credit') %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-400">
+            <%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Overdue') %></p>
+            <p class="mt-1 text-2xl font-bold <%= summary.overdue > 0 ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white' %>"><%= money(summary.overdue) %></p>
+            <p class="text-xs text-gray-400"><%= h.pluralize(summary.overdueCount, meta.isCustomer ? 'overdue invoice' : 'overdue bill', meta.isCustomer ? 'overdue invoices' : 'overdue bills') %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+            <%- include('/partials/icon', { name: 'check-circle', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Not yet due') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(summary.current) %></p>
+            <p class="text-xs text-gray-400"><%= h.pluralize(summary.openCount, meta.isCustomer ? 'open invoice' : 'open bill', meta.isCustomer ? 'open invoices' : 'open bills') %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
+            <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t(meta.creditLabel) %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(summary.unappliedCredit) %></p>
+            <p class="text-xs text-gray-400"><%= t('Available to apply') %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/15 dark:text-blue-light-400">
+            <%- include('/partials/icon', { name: meta.isCustomer ? 'receipt' : 'clipboard', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t(meta.totalLabel) %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(summary.totalInvoiced) %></p>
+            <p class="text-xs text-gray-400"><%= h.pluralize(summary.invoiceCount, meta.isCustomer ? 'invoice' : 'bill', meta.isCustomer ? 'invoices' : 'bills') %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+            <%- include('/partials/icon', { name: 'check-circle', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Total paid') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(summary.totalPaid) %></p>
+            <p class="text-xs text-gray-400">
+              <% if (summary.paidPercent !== null) { %><%= h.formatNumber(summary.paidPercent, 1) %>% <%= t('of issued value') %><% } else { %><%= t('No payments yet') %><% } %>
+            </p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
+            <%- include('/partials/icon', { name: 'clock', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Average days to pay') %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= summary.averageDaysToPay !== null ? h.formatNumber(summary.averageDaysToPay, 1) : '—' %></p>
+            <p class="text-xs text-gray-400"><%= t('From invoice to first payment') %></p>
+          </div>
+        </div>
+        <div class="card flex items-center gap-4 p-5">
+          <span class="kpi-icon bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <%- include('/partials/icon', { name: 'list', className: 'h-6 w-6' }) %>
+          </span>
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t(meta.openTitle) %></p>
+            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(summary.openCount, 0) %></p>
+            <p class="text-xs text-gray-400"><%= h.pluralize(summary.overdueCount, meta.isCustomer ? 'overdue invoice' : 'overdue bill', meta.isCustomer ? 'overdue invoices' : 'overdue bills') %></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card xl:col-span-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t(meta.billedLabel) %> &amp; <%= t('Payments') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Last 12 months') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('Monthly') %></span>
+          </div>
+          <div class="px-3 pb-2 pt-4">
+            <% if (trendInvoiced > 0 || trendPayments > 0) { %>
+              <div id="account-trend-chart" class="min-h-[320px]"></div>
+            <% } else { %>
+              <div class="flex h-[320px] flex-col items-center justify-center text-center">
+                <span class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                  <%- include('/partials/icon', { name: 'chart', className: 'h-6 w-6' }) %>
+                </span>
+                <p class="text-sm font-medium text-gray-600 dark:text-gray-300"><%= t('No billing or payment activity in the last 12 months.') %></p>
+                <p class="mt-1 text-sm text-gray-400"><%= t('Issued invoices and recorded payments will appear here.') %></p>
+              </div>
+            <% } %>
+          </div>
+          <div class="grid grid-cols-2 border-t border-gray-100 dark:border-gray-800">
+            <div class="px-5 py-4">
+              <p class="text-xs text-gray-500 dark:text-gray-400"><%= t('{label} (12 mo.)', { label: t(meta.billedLabel) }) %></p>
+              <p class="mt-1 text-lg font-semibold text-gray-800 dark:text-white"><%= money(trendInvoiced) %></p>
+            </div>
+            <div class="border-l border-gray-100 px-5 py-4 dark:border-gray-800">
+              <p class="text-xs text-gray-500 dark:text-gray-400"><%= t('Payments (12 mo.)') %></p>
+              <p class="mt-1 text-lg font-semibold text-gray-800 dark:text-white"><%= money(trendPayments) %></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title"><%= t('Aging') %></h2>
+              <span class="text-sm font-semibold text-gray-700 dark:text-gray-300"><%= money(summary.outstanding) %></span>
+            </div>
+            <div class="space-y-4 p-5">
+              <% if (summary.outstanding > 0) { %>
+                <% aging.forEach(bucket => { const percent = summary.outstanding > 0 ? Math.min(100, (bucket.amount / summary.outstanding) * 100) : 0; %>
+                  <div>
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                      <span class="text-gray-600 dark:text-gray-300"><%= t(bucket.label) %><span class="ml-1 text-xs text-gray-400">(<%= bucket.count %>)</span></span>
+                      <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(bucket.amount) %></span>
+                    </div>
+                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div class="h-full rounded-full <%= agingTones[bucket.key] %>" style="width: <%= percent %>%"></div>
+                    </div>
+                  </div>
+                <% }) %>
+              <% } else { %>
+                <p class="py-6 text-center text-sm text-gray-400"><%= t('No outstanding balance.') %></p>
+              <% } %>
+            </div>
+          </div>
+
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Account details') %></h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Payment terms') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= party.payment_terms %></dd></div>
+              <% if (meta.isCustomer) { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Credit limit') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= summary.creditLimit > 0 ? money(summary.creditLimit) : t('Not set') %></dd></div>
+                <% if (summary.creditLimit > 0) { %>
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Credit used') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= money(summary.creditUsed) %></dd></div>
+                  <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Credit available') %></dt><dd class="font-medium <%= summary.creditAvailable < 0 ? 'text-error-600 dark:text-error-400' : 'text-success-600 dark:text-success-400' %>"><%= money(summary.creditAvailable) %></dd></div>
+                  <div>
+                    <div class="flex justify-between gap-3 text-xs"><span class="text-gray-500 dark:text-gray-400"><%= t('Credit utilization') %></span><span class="font-medium text-gray-600 dark:text-gray-300"><%= h.formatNumber(summary.creditUsage, 1) %>%</span></div>
+                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div class="h-full rounded-full <%= summary.creditUsage >= 100 ? 'bg-error-500' : summary.creditUsage >= 80 ? 'bg-warning-500' : 'bg-brand-500' %>" style="width: <%= Math.min(100, summary.creditUsage || 0) %>%"></div>
+                    </div>
+                  </div>
+                <% } %>
+              <% } else { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Advance credit') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= money(summary.unappliedCredit) %></dd></div>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Average days to pay') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= summary.averageDaysToPay !== null ? h.formatNumber(summary.averageDaysToPay, 1) : '—' %></dd></div>
+              <% } %>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t(meta.isCustomer ? 'Customer since' : 'Supplier since') %></dt><dd class="text-gray-700 dark:text-gray-300"><%= h.formatDate(party.created_at) %></dd></div>
+              <% if (summary.averageDaysOverdue !== null && summary.overdueCount > 0) { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Average days overdue') %></dt><dd class="font-medium text-error-600 dark:text-error-400"><%= h.formatNumber(summary.averageDaysOverdue, 1) %></dd></div>
+              <% } %>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Last payment') %></dt><dd class="text-gray-700 dark:text-gray-300"><%= summary.lastPaymentDate ? h.formatDate(summary.lastPaymentDate) : t('No payments yet') %></dd></div>
+            </dl>
+            <a href="<%= meta.paymentSearch %>" class="btn btn-secondary btn-sm mt-4 w-full"><%= t('View all payments') %></a>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card xl:col-span-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t(meta.openTitle) %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= h.pluralize(summary.openCount, meta.isCustomer ? 'open invoice' : 'open bill', meta.isCustomer ? 'open invoices' : 'open bills') %> · <%= money(summary.outstanding) %></p>
+            </div>
+            <a href="<%= meta.invoiceSearch %>" class="btn btn-secondary btn-sm"><%= t('View all') %></a>
+          </div>
+          <% if (openInvoices.length) { %>
+            <div class="table-wrap">
+              <table class="table-base min-w-[860px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t(meta.isCustomer ? 'Invoice' : 'Bill') %></th>
+                    <th class="table-th"><%= t('Date') %></th>
+                    <th class="table-th"><%= t('Due') %></th>
+                    <th class="table-th"><%= t('Status') %></th>
+                    <th class="table-th text-right"><%= t('Total') %></th>
+                    <th class="table-th text-right"><%= t('Paid') %></th>
+                    <th class="table-th text-right"><%= t('Balance') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% openInvoices.forEach(invoice => { %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <a href="<%= meta.invoiceBase %>/<%= invoice.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= invoice.invoice_no %></a>
+                        <% if (invoice.days_overdue > 0) { %><span class="mt-0.5 block text-[11px] font-medium text-error-600 dark:text-error-400"><%= t('{count} days overdue', { count: invoice.days_overdue }) %></span><% } %>
+                      </td>
+                      <td class="table-td whitespace-nowrap"><%= h.formatDate(invoice.invoice_date) %></td>
+                      <td class="table-td whitespace-nowrap"><%= h.formatDate(invoice.due_date) %></td>
+                      <td class="table-td"><%- statusBadge(invoice.display_status) %></td>
+                      <td class="table-td text-right"><%= money(invoice.total) %></td>
+                      <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= money(invoice.amount_paid) %></td>
+                      <td class="table-td text-right font-semibold text-gray-800 dark:text-gray-200"><%= money(invoice.balance) %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <div class="px-6 py-12 text-center">
+              <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success-50 text-success-500 dark:bg-success-500/10"><%- include('/partials/icon', { name: 'check-circle', className: 'h-6 w-6' }) %></span>
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No outstanding balance.') %></p>
+              <p class="mt-1 text-sm text-gray-400"><%= t('All invoices are settled or none have been issued yet.') %></p>
+            </div>
+          <% } %>
+          <% if (summary.openCount > openInvoices.length) { %>
+            <div class="flex items-center justify-between gap-2 border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+              <span><%= t('Showing {shown} of {total}.', { shown: openInvoices.length, total: summary.openCount }) %></span>
+              <a href="<%= meta.invoiceSearch %>" class="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"><%= t('View all') %></a>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t('Recent payments') %></h2>
+            <a href="<%= meta.paymentSearch %>" class="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"><%= t('View all') %></a>
+          </div>
+          <% if (recentPayments.length) { %>
+            <div class="divide-y divide-gray-100 dark:divide-gray-800">
+              <% recentPayments.forEach(payment => { %>
+                <a href="/payments/<%= payment.id %>" class="block px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="font-medium text-gray-900 dark:text-white/90"><%= payment.payment_no %></p>
+                      <p class="mt-0.5 text-xs text-gray-400"><%= h.formatDate(payment.payment_date) %><% if (payment.methodLabels && payment.methodLabels.length) { %> · <%= payment.methodLabels.map(method => h.humanize(method)).join(', ') %><% } %></p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <p class="font-semibold text-gray-800 dark:text-gray-200"><%= money(payment.total_amount) %></p>
+                      <p class="text-[11px] text-gray-400"><%= t('Applied') %>: <%= money(payment.applied_amount) %></p>
+                    </div>
+                  </div>
+                  <% if (Number(payment.unapplied_amount) > 0) { %>
+                    <p class="mt-1 text-[11px] font-medium text-success-600 dark:text-success-400"><%= t('{amount} unapplied', { amount: money(payment.unapplied_amount) }) %></p>
+                  <% } %>
+                </a>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <p class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No payments recorded yet.') %></p>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t(meta.orderTitle) %></h2>
+            <a href="<%= meta.orderSearch %>" class="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"><%= t('View all') %></a>
+          </div>
+          <% if (recentOrders.length) { %>
+            <div class="table-wrap">
+              <table class="table-base min-w-[520px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Order') %></th>
+                    <th class="table-th"><%= t('Date') %></th>
+                    <th class="table-th"><%= t('Status') %></th>
+                    <th class="table-th text-right"><%= t('Total') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% recentOrders.forEach(order => { %>
+                    <tr class="table-row">
+                      <td class="table-td"><a href="<%= meta.orderBase %>/<%= order.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= order.order_no %></a></td>
+                      <td class="table-td whitespace-nowrap text-gray-500 dark:text-gray-400"><%= h.formatDate(order.order_date) %></td>
+                      <td class="table-td"><%- statusBadge(order.status) %></td>
+                      <td class="table-td text-right font-medium"><%= money(order.total) %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <p class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No orders yet.') %></p>
+          <% } %>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t(meta.topTitle) %></h2>
+            <span class="text-xs text-gray-400"><%= t('Last 12 months') %></span>
+          </div>
+          <% if (topProducts.length) { %>
+            <div class="space-y-4 p-5">
+              <% topProducts.forEach((product, index) => { const percent = Math.max(3, (product.amount / topMax) * 100); %>
+                <div>
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex min-w-0 items-center gap-3">
+                      <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500 dark:bg-gray-800 dark:text-gray-400"><%= index + 1 %></span>
+                      <div class="min-w-0">
+                        <a href="/products/<%= product.id %>" class="block truncate text-sm font-medium text-gray-800 hover:text-brand-600 dark:text-gray-200 dark:hover:text-brand-400"><%= product.name %></a>
+                        <p class="font-mono text-[11px] text-gray-400"><%= product.sku %> · <%= h.formatQty(product.quantity) %></p>
+                      </div>
+                    </div>
+                    <span class="shrink-0 text-sm font-semibold text-gray-700 dark:text-gray-300"><%= money(product.amount) %></span>
+                  </div>
+                  <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                    <div class="h-full rounded-full bg-brand-500" style="width: <%= percent %>%"></div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <p class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No product history in the last 12 months.') %></p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const currency = <%- JSON.stringify(currency) %>;
+      const locale = document.body.dataset.locale || 'en-US';
+      const trend = <%- JSON.stringify(trend) %>;
+      const billedLabel = <%- JSON.stringify(t(meta.billedLabel)) %>;
+      const paymentsLabel = <%- JSON.stringify(t('Payments')) %>;
+      const isDark = () => document.documentElement.classList.contains('dark');
+      const palette = ['#465FFF', '#12B76A'];
+      function money(value) {
+        try {
+          return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value || 0));
+        } catch {
+          return currency + ' ' + Number(value || 0).toFixed(0);
+        }
+      }
+      function theme() {
+        return {
+          foreColor: isDark() ? '#98A2B3' : '#667085',
+          grid: isDark() ? '#1F2937' : '#F2F4F7',
+          tooltip: isDark() ? 'dark' : 'light',
+        };
+      }
+      const element = document.querySelector('#account-trend-chart');
+      if (!element || typeof ApexCharts === 'undefined') return;
+      const initial = theme();
+      const chart = new ApexCharts(element, {
+        chart: { type: 'bar', height: 320, toolbar: { show: false }, fontFamily: 'Outfit, sans-serif', foreColor: initial.foreColor },
+        series: [
+          { name: billedLabel, data: trend.invoices },
+          { name: paymentsLabel, data: trend.payments }
+        ],
+        colors: palette,
+        plotOptions: { bar: { borderRadius: 4, columnWidth: '45%' } },
+        dataLabels: { enabled: false },
+        grid: { borderColor: initial.grid, strokeDashArray: 4, padding: { left: 8, right: 8 } },
+        xaxis: { categories: trend.months, axisBorder: { show: false }, axisTicks: { show: false } },
+        yaxis: { labels: { formatter: money } },
+        tooltip: { theme: initial.tooltip, y: { formatter: money } },
+        legend: { position: 'top', horizontalAlign: 'right', markers: { radius: 4 }, itemMargin: { horizontal: 10 } }
+      });
+      chart.render();
+      document.addEventListener('werp:theme', () => {
+        const next = theme();
+        chart.updateOptions({ chart: { foreColor: next.foreColor }, grid: { borderColor: next.grid }, tooltip: { theme: next.tooltip } });
+      });
+    })();
+  </script>
+  <%- include('/layouts/footer') %>

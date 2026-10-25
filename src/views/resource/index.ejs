@@ -178,6 +178,11 @@
                   <% }) %>
                   <td class="table-td">
                     <div class="flex items-center justify-end gap-1">
+                      <% if (resource.key === 'customers' || resource.key === 'suppliers') { %>
+                        <a href="<%= resource.basePath %>/<%= row.id %>/dashboard" class="btn-icon" title="<%= t('Account dashboard') %>">
+                          <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %>
+                        </a>
+                      <% } %>
                       <a href="<%= resource.basePath %>/<%= row.id %>" class="btn-icon" title="View">
                         <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
                       </a>

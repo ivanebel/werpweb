@@ -3,6 +3,7 @@
 const { makeResourceRouter } = require('./resource');
 const { query, one, getPool } = require('../db');
 const h = require('../lib/helpers');
+const { renderAccountDashboard } = require('../lib/accountDashboard');
 
 const statusOptions = [
   { value: 'active', label: 'Active' },
@@ -194,6 +195,9 @@ const router = makeResourceRouter({
     await query("DELETE FROM bank_accounts WHERE owner_type = 'customer' AND owner_id = ?", [row.id]);
   },
 });
+
+// ------------------------------------------------------- account dashboard
+router.get('/:id(\\d+)/dashboard', (req, res, next) => renderAccountDashboard(req, res, next, 'customer'));
 
 // --------------------------------------------------------- product codes
 async function loadProductCodePage(customerId) {

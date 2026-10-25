@@ -33,6 +33,11 @@
           <a href="<%= resource.basePath %>" class="btn btn-secondary btn-sm">
             <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
           </a>
+          <% if (resource.key === 'customers' || resource.key === 'suppliers') { %>
+            <a href="<%= resource.basePath %>/<%= row.id %>/dashboard" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %> <%= t('Account dashboard') %>
+            </a>
+          <% } %>
           <% if (resource.key === 'customers') { %>
             <a href="/payments/new?type=customer&party_id=<%= row.id %>" class="btn btn-primary btn-sm">
               <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %> <%= t('New customer payment') %>

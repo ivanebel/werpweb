@@ -2,6 +2,7 @@
 
 const { makeResourceRouter } = require('./resource');
 const { query } = require('../db');
+const { renderAccountDashboard } = require('../lib/accountDashboard');
 
 const statusOptions = [
   { value: 'active', label: 'Active' },
@@ -36,7 +37,7 @@ const fields = [
   { name: 'notes', label: 'Notes', type: 'textarea', full: true, section: 'Notes' },
 ];
 
-module.exports = makeResourceRouter({
+const router = makeResourceRouter({
   key: 'suppliers',
   basePath: '/suppliers',
   title: 'Suppliers',
@@ -154,3 +155,7 @@ module.exports = makeResourceRouter({
     await query("DELETE FROM bank_accounts WHERE owner_type = 'supplier' AND owner_id = ?", [row.id]);
   },
 });
+
+router.get('/:id(\\d+)/dashboard', (req, res, next) => renderAccountDashboard(req, res, next, 'supplier'));
+
+module.exports = router;
