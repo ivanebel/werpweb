@@ -9,7 +9,7 @@ const methodOverride = require('method-override');
 
 const config = require('./config');
 const { getPool } = require('./db');
-const { locale, sessionFlash, csrf, webLocals, localizeResponses, requireAuth } = require('./middleware/web');
+const { locale, sessionFlash, csrf, webLocals, localizeResponses, requireAuth, requireRole } = require('./middleware/web');
 
 const authRoutes = require('./routes/auth');
 const languageRoutes = require('./routes/language');
@@ -28,6 +28,7 @@ const purchaseInvoiceRoutes = require('./routes/purchaseInvoices');
 const paymentRoutes = require('./routes/payments');
 const checkRoutes = require('./routes/checks');
 const deliveryRoutes = require('./routes/deliveries');
+const carrierRoutes = require('./routes/carriers');
 const manufacturingRoutes = require('./routes/manufacturing');
 const posRoutes = require('./routes/pos');
 const emailRoutes = require('./routes/emails');
@@ -127,6 +128,7 @@ async function createApp() {
   app.use('/payments', paymentRoutes);
   app.use('/checks', checkRoutes);
   app.use('/deliveries', deliveryRoutes);
+  app.use('/carriers', requireRole('admin', 'manager'), carrierRoutes);
   app.use('/manufacturing', manufacturingRoutes);
   app.use('/pos', posRoutes);
   app.use('/emails', emailRoutes);

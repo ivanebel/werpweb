@@ -1,0 +1,112 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1000px]">
+      <%
+        const legacyCarrierValue = !delivery.carrier_id && delivery.carrier ? delivery.carrier : '';
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Transport details') %></h1>
+            <%- statusBadge(delivery.status) %>
+          </div>
+          <p class="page-subtitle">
+            <%= delivery.packing_slip_no || delivery.delivery_no %> · <%= delivery.customer_name %>
+          </p>
+        </div>
+        <a href="/deliveries/<%= delivery.id %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Back to delivery') %>
+        </a>
+      </div>
+
+      <div class="mb-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+        <p><%= t('These details are printed on the packing slip.') %></p>
+      </div>
+
+      <form method="POST" action="/deliveries/<%= delivery.id %>/transport" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <h2 class="card-title"><%= t('Carrier / transport') %></h2>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <div class="md:col-span-2">
+            <label for="carrier_id" class="form-label"><%= t('Carrier / transport') %></label>
+            <select id="carrier_id" name="carrier_id" class="form-select">
+              <option value=""><%= t('Select carrier') %></option>
+              <% carriers.forEach(carrier => { %>
+                <option value="<%= carrier.id %>"
+                        data-driver-name="<%= carrier.driver_name || '' %>"
+                        data-driver-id="<%= carrier.driver_id || '' %>"
+                        data-license-plate="<%= carrier.license_plate || '' %>"
+                        <%= String(delivery.carrier_id || '') === String(carrier.id) ? 'selected' : '' %>>
+                  <%= carrier.company_name %><%= carrier.status !== 'active' ? ` (${t('Inactive')})` : '' %>
+                </option>
+              <% }) %>
+            </select>
+            <input type="hidden" name="legacy_carrier" value="<%= legacyCarrierValue %>">
+            <p class="form-help">
+              <% if (delivery.carrier && !delivery.carrier_id) { %><%= t('Current carrier') %>: <span class="font-medium"><%= delivery.carrier %></span><% } %>
+              <% if (currentUser && ['admin', 'manager'].includes(currentUser.role)) { %>
+                <a href="/carriers" class="link"><%= t('Manage carriers') %></a>
+              <% } %>
+            </p>
+            <% if (!carriers.length) { %>
+              <p class="form-help text-warning-600 dark:text-warning-400"><%= t('No carriers configured. Add a carrier to print transport details.') %></p>
+            <% } %>
+          </div>
+          <div>
+            <label for="carrier_driver_name" class="form-label"><%= t('Driver name') %></label>
+            <input id="carrier_driver_name" name="carrier_driver_name" type="text" maxlength="120" value="<%= delivery.carrier_driver_name || '' %>" class="form-input">
+          </div>
+          <div>
+            <label for="carrier_driver_id" class="form-label"><%= t('Driver ID / DNI') %></label>
+            <input id="carrier_driver_id" name="carrier_driver_id" type="text" maxlength="40" value="<%= delivery.carrier_driver_id || '' %>" class="form-input" placeholder="DNI">
+          </div>
+          <div>
+            <label for="carrier_license_plate" class="form-label"><%= t('License plate') %></label>
+            <input id="carrier_license_plate" name="carrier_license_plate" type="text" maxlength="20" value="<%= delivery.carrier_license_plate || '' %>" class="form-input" placeholder="AB123CD">
+          </div>
+          <div>
+            <label for="tracking_number" class="form-label">Tracking number</label>
+            <input id="tracking_number" name="tracking_number" type="text" maxlength="120" value="<%= delivery.tracking_number || '' %>" class="form-input" placeholder="Optional">
+          </div>
+        </div>
+
+        <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+          <a href="/deliveries/<%= delivery.id %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= t('Save changes') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+    (function () {
+      const select = document.getElementById('carrier_id');
+      if (!select) return;
+      const driverName = document.getElementById('carrier_driver_name');
+      const driverId = document.getElementById('carrier_driver_id');
+      const licensePlate = document.getElementById('carrier_license_plate');
+      const setValue = (input, value) => {
+        if (input) input.value = value || '';
+      };
+      select.addEventListener('change', () => {
+        const option = select.options[select.selectedIndex];
+        setValue(driverName, option && option.dataset.driverName);
+        setValue(driverId, option && option.dataset.driverId);
+        setValue(licensePlate, option && option.dataset.licensePlate);
+      });
+    })();
+  </script>
+</div>

@@ -18,6 +18,7 @@
           ? (delivery.packing_slip_no || t('Not assigned'))
           : (nextPackingSlip || t('Not assigned'));
         const assignedCai = mode === 'edit' ? delivery.cai_number : (activeCai ? activeCai.cai_number : null);
+        const legacyCarrierValue = row.legacy_carrier || (!row.carrier_id && row.carrier ? row.carrier : '');
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -87,13 +88,46 @@
                 <% if (order.reception_at) { %><p><span class="font-medium text-gray-600 dark:text-gray-300"><%= t('Reception date & time') %>:</span> <%= h.formatDateTime(order.reception_at) %></p><% } %>
               </div>
             </div>
-            <div>
-              <label for="carrier" class="form-label">Carrier</label>
-              <input id="carrier" name="carrier" type="text" value="<%= row.carrier || '' %>" class="form-input" placeholder="DHL, UPS, local courier…">
+            <div class="md:col-span-2">
+              <label for="carrier_id" class="form-label"><%= t('Carrier / transport') %></label>
+              <select id="carrier_id" name="carrier_id" class="form-select">
+                <option value=""><%= t('Select carrier') %></option>
+                <% carriers.forEach(carrier => { %>
+                  <option value="<%= carrier.id %>"
+                          data-driver-name="<%= carrier.driver_name || '' %>"
+                          data-driver-id="<%= carrier.driver_id || '' %>"
+                          data-license-plate="<%= carrier.license_plate || '' %>"
+                          <%= String(row.carrier_id || '') === String(carrier.id) ? 'selected' : '' %>>
+                    <%= carrier.company_name %><%= carrier.status !== 'active' ? ` (${t('Inactive')})` : '' %>
+                  </option>
+                <% }) %>
+              </select>
+              <input type="hidden" name="legacy_carrier" value="<%= legacyCarrierValue %>">
+              <p class="form-help">
+                <% if (row.carrier && !row.carrier_id) { %><%= t('Current carrier') %>: <span class="font-medium"><%= row.carrier %></span><% } %>
+                <% if (currentUser && ['admin', 'manager'].includes(currentUser.role)) { %>
+                  <a href="/carriers" class="link"><%= t('Manage carriers') %></a>
+                <% } %>
+              </p>
+              <% if (!carriers.length) { %>
+                <p class="form-help text-warning-600 dark:text-warning-400"><%= t('No carriers configured. Add a carrier to print transport details.') %></p>
+              <% } %>
             </div>
-            <div>
+            <div class="md:col-span-2">
               <label for="tracking_number" class="form-label">Tracking number</label>
               <input id="tracking_number" name="tracking_number" type="text" value="<%= row.tracking_number || '' %>" class="form-input" placeholder="Optional">
+            </div>
+            <div class="md:col-span-2">
+              <label for="carrier_driver_name" class="form-label"><%= t('Driver name') %></label>
+              <input id="carrier_driver_name" name="carrier_driver_name" type="text" maxlength="120" value="<%= row.carrier_driver_name || '' %>" class="form-input">
+            </div>
+            <div>
+              <label for="carrier_driver_id" class="form-label"><%= t('Driver ID / DNI') %></label>
+              <input id="carrier_driver_id" name="carrier_driver_id" type="text" maxlength="40" value="<%= row.carrier_driver_id || '' %>" class="form-input" placeholder="DNI">
+            </div>
+            <div>
+              <label for="carrier_license_plate" class="form-label"><%= t('License plate') %></label>
+              <input id="carrier_license_plate" name="carrier_license_plate" type="text" maxlength="20" value="<%= row.carrier_license_plate || '' %>" class="form-input" placeholder="AB123CD">
             </div>
             <div>
               <label for="cot" class="form-label"><%= t('COT') %></label>
@@ -274,6 +308,32 @@
               row.querySelector('[name="slip_weight_kg"]').value = round3(qty * unitWeight);
             });
           });
+        })();
+      </script>
+
+      <script>
+        (function () {
+          const select = document.getElementById('carrier_id');
+          if (!select) return;
+          const driverName = document.getElementById('carrier_driver_name');
+          const driverId = document.getElementById('carrier_driver_id');
+          const licensePlate = document.getElementById('carrier_license_plate');
+          const setValue = (input, value) => {
+            if (input) input.value = value || '';
+          };
+          const fillFromSelection = () => {
+            const option = select.options[select.selectedIndex];
+            setValue(driverName, option && option.dataset.driverName);
+            setValue(driverId, option && option.dataset.driverId);
+            setValue(licensePlate, option && option.dataset.licensePlate);
+          };
+          select.addEventListener('change', fillFromSelection);
+          if (select.value) {
+            const option = select.options[select.selectedIndex];
+            if (driverName && !driverName.value) driverName.value = option.dataset.driverName || '';
+            if (driverId && !driverId.value) driverId.value = option.dataset.driverId || '';
+            if (licensePlate && !licensePlate.value) licensePlate.value = option.dataset.licensePlate || '';
+          }
         })();
       </script>
     </div>

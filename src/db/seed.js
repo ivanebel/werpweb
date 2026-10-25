@@ -1170,6 +1170,31 @@ async function main() {
       });
     }
 
+    // ------------------------------------------------------------- carriers
+    const carrierDefs = [
+      {
+        company_name: 'UPS', driver_name: 'Michael Reed', driver_id: '12345678',
+        license_plate: 'AB123CD', phone: '+1 (415) 555-0181', email: 'michael.reed@ups.example',
+      },
+      {
+        company_name: 'FedEx', driver_name: 'Laura Gómez', driver_id: '23456789',
+        license_plate: 'AC456EF', phone: '+1 (415) 555-0192', email: 'laura.gomez@fedex.example',
+      },
+      {
+        company_name: 'DHL', driver_name: 'Diego Fernández', driver_id: '34567890',
+        license_plate: 'AD789GH', phone: '+1 (415) 555-0173', email: 'diego.fernandez@dhl.example',
+      },
+      {
+        company_name: 'Local courier', driver_name: 'Sofía Ramírez', driver_id: '45678901',
+        license_plate: 'AE012IJ', phone: '+1 (415) 555-0164', email: 'sofia.ramirez@local.example',
+      },
+    ];
+    const carriers = [];
+    for (const def of carrierDefs) {
+      const id = await insert(conn, 'carriers', { ...def, status: 'active' });
+      carriers.push({ id, ...def });
+    }
+
     // ------------------------------------------------------------ deliveries
     const [[caiCount]] = await conn.query('SELECT COUNT(*) AS count FROM cai_authorizations');
     const caiPrefix = Number(caiCount.count) === 0 ? '00001' : String(Date.now()).slice(-5).padStart(5, '0');
@@ -1191,6 +1216,7 @@ async function main() {
       const status = order.status === 'delivered' ? 'delivered' : pick(['pending', 'shipped', 'shipped']);
       const deliveryDate = addDays(order.orderDate, Math.floor(between(2, 10)));
       const seq = deliverySeq++;
+      const carrier = pick(carriers);
       const deliveryId = await insert(conn, 'deliveries', {
         delivery_no: `DLV-${deliveryDate.slice(0, 4)}-${String(seq).padStart(4, '0')}`,
         packing_slip_no: formatPackingSlipNo(caiPrefix, seq),
@@ -1200,7 +1226,11 @@ async function main() {
         sales_order_id: order.id,
         customer_id: order.customer.id,
         delivery_date: deliveryDate,
-        carrier: pick(['UPS', 'FedEx', 'DHL', 'Local courier']),
+        carrier_id: carrier.id,
+        carrier: carrier.company_name,
+        carrier_driver_name: carrier.driver_name,
+        carrier_driver_id: carrier.driver_id,
+        carrier_license_plate: carrier.license_plate,
         tracking_number: `1Z${Math.floor(between(100000, 999999))}${Math.floor(between(1000, 9999))}`,
         status,
         stock_posted: status === 'pending' ? 0 : 1,

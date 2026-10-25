@@ -99,8 +99,26 @@
                       <% } %>
                       <% if (delivery.carrier) { %>
                         <tr>
-                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Carrier:') %></td>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Carrier company') %>:</td>
                           <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= delivery.carrier %></td>
+                        </tr>
+                      <% } %>
+                      <% if (delivery.carrier_driver_name) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Driver name') %>:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;"><%= delivery.carrier_driver_name %></td>
+                        </tr>
+                      <% } %>
+                      <% if (delivery.carrier_driver_id) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('Driver ID / DNI') %>:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;font-family:monospace;"><%= delivery.carrier_driver_id %></td>
+                        </tr>
+                      <% } %>
+                      <% if (delivery.carrier_license_plate) { %>
+                        <tr>
+                          <td style="font-size:12px;color:#667085;padding:2px 0;"><%= t('License plate') %>:</td>
+                          <td style="font-size:12px;color:#1d2939;font-weight:bold;padding:2px 0 2px 12px;text-align:right;font-family:monospace;"><%= delivery.carrier_license_plate %></td>
                         </tr>
                       <% } %>
                       <% if (delivery.tracking_number) { %>

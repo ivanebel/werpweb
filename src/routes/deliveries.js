@@ -76,6 +76,35 @@ function caiStatusFor(input, nextNumber) {
   return remaining > 0 ? 'active' : 'exhausted';
 }
 
+async function carrierOptions(currentId = null) {
+  return query(
+    `SELECT id, company_name, driver_name, driver_id, license_plate, status
+       FROM carriers
+      WHERE status = 'active' ${currentId ? 'OR id = ?' : ''}
+      ORDER BY company_name`,
+    currentId ? [currentId] : [],
+  );
+}
+
+async function resolveCarrier(body, existing = null) {
+  const carrierId = Number.parseInt(body.carrier_id, 10) || null;
+  const carrier = carrierId
+    ? await one('SELECT * FROM carriers WHERE id = ? LIMIT 1', [carrierId])
+    : null;
+  const legacy = String(body.legacy_carrier || existing?.carrier || '').trim();
+  const company = (carrier ? carrier.company_name : legacy).slice(0, 120) || null;
+  const driverName = (String(body.carrier_driver_name || '').trim() || carrier?.driver_name || '').slice(0, 120) || null;
+  const driverId = (String(body.carrier_driver_id || '').trim() || carrier?.driver_id || '').slice(0, 40) || null;
+  const licensePlate = (String(body.carrier_license_plate || '').trim() || carrier?.license_plate || '').slice(0, 20) || null;
+  return {
+    carrierId: carrier ? carrier.id : null,
+    company,
+    driverName,
+    driverId,
+    licensePlate,
+  };
+}
+
 async function loadOrderItems(orderId, excludeDeliveryId = 0) {
   return query(
     `SELECT i.id AS so_item_id, i.product_id, i.quantity, i.delivered_qty,
@@ -193,8 +222,9 @@ router.get('/', async (req, res, next) => {
     const where = [];
     const params = [];
     if (search) {
-      where.push('(d.delivery_no LIKE ? OR d.packing_slip_no LIKE ? OR d.cai_number LIKE ? OR d.cot LIKE ? OR c.company_name LIKE ? OR so.order_no LIKE ? OR so.customer_order_no LIKE ? OR cw.name LIKE ? OR d.tracking_number LIKE ?)');
+      where.push('(d.delivery_no LIKE ? OR d.packing_slip_no LIKE ? OR d.cai_number LIKE ? OR d.cot LIKE ? OR d.carrier LIKE ? OR d.carrier_driver_name LIKE ? OR d.carrier_driver_id LIKE ? OR d.carrier_license_plate LIKE ? OR c.company_name LIKE ? OR so.order_no LIKE ? OR so.customer_order_no LIKE ? OR cw.name LIKE ? OR d.tracking_number LIKE ?)');
       params.push(
+        `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
         `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
         `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
       );
@@ -262,6 +292,7 @@ router.get('/new', async (req, res, next) => {
   try {
     const orderId = Number.parseInt(req.query.sales_order_id, 10);
     const currentCai = await activeCai();
+    const carriers = await carrierOptions();
     if (!orderId) {
       const orders = await query(
         `SELECT so.id, so.order_no, so.customer_order_no, so.order_date, so.status,
@@ -310,7 +341,18 @@ router.get('/new', async (req, res, next) => {
       activeCai: currentCai,
       nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
       packingDefaults,
-      row: { delivery_date: todayISO(), carrier: '', tracking_number: '', cot: '', notes: '' },
+      carriers,
+      row: {
+        delivery_date: todayISO(),
+        carrier_id: '',
+        carrier_driver_name: '',
+        carrier_driver_id: '',
+        carrier_license_plate: '',
+        legacy_carrier: '',
+        tracking_number: '',
+        cot: '',
+        notes: '',
+      },
     });
   } catch (err) {
     next(err);
@@ -385,6 +427,7 @@ router.post('/', async (req, res, next) => {
     const renderCreateError = async (messages) => {
       const available = (await loadOrderItems(orderId)).filter((i) => remainingOf(i) > 0);
       const currentCai = await activeCai();
+      const carriers = await carrierOptions();
       return res.status(422).render('deliveries/form', {
         title: req.t('New delivery'),
         active: 'deliveries',
@@ -398,11 +441,13 @@ router.post('/', async (req, res, next) => {
         activeCai: currentCai,
         nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
         packingDefaults,
+        carriers,
         row: req.body,
       });
     };
 
     if (errors.length) return renderCreateError(errors);
+    const carrier = await resolveCarrier(req.body);
 
     let deliveryId;
     try {
@@ -418,18 +463,23 @@ router.post('/', async (req, res, next) => {
         const [result] = await conn.query(
           `INSERT INTO deliveries
              (delivery_no, packing_slip_no, cai_authorization_id, cai_number, cot,
-              sales_order_id, customer_id, delivery_date, carrier, tracking_number, status, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+              carrier_id, carrier, carrier_driver_name, carrier_driver_id, carrier_license_plate,
+              sales_order_id, customer_id, delivery_date, tracking_number, status, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
           [
             deliveryNo,
             slip.packingSlipNo,
             slip.id,
             slip.caiNumber,
             (req.body.cot || '').slice(0, 80) || null,
+            carrier.carrierId,
+            carrier.company,
+            carrier.driverName,
+            carrier.driverId,
+            carrier.licensePlate,
             orderId,
             order.customer_id,
             deliveryDate,
-            (req.body.carrier || '').slice(0, 120) || null,
             (req.body.tracking_number || '').slice(0, 120) || null,
             (req.body.notes || '').slice(0, 5000) || null,
           ],
@@ -760,6 +810,7 @@ router.get('/:id(\\d+)', async (req, res, next) => {
       actions.push({ href: `${basePath}/${delivery.id}/print`, label: req.t('Print packing slip'), tone: 'secondary' });
     }
     actions.push({ href: `${basePath}/${delivery.id}/packing`, label: req.t('Edit packing quantities'), tone: 'secondary' });
+    actions.push({ href: `${basePath}/${delivery.id}/transport`, label: req.t('Edit transport'), tone: 'secondary' });
     actions.push({ href: `/emails/compose?type=delivery&id=${delivery.id}`, label: req.t('Email'), tone: 'secondary' });
 
     const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
@@ -771,6 +822,60 @@ router.get('/:id(\\d+)', async (req, res, next) => {
       items,
       actions,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id(\\d+)/transport', async (req, res, next) => {
+  try {
+    const delivery = await loadDelivery(req.params.id);
+    if (!delivery) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
+    }
+    const carriers = await carrierOptions(delivery.carrier_id);
+    const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
+
+    res.render('deliveries/transport', {
+      title: req.t('Transport details'),
+      active: 'deliveries',
+      breadcrumbs: [
+        { label: req.t('Deliveries'), href: basePath },
+        { label: pageNumber, href: `${basePath}/${delivery.id}` },
+        { label: req.t('Transport details') },
+      ],
+      delivery,
+      carriers,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id(\\d+)/transport', async (req, res, next) => {
+  try {
+    const delivery = await loadDelivery(req.params.id);
+    if (!delivery) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
+    }
+    const carrier = await resolveCarrier(req.body, delivery);
+    await getPool().query(
+      `UPDATE deliveries
+          SET carrier_id = ?, carrier = ?, carrier_driver_name = ?, carrier_driver_id = ?,
+              carrier_license_plate = ?, tracking_number = ?
+        WHERE id = ?`,
+      [
+        carrier.carrierId,
+        carrier.company,
+        carrier.driverName,
+        carrier.driverId,
+        carrier.licensePlate,
+        (req.body.tracking_number || '').slice(0, 120) || null,
+        delivery.id,
+      ],
+    );
+    req.flash('success', 'Transport details updated.');
+    res.redirect(`${basePath}/${delivery.id}`);
   } catch (err) {
     next(err);
   }
@@ -864,6 +969,7 @@ router.get('/:id(\\d+)/edit', async (req, res, next) => {
     const delivered = await query('SELECT * FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
     const items = withCurrentPacking(currentItems, delivered);
     const currentCai = await activeCai();
+    const carriers = await carrierOptions(delivery.carrier_id);
     const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
 
     res.render('deliveries/form', {
@@ -883,6 +989,7 @@ router.get('/:id(\\d+)/edit', async (req, res, next) => {
       activeCai: currentCai,
       nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
       packingDefaults,
+      carriers,
       row: delivery,
     });
   } catch (err) {
@@ -908,6 +1015,7 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       const deliveredRows = await query('SELECT * FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
       const items = withCurrentPacking(currentItems, deliveredRows);
       const currentCai = await activeCai();
+      const carriers = await carrierOptions(delivery.carrier_id);
       const pageNumber = delivery.packing_slip_no || delivery.delivery_no;
       return res.status(422).render('deliveries/form', {
         title: req.t('Edit {number}', { number: pageNumber }),
@@ -926,16 +1034,26 @@ router.post('/:id(\\d+)', async (req, res, next) => {
         activeCai: currentCai,
         nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
         packingDefaults,
+        carriers,
         row: req.body,
       });
     }
 
+    const carrier = await resolveCarrier(req.body, delivery);
     await withTransaction(async (conn) => {
       await conn.query(
-        `UPDATE deliveries SET delivery_date = ?, carrier = ?, tracking_number = ?, cot = ?, notes = ? WHERE id = ?`,
+        `UPDATE deliveries
+            SET delivery_date = ?, carrier_id = ?, carrier = ?,
+                carrier_driver_name = ?, carrier_driver_id = ?, carrier_license_plate = ?,
+                tracking_number = ?, cot = ?, notes = ?
+          WHERE id = ?`,
         [
           deliveryDate,
-          (req.body.carrier || '').slice(0, 120) || null,
+          carrier.carrierId,
+          carrier.company,
+          carrier.driverName,
+          carrier.driverId,
+          carrier.licensePlate,
           (req.body.tracking_number || '').slice(0, 120) || null,
           (req.body.cot || '').slice(0, 80) || null,
           (req.body.notes || '').slice(0, 5000) || null,

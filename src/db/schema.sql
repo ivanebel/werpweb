@@ -349,6 +349,22 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS carriers (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  company_name  VARCHAR(120) NOT NULL,
+  driver_name   VARCHAR(120) NULL,
+  driver_id     VARCHAR(40) NULL,
+  license_plate VARCHAR(20) NULL,
+  phone         VARCHAR(40) NULL,
+  email         VARCHAR(180) NULL,
+  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  notes         VARCHAR(500) NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_carriers_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Government-issued CAI authorizations for packing slips. Each authorization
 -- covers a contiguous numeric range for one five-digit series/prefix.
 CREATE TABLE IF NOT EXISTS cai_authorizations (
@@ -382,6 +398,10 @@ CREATE TABLE IF NOT EXISTS deliveries (
   customer_id           INT UNSIGNED NOT NULL,
   delivery_date         DATE NOT NULL,
   carrier               VARCHAR(120) NULL,
+  carrier_id            INT UNSIGNED NULL,
+  carrier_driver_name   VARCHAR(120) NULL,
+  carrier_driver_id     VARCHAR(40) NULL,
+  carrier_license_plate VARCHAR(20) NULL,
   tracking_number       VARCHAR(120) NULL,
   status                ENUM('pending','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending',
   stock_posted          TINYINT(1) NOT NULL DEFAULT 0,
@@ -395,12 +415,15 @@ CREATE TABLE IF NOT EXISTS deliveries (
   KEY idx_deliveries_customer (customer_id),
   KEY idx_deliveries_status (status),
   KEY idx_deliveries_cai (cai_authorization_id),
+  KEY idx_deliveries_carrier (carrier_id),
   CONSTRAINT fk_deliveries_order FOREIGN KEY (sales_order_id)
     REFERENCES sales_orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_deliveries_customer FOREIGN KEY (customer_id)
     REFERENCES customers (id) ON DELETE RESTRICT,
   CONSTRAINT fk_deliveries_cai FOREIGN KEY (cai_authorization_id)
-    REFERENCES cai_authorizations (id) ON DELETE SET NULL
+    REFERENCES cai_authorizations (id) ON DELETE SET NULL,
+  CONSTRAINT fk_deliveries_carrier FOREIGN KEY (carrier_id)
+    REFERENCES carriers (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS delivery_items (

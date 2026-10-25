@@ -152,6 +152,13 @@ async function upgradeSchema(conn, dbName) {
   await addIndex(conn, dbName, 'deliveries', 'idx_deliveries_cai', 'KEY `idx_deliveries_cai` (`cai_authorization_id`)');
   await addConstraint(conn, dbName, 'deliveries', 'fk_deliveries_cai',
     'FOREIGN KEY (`cai_authorization_id`) REFERENCES `cai_authorizations` (`id`) ON DELETE SET NULL');
+  await addColumn(conn, dbName, 'deliveries', 'carrier_id', 'INT UNSIGNED NULL AFTER carrier');
+  await addColumn(conn, dbName, 'deliveries', 'carrier_driver_name', 'VARCHAR(120) NULL AFTER carrier_id');
+  await addColumn(conn, dbName, 'deliveries', 'carrier_driver_id', 'VARCHAR(40) NULL AFTER carrier_driver_name');
+  await addColumn(conn, dbName, 'deliveries', 'carrier_license_plate', 'VARCHAR(20) NULL AFTER carrier_driver_id');
+  await addIndex(conn, dbName, 'deliveries', 'idx_deliveries_carrier', 'KEY `idx_deliveries_carrier` (`carrier_id`)');
+  await addConstraint(conn, dbName, 'deliveries', 'fk_deliveries_carrier',
+    'FOREIGN KEY (`carrier_id`) REFERENCES `carriers` (`id`) ON DELETE SET NULL');
 
   // --------------------------------------------------- packing slip breakdown
   await addColumn(conn, dbName, 'delivery_items', 'slip_pallets', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER quantity');

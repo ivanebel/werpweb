@@ -191,7 +191,10 @@ function deliveryPlainText(email, message) {
     + ` · ${t('Units')}: ${h.formatQty(packingTotals.units)}`
     + ` · ${t('Weight (kg)')}: ${h.formatQty(packingTotals.weight)}`,
   );
-  if (delivery.carrier) lines.push('', `${t('Carrier:')} ${delivery.carrier}`);
+  if (delivery.carrier) lines.push('', `${t('Carrier company')}: ${delivery.carrier}`);
+  if (delivery.carrier_driver_name) lines.push(`${t('Driver name')}: ${delivery.carrier_driver_name}`);
+  if (delivery.carrier_driver_id) lines.push(`${t('Driver ID / DNI')}: ${delivery.carrier_driver_id}`);
+  if (delivery.carrier_license_plate) lines.push(`${t('License plate')}: ${delivery.carrier_license_plate}`);
   if (delivery.tracking_number) lines.push(`${t('Tracking:')} ${delivery.tracking_number}`);
   if (delivery.notes) lines.push('', `${t('Notes')}: ${delivery.notes}`);
   lines.push('', signature);

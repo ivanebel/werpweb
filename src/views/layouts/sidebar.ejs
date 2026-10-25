@@ -16,6 +16,7 @@
       { key: 'sales', label: 'Sales invoices', href: '/sales', icon: 'receipt' },
       { key: 'payments-customer', label: 'Customer payments', href: '/payments?type=customer', icon: 'banknotes' },
       { key: 'deliveries', label: 'Deliveries', href: '/deliveries', icon: 'truck' },
+      { key: 'carriers', label: 'Carriers', href: '/carriers', icon: 'truck', roles: ['admin', 'manager'] },
       { key: 'deliveries-cai', label: 'CAI authorizations', href: '/deliveries/cai', icon: 'shield', adminOnly: true }
     ] },
     { label: 'Point of Sale', items: [
@@ -65,7 +66,11 @@
 
   <nav class="no-scrollbar flex-1 overflow-y-auto px-4 pb-6">
     <% groups.forEach((group, gi) => { %>
-      <% const visibleItems = group.items.filter(item => !item.adminOnly || (currentUser && currentUser.role === 'admin')); %>
+      <% const visibleItems = group.items.filter(item => {
+        if (item.adminOnly) return currentUser && currentUser.role === 'admin';
+        if (item.roles) return currentUser && item.roles.includes(currentUser.role);
+        return true;
+      }); %>
       <% if (visibleItems.length) { %>
         <% if (group.label) { %>
           <p class="menu-group mb-2 mt-6"><%= group.label %></p>

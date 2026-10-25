@@ -31,6 +31,7 @@
     <div class="flex items-center gap-2">
       <span class="text-sm text-gray-500"><%= t('Packing slip {number}', { number: delivery.packing_slip_no }) %></span>
       <a href="/deliveries/<%= delivery.id %>/packing" class="btn btn-secondary btn-sm"><%= t('Edit packing quantities') %></a>
+      <a href="/deliveries/<%= delivery.id %>/transport" class="btn btn-secondary btn-sm"><%= t('Edit transport') %></a>
       <button type="button" onclick="window.print()" class="btn btn-primary btn-sm">Print / Save PDF</button>
     </div>
   </div>
@@ -70,24 +71,22 @@
         <p class="mt-2 text-sm font-semibold text-gray-900"><%= delivery.customer_name %></p>
         <% if (delivery.warehouse_name) { %>
           <p class="mt-1 text-sm font-medium text-brand-600"><%= delivery.warehouse_name %><%= delivery.warehouse_code ? ` · ${delivery.warehouse_code}` : '' %></p>
-          <% if (delivery.warehouse_contact) { %><p class="text-sm text-gray-600"><%= delivery.warehouse_contact %></p><% } %>
           <% if (delivery.warehouse_address) { %><p class="text-sm text-gray-600"><%= delivery.warehouse_address %></p><% } %>
           <% if (delivery.warehouse_address2) { %><p class="text-sm text-gray-600"><%= delivery.warehouse_address2 %></p><% } %>
           <% if (delivery.warehouse_city) { %><p class="text-sm text-gray-600"><%= delivery.warehouse_city %><%= delivery.warehouse_state ? ', ' + delivery.warehouse_state : '' %> <%= delivery.warehouse_postal || '' %></p><% } %>
           <% if (delivery.warehouse_country) { %><p class="text-sm text-gray-600"><%= delivery.warehouse_country %></p><% } %>
-          <% if (delivery.warehouse_phone) { %><p class="text-sm text-gray-600"><%= delivery.warehouse_phone %></p><% } %>
         <% } else { %>
-          <% if (delivery.customer_contact) { %><p class="text-sm text-gray-600"><%= delivery.customer_contact %></p><% } %>
           <% if (delivery.customer_address) { %><p class="text-sm text-gray-600"><%= delivery.customer_address %></p><% } %>
           <% if (delivery.customer_city) { %><p class="text-sm text-gray-600"><%= delivery.customer_city %><%= delivery.customer_state ? ', ' + delivery.customer_state : '' %> <%= delivery.customer_postal || '' %></p><% } %>
           <% if (delivery.customer_country) { %><p class="text-sm text-gray-600"><%= delivery.customer_country %></p><% } %>
         <% } %>
-        <% if (delivery.customer_email) { %><p class="mt-1 text-sm text-gray-600"><%= delivery.customer_email %></p><% } %>
-        <% if (delivery.customer_phone) { %><p class="text-sm text-gray-600"><%= delivery.customer_phone %></p><% } %>
       </div>
       <div class="sm:text-right">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">Shipment details</p>
-        <p class="mt-2 text-sm text-gray-600">Carrier: <span class="font-medium text-gray-800"><%= delivery.carrier || '—' %></span></p>
+        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">Carrier / transport</p>
+        <p class="mt-2 text-sm text-gray-600"><%= t('Carrier company') %>: <span class="font-medium text-gray-800"><%= delivery.carrier || '—' %></span></p>
+        <p class="text-sm text-gray-600"><%= t('Driver name') %>: <span class="font-medium text-gray-800"><%= delivery.carrier_driver_name || '—' %></span></p>
+        <p class="text-sm text-gray-600"><%= t('Driver ID / DNI') %>: <span class="font-mono text-xs font-medium text-gray-800"><%= delivery.carrier_driver_id || '—' %></span></p>
+        <p class="text-sm text-gray-600"><%= t('License plate') %>: <span class="font-mono text-xs font-medium text-gray-800"><%= delivery.carrier_license_plate || '—' %></span></p>
         <p class="text-sm text-gray-600">Tracking: <span class="font-mono text-xs font-medium text-gray-800"><%= delivery.tracking_number || '—' %></span></p>
         <% if (delivery.customer_order_no) { %><p class="text-sm text-gray-600"><%= t('Customer order no.') %>: <span class="font-medium text-gray-800"><%= delivery.customer_order_no %></span></p><% } %>
         <% if (delivery.docking_station) { %><p class="text-sm text-gray-600"><%= t('Docking station') %>: <span class="font-medium text-gray-800"><%= delivery.docking_station %></span></p><% } %>

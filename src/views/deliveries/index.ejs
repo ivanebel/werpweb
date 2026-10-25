@@ -11,6 +11,12 @@
           <p class="page-subtitle">Fulfil confirmed sales orders and keep track of every shipment.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <% if (currentUser && ['admin', 'manager'].includes(currentUser.role)) { %>
+            <a href="/carriers" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'truck', className: 'h-4 w-4' }) %>
+              <%= t('Carriers') %>
+            </a>
+          <% } %>
           <% if (currentUser && currentUser.role === 'admin') { %>
             <a href="/deliveries/cai" class="btn btn-secondary btn-sm">
               <%- include('/partials/icon', { name: 'shield', className: 'h-4 w-4' }) %>
@@ -75,7 +81,7 @@
                 <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
                   <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
                 </span>
-                <input id="q" type="search" name="q" value="<%= search %>" class="form-input pl-10" placeholder="Packing slip no., CAI, COT, customer, order or tracking…">
+                <input id="q" type="search" name="q" value="<%= search %>" class="form-input pl-10" placeholder="Packing slip no., CAI, COT, carrier, customer, order or tracking…">
               </div>
             </div>
             <div class="w-full sm:w-auto">
@@ -131,7 +137,14 @@
                     <% if (row.warehouse_name) { %><span class="mt-0.5 block text-xs text-gray-400"><%= row.warehouse_name %><%= row.warehouse_code ? ` · ${row.warehouse_code}` : '' %></span><% } %>
                   </td>
                   <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(row.delivery_date) %></td>
-                  <td class="table-td text-gray-500 dark:text-gray-400"><%= row.carrier || '—' %></td>
+                  <td class="table-td text-gray-500 dark:text-gray-400">
+                    <%= row.carrier || '—' %>
+                    <% if (row.carrier_driver_name || row.carrier_license_plate) { %>
+                      <span class="mt-0.5 block text-xs text-gray-400">
+                        <%= row.carrier_driver_name || '—' %><% if (row.carrier_license_plate) { %> · <span class="font-mono"><%= row.carrier_license_plate %></span><% } %>
+                      </span>
+                    <% } %>
+                  </td>
                   <td class="table-td text-right"><%= h.formatNumber(row.item_count, 0) %></td>
                   <td class="table-td"><%- statusBadge(row.status) %></td>
                   <td class="table-td">

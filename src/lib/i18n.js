@@ -697,8 +697,8 @@ const ES = {
   'No active CAI authorization with available packing slips. Ask an administrator to add or activate one before creating a delivery.':
     'No hay una autorización CAI activa con remitos disponibles. Pedile a un administrador que agregue o active una antes de crear una entrega.',
   'Manage CAI': 'Administrar CAI',
-  'Packing slip no., CAI, COT, customer, order or tracking…':
-    'N.º de remito, CAI, COT, cliente, orden o seguimiento…',
+  'Packing slip no., CAI, COT, carrier, customer, order or tracking…':
+    'N.º de remito, CAI, COT, transportista, cliente, orden o seguimiento…',
   'CAI number is required.': 'El número de CAI es obligatorio.',
   'CAI number is too long.': 'El número de CAI es demasiado largo.',
   'Prefix must contain exactly five digits.': 'El prefijo debe tener exactamente cinco dígitos.',
@@ -755,6 +755,30 @@ const ES = {
     'Estas cantidades se imprimen en el remito. Modificarlas no altera el stock ni la cantidad de la entrega.',
   'Adjust pallets, boxes, units or weight for any line.':
     'Ajustá pallets, cajas, unidades o peso en cualquier línea.',
+  'Carriers': 'Transportistas',
+  'carrier': 'transportista',
+  'carriers': 'transportistas',
+  'Carrier / transport': 'Transportista / transporte',
+  'Carrier company': 'Empresa transportista',
+  'Driver': 'Chofer',
+  'Driver name': 'Nombre del chofer',
+  'Driver ID / DNI': 'DNI / Identificación del chofer',
+  'License plate': 'Patente del vehículo',
+  'Vehicle': 'Vehículo',
+  'National identity document or equivalent.': 'Documento nacional de identidad o equivalente.',
+  'Select carrier': 'Seleccionar transportista',
+  'Current carrier': 'Transportista actual',
+  'Manage carriers': 'Administrar transportistas',
+  'No carriers configured. Add a carrier to print transport details.':
+    'No hay transportistas configurados. Agregá uno para imprimir los datos del transporte.',
+  'Manage transport companies, drivers and vehicle details used on packing slips.':
+    'Administrá empresas de transporte, choferes y datos del vehículo usados en los remitos.',
+  'New Carrier': 'Nuevo transportista',
+  'Edit Carrier': 'Editar transportista',
+  'Transport details': 'Datos del transporte',
+  'Edit transport': 'Editar transporte',
+  'Transport details updated.': 'Datos del transporte actualizados.',
+  'These details are printed on the packing slip.': 'Estos datos se imprimen en el remito.',
 
   // -------------------------------------------- customer warehouses/orders
   'Warehouses': 'Depósitos',
