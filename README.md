@@ -17,7 +17,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Sales** — sales orders, sales invoices and deliveries. Orders can be confirmed, invoiced and delivered partially or completely. Each customer can have several receiving warehouses (separate from the billing address). Sales orders store the customer's own order number, a destination warehouse, the docking station and the expected reception date/time; deliveries and their printed documents show these details. Each delivery receives a sequential packing-slip number from an administrator-managed CAI authorization, and packing slips can carry an optional COT code. Packing-slip lines show pallets, boxes, units and weight, calculated from the product packaging data and editable for manual adjustments. Carrier and transport records store the company, driver, DNI/ID and truck license plate, and those details are printed on the packing slip. Customers can also store their own product codes, which are printed on sales documents and packing slips.
 - **Purchasing** — purchase orders and purchase invoices (bills). Receiving a bill posts stock into inventory.
 - **Point of Sale (Unit #2)** — manage several shops as distinct points of sale, record completed POS sales with ticket type, ticket number and shop, and analyse revenue, average ticket, units, product rankings and category performance. POS sales are reporting records only: they do not create stock movements or change Unit #1 inventory.
-- **Manufacturing** — bills of materials with component quantities and scrap, production orders that snapshot the BOM, check material availability, consume components and add finished goods to stock when completed, and scale records from the Bizerba GLM-e labeler with lot/date filters, weight statistics, and box/pallet totals.
+- **Manufacturing** — bills of materials with component quantities and scrap, multi-BOM production orders where each line has its own quantity, lot, expiry and notes, aggregated material requirements across all BOM lines, material availability checks, component consumption and finished-goods posting, plus scale records from the Bizerba GLM-e labeler with lot/date filters, weight statistics, and box/pallet totals.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
 - **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
@@ -211,10 +211,10 @@ The test logs in with the seeded admin account, creates its own customer, suppli
 ### Manufacturing
 
 1. Create an **active BOM** for a finished product and add its components with quantities and scrap percentages.
-2. Create a **production order** from the BOM (optionally linked to a sales order).
-3. Release the order, then start production.
-4. **Complete** the order: the system checks material availability, consumes components, records stock movements and adds the finished quantity to stock. If stock is short, completion is blocked with a clear error.
-5. Sales orders can also generate production orders for their manufactured products from the order detail page.
+2. Create a **production order** and add one or more **BOM lines**, each with its own quantity, lot number, expiry date and notes. The order can optionally be linked to a sales order.
+3. Review the **aggregated material requirements**; components shared by several BOMs appear once with their combined quantity. Release the order, then start production.
+4. **Complete** the order: the system checks material availability, consumes the combined components, records stock movements and adds every finished product to stock. If stock is short, completion is blocked with a clear error.
+5. Sales orders can also generate a production order with lines for their manufactured products from the order detail page.
 
 ### Point-of-sale reporting
 

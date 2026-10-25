@@ -238,7 +238,9 @@
                   <a href="/manufacturing/production-orders/<%= po.id %>" class="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div>
                       <p class="text-sm font-medium text-gray-800 dark:text-gray-200"><%= po.production_no %></p>
-                      <p class="text-xs text-gray-400"><%= t('{count} units · due {date}', { count: h.formatQty(po.quantity), date: h.formatDate(po.due_date) }) %></p>
+                      <p class="text-xs text-gray-400">
+                        <%= po.first_product_name ? `${po.first_product_name} · ` : '' %><%= h.pluralize(po.line_count, 'BOM line') %> · <%= t('Due') %> <%= h.formatDate(po.due_date) %>
+                      </p>
                     </div>
                     <%- statusBadge(po.status) %>
                   </a>

@@ -33,6 +33,18 @@ async function addColumn(conn, dbName, table, column, definition) {
   return true;
 }
 
+async function makeNullable(conn, dbName, table, column, definition) {
+  const [rows] = await conn.query(
+    `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [dbName, table, column],
+  );
+  if (!rows.length || rows[0].IS_NULLABLE === 'YES') return false;
+  await conn.query(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`);
+  console.log(`[migrate] made ${table}.${column} nullable`);
+  return true;
+}
+
 async function indexExists(conn, dbName, table, indexName) {
   const [rows] = await conn.query(
     `SELECT 1 FROM information_schema.STATISTICS
@@ -142,6 +154,23 @@ async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'production_orders', 'lot_number', 'VARCHAR(60) NULL AFTER product_id');
   await addColumn(conn, dbName, 'production_orders', 'expiry_date', 'DATE NULL AFTER lot_number');
   await addIndex(conn, dbName, 'production_orders', 'idx_production_orders_expiry', 'KEY `idx_production_orders_expiry` (`expiry_date`)');
+
+  // ---------------------------------------------------- multi-BOM production
+  await makeNullable(conn, dbName, 'production_orders', 'bom_id', 'INT UNSIGNED NULL');
+  await makeNullable(conn, dbName, 'production_orders', 'product_id', 'INT UNSIGNED NULL');
+  await makeNullable(conn, dbName, 'production_orders', 'quantity', 'DECIMAL(14,3) NULL');
+  await addColumn(conn, dbName, 'production_order_materials', 'source_count', 'INT UNSIGNED NOT NULL DEFAULT 1 AFTER quantity_consumed');
+  await conn.query(
+    `INSERT INTO production_order_lines
+       (production_order_id, bom_id, product_id, quantity, lot_number, expiry_date, notes, sort_order)
+     SELECT po.id, po.bom_id, po.product_id, po.quantity, po.lot_number, po.expiry_date, NULL, 0
+       FROM production_orders po
+      WHERE po.bom_id IS NOT NULL
+        AND po.product_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM production_order_lines l WHERE l.production_order_id = po.id
+        )`,
+  );
 
   // ------------------------------------------------- packing slips and CAI
   await addColumn(conn, dbName, 'deliveries', 'packing_slip_no', 'VARCHAR(14) NULL AFTER delivery_no');

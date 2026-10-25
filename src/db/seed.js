@@ -1307,17 +1307,24 @@ async function main() {
       const productionId = await insert(conn, 'production_orders', {
         production_no: `PRD-${startDate.slice(0, 4)}-${String(prodSeq++).padStart(4, '0')}`,
         sales_order_id: order.id,
-        bom_id: bom[finishedLine.sku],
-        product_id: prod[finishedLine.sku],
-        lot_number: lotFromDate(startDate),
-        expiry_date: addDays(dueDate, 365),
-        quantity: finishedLine.quantity,
         start_date: startDate,
         due_date: dueDate,
         status,
         completed_at: status === 'completed' ? `${dueDate} 15:30:00` : null,
         notes: null,
         created_by: adminId,
+      });
+      const productionLot = lotFromDate(startDate);
+      const productionExpiry = addDays(dueDate, 365);
+      await insert(conn, 'production_order_lines', {
+        production_order_id: productionId,
+        bom_id: bom[finishedLine.sku],
+        product_id: prod[finishedLine.sku],
+        quantity: finishedLine.quantity,
+        lot_number: productionLot,
+        expiry_date: productionExpiry,
+        notes: null,
+        sort_order: 0,
       });
       const [bomComponents] = await conn.query(
         `SELECT component_id, quantity, scrap_percent FROM bom_items WHERE bom_id = ?`,
@@ -1330,6 +1337,7 @@ async function main() {
           component_id: comp.component_id,
           quantity_required: required,
           quantity_consumed: status === 'completed' ? required : 0,
+          source_count: 1,
         });
         if (status === 'completed') {
           await insert(conn, 'stock_movements', {
@@ -1367,8 +1375,8 @@ async function main() {
           await insert(conn, 'scale_records', {
             product_id: prod[finishedLine.sku],
             plu: finishedPlu,
-            lot_number: lotFromDate(startDate),
-            expiry_date: addDays(dueDate, 365),
+            lot_number: productionLot,
+            expiry_date: productionExpiry,
             weighed_at: `${startDate} ${String(8 + Math.floor(n / 6)).padStart(2, '0')}:${String((n * 7) % 60).padStart(2, '0')}:00`,
             in_range: inRange,
             real_weight: realWeight,

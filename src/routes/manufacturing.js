@@ -291,9 +291,11 @@ router.get('/boms/:id(\\d+)', async (req, res, next) => {
     const unitCost = materialCost / (Number(bom.output_qty) || 1);
     const margin = Number(bom.sale_price) - unitCost;
     const productionOrders = await query(
-      `SELECT po.id, po.production_no, po.quantity, po.status, po.due_date, so.order_no
-         FROM production_orders po LEFT JOIN sales_orders so ON so.id = po.sales_order_id
-        WHERE po.bom_id = ? ORDER BY po.id DESC LIMIT 10`,
+      `SELECT DISTINCT po.id, po.production_no, l.quantity, po.status, po.due_date, so.order_no
+         FROM production_orders po
+         JOIN production_order_lines l ON l.production_order_id = po.id
+         LEFT JOIN sales_orders so ON so.id = po.sales_order_id
+        WHERE l.bom_id = ? ORDER BY po.id DESC LIMIT 10`,
       [bom.id],
     );
 
@@ -427,7 +429,7 @@ router.post('/boms/:id(\\d+)/delete', async (req, res, next) => {
     if (!bom) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('BOM') })), { status: 404 }));
     }
-    const used = await scalar('SELECT COUNT(*) FROM production_orders WHERE bom_id = ?', [bom.id]);
+    const used = await scalar('SELECT COUNT(*) FROM production_order_lines WHERE bom_id = ?', [bom.id]);
     if (Number(used) > 0) {
       req.flash('error', 'This BOM is used by production orders and cannot be deleted. Archive it instead.');
       return res.redirect(`/manufacturing/boms/${bom.id}`);
@@ -441,6 +443,171 @@ router.post('/boms/:id(\\d+)/delete', async (req, res, next) => {
 });
 
 // --------------------------------------------------------- production orders
+
+async function bomOptions(productionOrderId = null) {
+  return query(
+    `SELECT b.id, b.name, b.version, b.output_qty, b.status,
+            b.product_id, p.name AS product_name, p.sku, p.unit
+       FROM boms b JOIN products p ON p.id = b.product_id
+      WHERE (b.status = 'active'
+        ${productionOrderId ? 'OR b.id IN (SELECT bom_id FROM production_order_lines WHERE production_order_id = ?)' : ''})
+      ORDER BY p.name, b.version`,
+    productionOrderId ? [productionOrderId] : [],
+  );
+}
+
+async function productionFormOptions(productionOrderId = null) {
+  const boms = await bomOptions(productionOrderId);
+  const salesOrders = await query(
+    `SELECT so.id, so.order_no, so.expected_date, c.company_name FROM sales_orders so
+       JOIN customers c ON c.id = so.customer_id
+      WHERE so.status IN ('confirmed','partially_delivered')
+      ORDER BY so.order_date DESC LIMIT 100`,
+  );
+  return { boms, salesOrders };
+}
+
+function defaultProductionLine(startDate, bomId = '') {
+  return {
+    bom_id: bomId,
+    quantity: 1,
+    lot_number: lotFromDate(startDate || todayISO()),
+    expiry_date: '',
+    notes: '',
+  };
+}
+
+function collectProductionLines(body, boms, t = (value) => value) {
+  const bomIds = arr(body.line_bom_id);
+  const quantities = arr(body.line_quantity);
+  const lots = arr(body.line_lot_number);
+  const expiries = arr(body.line_expiry_date);
+  const notes = arr(body.line_notes);
+  const count = Math.max(bomIds.length, quantities.length, lots.length, expiries.length, notes.length);
+  const byId = new Map(boms.map((bom) => [String(bom.id), bom]));
+  const seen = new Set();
+  const seenProducts = new Set();
+  const rows = [];
+  const lines = [];
+  const errors = [];
+
+  for (let i = 0; i < count; i++) {
+    const raw = {
+      bom_id: String(bomIds[i] || '').trim(),
+      quantity: String(quantities[i] || '').trim(),
+      lot_number: String(lots[i] || '').trim(),
+      expiry_date: String(expiries[i] || '').trim(),
+      notes: String(notes[i] || '').trim(),
+    };
+    if (!raw.bom_id && !raw.quantity && !raw.lot_number && !raw.expiry_date && !raw.notes) continue;
+    rows.push(raw);
+    const lineNumber = rows.length;
+    const bomId = Number.parseInt(raw.bom_id, 10);
+    const bom = byId.get(String(bomId));
+    if (!bom) {
+      errors.push(t('Line {line}: select a valid BOM.', { line: lineNumber }));
+      continue;
+    }
+    if (seen.has(bomId)) {
+      errors.push(t('Line {line}: this BOM is already in the order.', { line: lineNumber }));
+      continue;
+    }
+    if (seenProducts.has(bom.product_id)) {
+      errors.push(t('Line {line}: this product is already produced by another BOM in the order.', { line: lineNumber }));
+      continue;
+    }
+    seen.add(bomId);
+    seenProducts.add(bom.product_id);
+    const quantity = toNumber(raw.quantity, 0);
+    if (quantity <= 0) {
+      errors.push(t('Line {line}: quantity must be greater than zero.', { line: lineNumber }));
+    }
+    if (!raw.lot_number) {
+      errors.push(t('Line {line}: lot number is required.', { line: lineNumber }));
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw.expiry_date)) {
+      errors.push(t('Line {line}: valid expiry date required.', { line: lineNumber }));
+    }
+    lines.push({
+      bom_id: bomId,
+      product_id: bom.product_id,
+      quantity,
+      lot_number: raw.lot_number.slice(0, 60),
+      expiry_date: raw.expiry_date.slice(0, 10),
+      notes: raw.notes.slice(0, 5000) || null,
+      sort_order: lines.length,
+    });
+  }
+
+  if (!rows.length) errors.push(t('Add at least one BOM line.'));
+  return { rows, lines, errors };
+}
+
+async function loadProductionLines(productionOrderId) {
+  return query(
+    `SELECT l.*, b.name AS bom_name, b.version, b.output_qty, b.status AS bom_status,
+            p.name AS product_name, p.sku, p.unit, p.stock_qty AS product_stock
+       FROM production_order_lines l
+       JOIN boms b ON b.id = l.bom_id
+       JOIN products p ON p.id = l.product_id
+      WHERE l.production_order_id = ?
+      ORDER BY l.sort_order, l.id`,
+    [productionOrderId],
+  );
+}
+
+async function loadProductionMaterials(productionOrderId) {
+  return query(
+    `SELECT m.*, p.sku, p.name, p.unit, p.stock_qty, p.track_stock, p.cost_price,
+            (m.quantity_required * p.cost_price) AS line_cost
+       FROM production_order_materials m
+       JOIN products p ON p.id = m.component_id
+      WHERE m.production_order_id = ?
+      ORDER BY p.name, m.id`,
+    [productionOrderId],
+  );
+}
+
+async function loadProductionOrder(productionOrderId) {
+  return one(
+    `SELECT po.*, so.order_no, so.customer_order_no, c.company_name AS customer_name
+       FROM production_orders po
+       LEFT JOIN sales_orders so ON so.id = po.sales_order_id
+       LEFT JOIN customers c ON c.id = so.customer_id
+      WHERE po.id = ? LIMIT 1`,
+    [productionOrderId],
+  );
+}
+
+function productionFormLocals(req, options) {
+  const breadcrumbs = [
+    { label: req.t('Manufacturing') },
+    { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
+  ];
+  if (options.mode === 'edit') {
+    breadcrumbs.push(
+      { label: options.row.production_no, href: `/manufacturing/production-orders/${options.row.id}` },
+      { label: req.t('Edit') },
+    );
+  } else {
+    breadcrumbs.push({ label: req.t('New order') });
+  }
+  return {
+    title: options.title,
+    active: 'manufacturing-production',
+    breadcrumbs,
+    boms: options.boms,
+    salesOrders: options.salesOrders,
+    row: options.row,
+    lines: options.lines,
+    errors: options.errors || {},
+    lineErrors: options.lineErrors || [],
+    mode: options.mode,
+    action: options.action,
+    defaultLot: lotFromDate(options.row.start_date || todayISO()),
+  };
+}
+
 router.get('/production-orders', async (req, res, next) => {
   try {
     const search = String(req.query.q || '').trim();
@@ -448,7 +615,11 @@ router.get('/production-orders', async (req, res, next) => {
     const where = [];
     const params = [];
     if (search) {
-      where.push('(po.production_no LIKE ? OR p.name LIKE ? OR p.sku LIKE ? OR po.lot_number LIKE ? OR so.order_no LIKE ?)');
+      where.push(`(po.production_no LIKE ? OR so.order_no LIKE ? OR EXISTS (
+        SELECT 1 FROM production_order_lines l JOIN products p ON p.id = l.product_id
+         WHERE l.production_order_id = po.id
+           AND (p.name LIKE ? OR p.sku LIKE ? OR l.lot_number LIKE ?)
+      ))`);
       params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
     if (status) {
@@ -460,17 +631,26 @@ router.get('/production-orders', async (req, res, next) => {
     const perPage = 12;
     const total = Number(
       (await scalar(
-        `SELECT COUNT(*) FROM production_orders po JOIN products p ON p.id = po.product_id
-          LEFT JOIN sales_orders so ON so.id = po.sales_order_id ${whereSql}`,
+        `SELECT COUNT(*) FROM production_orders po
+           LEFT JOIN sales_orders so ON so.id = po.sales_order_id
+           ${whereSql}`,
         params,
       )) || 0,
     );
     const pag = pagination(total, page, perPage);
     const rows = await query(
-      `SELECT po.*, p.name AS product_name, p.sku AS product_sku, so.order_no, b.name AS bom_name
+      `SELECT po.*, so.order_no,
+              (SELECT COUNT(*) FROM production_order_lines l WHERE l.production_order_id = po.id) AS line_count,
+              (SELECT p.name FROM production_order_lines l JOIN products p ON p.id = l.product_id
+                WHERE l.production_order_id = po.id ORDER BY l.sort_order, l.id LIMIT 1) AS first_product_name,
+              (SELECT p.sku FROM production_order_lines l JOIN products p ON p.id = l.product_id
+                WHERE l.production_order_id = po.id ORDER BY l.sort_order, l.id LIMIT 1) AS first_product_sku,
+              (SELECT GROUP_CONCAT(DISTINCT l.lot_number ORDER BY l.lot_number SEPARATOR ', ')
+                 FROM production_order_lines l
+                WHERE l.production_order_id = po.id AND l.lot_number IS NOT NULL AND l.lot_number <> '') AS lot_summary,
+              (SELECT MIN(l.expiry_date) FROM production_order_lines l
+                WHERE l.production_order_id = po.id AND l.expiry_date IS NOT NULL) AS next_expiry
          FROM production_orders po
-         JOIN products p ON p.id = po.product_id
-         JOIN boms b ON b.id = po.bom_id
          LEFT JOIN sales_orders so ON so.id = po.sales_order_id
          ${whereSql}
         ORDER BY FIELD(po.status, 'in_progress','released','planned','completed','cancelled'), po.due_date ASC, po.id DESC
@@ -504,43 +684,23 @@ router.get('/production-orders', async (req, res, next) => {
 
 router.get('/production-orders/new', async (req, res, next) => {
   try {
-    const boms = await query(
-      `SELECT b.id, b.name, b.version, b.output_qty, p.name AS product_name, p.sku, p.unit
-         FROM boms b JOIN products p ON p.id = b.product_id
-        WHERE b.status = 'active' ORDER BY p.name`,
-    );
-    const salesOrders = await query(
-      `SELECT so.id, so.order_no, so.expected_date, c.company_name FROM sales_orders so
-         JOIN customers c ON c.id = so.customer_id
-        WHERE so.status IN ('confirmed','partially_delivered')
-        ORDER BY so.order_date DESC LIMIT 100`,
-    );
+    const options = await productionFormOptions();
     const today = todayISO();
     const row = {
-      bom_id: req.query.bom_id || '',
       sales_order_id: req.query.sales_order_id || '',
-      quantity: 1,
-      lot_number: lotFromDate(today),
-      expiry_date: '',
       start_date: today,
       due_date: addDaysISO(today, 14),
       notes: '',
     };
-    res.render('manufacturing/production/form', {
+    const lines = [defaultProductionLine(today, req.query.bom_id || '')];
+    res.render('manufacturing/production/form', productionFormLocals(req, {
       title: req.t('New Production Order'),
-      active: 'manufacturing-production',
-      breadcrumbs: [
-        { label: req.t('Manufacturing') },
-        { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
-        { label: req.t('New order') },
-      ],
-      boms,
-      salesOrders,
-      row,
-      errors: {},
       mode: 'create',
       action: '/manufacturing/production-orders',
-    });
+      row,
+      lines,
+      ...options,
+    }));
   } catch (err) {
     next(err);
   }
@@ -548,50 +708,33 @@ router.get('/production-orders/new', async (req, res, next) => {
 
 router.post('/production-orders', async (req, res, next) => {
   try {
-    const bomId = Number.parseInt(req.body.bom_id, 10);
-    const quantity = toNumber(req.body.quantity, 0);
-    const bom = bomId
-      ? await one('SELECT * FROM boms WHERE id = ?', [bomId])
-      : null;
-    const startDate = String(req.body.start_date || '').slice(0, 10);
-    const lotNumber = String(req.body.lot_number || '').trim().slice(0, 60);
-    const expiryDate = String(req.body.expiry_date || '').slice(0, 10);
+    const options = await productionFormOptions();
+    const { rows, lines, errors: lineErrors } = collectProductionLines(req.body, options.boms, req.t);
     const errors = {};
-    if (!bom) errors.bom_id = req.t('Select an active BOM.');
-    if (quantity <= 0) errors.quantity = req.t('Quantity must be greater than zero.');
+    const startDate = String(req.body.start_date || '').slice(0, 10);
+    const dueDate = String(req.body.due_date || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
       errors.start_date = req.t('Valid start date required.');
     }
-    if (!lotNumber) errors.lot_number = req.t('Lot number is required.');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
-      errors.expiry_date = req.t('Valid expiry date required.');
+    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      errors.due_date = req.t('Valid due date required.');
     }
+    if (!errors.start_date && !errors.due_date && dueDate && dueDate < startDate) {
+      errors.due_date = req.t('Due date cannot be before the start date.');
+    }
+    const row = { ...req.body, start_date: startDate, due_date: dueDate };
 
-    if (Object.keys(errors).length) {
-      const boms = await query(
-        `SELECT b.id, b.name, b.version, b.output_qty, p.name AS product_name, p.sku, p.unit
-           FROM boms b JOIN products p ON p.id = b.product_id WHERE b.status = 'active' ORDER BY p.name`,
-      );
-      const salesOrders = await query(
-        `SELECT so.id, so.order_no, so.expected_date, c.company_name FROM sales_orders so
-           JOIN customers c ON c.id = so.customer_id
-          WHERE so.status IN ('confirmed','partially_delivered') ORDER BY so.order_date DESC LIMIT 100`,
-      );
-      return res.status(422).render('manufacturing/production/form', {
+    if (Object.keys(errors).length || lineErrors.length) {
+      return res.status(422).render('manufacturing/production/form', productionFormLocals(req, {
         title: req.t('New Production Order'),
-        active: 'manufacturing-production',
-        breadcrumbs: [
-          { label: req.t('Manufacturing') },
-          { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
-          { label: req.t('New order') },
-        ],
-        boms,
-        salesOrders,
-        row: req.body,
-        errors,
         mode: 'create',
         action: '/manufacturing/production-orders',
-      });
+        row,
+        lines: rows.length ? rows : [defaultProductionLine(startDate)],
+        errors,
+        lineErrors,
+        ...options,
+      }));
     }
 
     const id = await withTransaction(async (conn) => {
@@ -604,23 +747,36 @@ router.post('/production-orders', async (req, res, next) => {
       });
       const [result] = await conn.query(
         `INSERT INTO production_orders
-           (production_no, sales_order_id, bom_id, product_id, lot_number, expiry_date, quantity, start_date, due_date, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned', ?, ?)`,
+           (production_no, sales_order_id, start_date, due_date, status, notes, created_by)
+         VALUES (?, ?, ?, ?, 'planned', ?, ?)`,
         [
           productionNo,
           Number.parseInt(req.body.sales_order_id, 10) || null,
-          bom.id,
-          bom.product_id,
-          lotNumber,
-          expiryDate,
-          quantity,
           startDate,
-          req.body.due_date || null,
+          dueDate || null,
           (req.body.notes || '').slice(0, 5000) || null,
           req.session.user.id,
         ],
       );
-      await snapshotMaterials(conn, result.insertId, bom.id, quantity);
+      let sort = 0;
+      for (const line of lines) {
+        await conn.query(
+          `INSERT INTO production_order_lines
+             (production_order_id, bom_id, product_id, quantity, lot_number, expiry_date, notes, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            result.insertId,
+            line.bom_id,
+            line.product_id,
+            line.quantity,
+            line.lot_number,
+            line.expiry_date,
+            line.notes,
+            sort++,
+          ],
+        );
+      }
+      await snapshotMaterials(conn, result.insertId);
       return result.insertId;
     });
 
@@ -633,28 +789,12 @@ router.post('/production-orders', async (req, res, next) => {
 
 router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
   try {
-    const order = await one(
-      `SELECT po.*, p.name AS product_name, p.sku AS product_sku, p.unit, p.stock_qty AS product_stock,
-              b.name AS bom_name, b.version, b.output_qty, so.order_no, c.company_name AS customer_name
-         FROM production_orders po
-         JOIN products p ON p.id = po.product_id
-         JOIN boms b ON b.id = po.bom_id
-         LEFT JOIN sales_orders so ON so.id = po.sales_order_id
-         LEFT JOIN customers c ON c.id = so.customer_id
-        WHERE po.id = ? LIMIT 1`,
-      [req.params.id],
-    );
+    const order = await loadProductionOrder(req.params.id);
     if (!order) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
     }
-
-    const materials = await query(
-      `SELECT m.*, p.sku, p.name, p.unit, p.stock_qty, p.track_stock, p.cost_price,
-              (m.quantity_required * p.cost_price) AS line_cost
-         FROM production_order_materials m JOIN products p ON p.id = m.component_id
-        WHERE m.production_order_id = ? ORDER BY m.id`,
-      [order.id],
-    );
+    const lines = await loadProductionLines(order.id);
+    const materials = await loadProductionMaterials(order.id);
     const shortage = materials.some((m) => m.track_stock && Number(m.stock_qty) < Number(m.quantity_required));
 
     const actions = [];
@@ -669,6 +809,7 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
       actions.push({ action: 'status', value: 'completed', label: req.t('Complete & consume stock'), tone: 'success', confirm: true });
     }
     if (['planned', 'released', 'in_progress'].includes(order.status)) {
+      actions.push({ href: `/manufacturing/production-orders/${order.id}/batches`, label: req.t('Edit batch details'), tone: 'secondary' });
       actions.push({ action: 'status', value: 'cancelled', label: req.t('Cancel'), tone: 'danger', confirm: true });
     }
 
@@ -681,10 +822,10 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
         { label: order.production_no },
       ],
       order,
+      lines,
       materials,
       shortage,
       actions,
-      defaultLot: order.lot_number || lotFromDate(order.start_date),
     });
   } catch (err) {
     next(err);
@@ -693,7 +834,7 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
 
 router.get('/production-orders/:id(\\d+)/edit', async (req, res, next) => {
   try {
-    const order = await one('SELECT * FROM production_orders WHERE id = ?', [req.params.id]);
+    const order = await loadProductionOrder(req.params.id);
     if (!order) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
     }
@@ -701,31 +842,17 @@ router.get('/production-orders/:id(\\d+)/edit', async (req, res, next) => {
       req.flash('error', 'Only planned production orders can be edited.');
       return res.redirect(`/manufacturing/production-orders/${order.id}`);
     }
-    const boms = await query(
-      `SELECT b.id, b.name, b.version, b.output_qty, p.name AS product_name, p.sku, p.unit
-         FROM boms b JOIN products p ON p.id = b.product_id WHERE b.status = 'active' ORDER BY p.name`,
-    );
-    const salesOrders = await query(
-      `SELECT so.id, so.order_no, so.expected_date, c.company_name FROM sales_orders so
-         JOIN customers c ON c.id = so.customer_id
-        WHERE so.status IN ('confirmed','partially_delivered') ORDER BY so.order_date DESC LIMIT 100`,
-    );
-    res.render('manufacturing/production/form', {
+    const options = await productionFormOptions(order.id);
+    let lines = await loadProductionLines(order.id);
+    if (!lines.length) lines = [defaultProductionLine(order.start_date || todayISO())];
+    res.render('manufacturing/production/form', productionFormLocals(req, {
       title: req.t('Edit {number}', { number: order.production_no }),
-      active: 'manufacturing-production',
-      breadcrumbs: [
-        { label: req.t('Manufacturing') },
-        { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
-        { label: order.production_no, href: `/manufacturing/production-orders/${order.id}` },
-        { label: req.t('Edit') },
-      ],
-      boms,
-      salesOrders,
-      row: { ...order, lot_number: order.lot_number || lotFromDate(order.start_date) },
-      errors: {},
       mode: 'edit',
       action: `/manufacturing/production-orders/${order.id}`,
-    });
+      row: { ...order, start_date: order.start_date || todayISO(), due_date: order.due_date || '', notes: order.notes || '' },
+      lines,
+      ...options,
+    }));
   } catch (err) {
     next(err);
   }
@@ -733,7 +860,7 @@ router.get('/production-orders/:id(\\d+)/edit', async (req, res, next) => {
 
 router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
   try {
-    const order = await one('SELECT * FROM production_orders WHERE id = ?', [req.params.id]);
+    const order = await loadProductionOrder(req.params.id);
     if (!order) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
     }
@@ -741,80 +868,83 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
       req.flash('error', 'Only planned production orders can be edited.');
       return res.redirect(`/manufacturing/production-orders/${order.id}`);
     }
-    const bomId = Number.parseInt(req.body.bom_id, 10);
-    const quantity = toNumber(req.body.quantity, 0);
-    const bom = bomId ? await one('SELECT * FROM boms WHERE id = ?', [bomId]) : null;
-    const startDate = String(req.body.start_date || '').slice(0, 10);
-    const lotNumber = String(req.body.lot_number || '').trim().slice(0, 60);
-    const expiryDate = String(req.body.expiry_date || '').slice(0, 10);
+    const options = await productionFormOptions(order.id);
+    const { rows, lines, errors: lineErrors } = collectProductionLines(req.body, options.boms, req.t);
     const errors = {};
-    if (!bom) errors.bom_id = req.t('Select an active BOM.');
-    if (quantity <= 0) errors.quantity = req.t('Quantity must be greater than zero.');
-    if (!lotNumber) errors.lot_number = req.t('Lot number is required.');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
-      errors.expiry_date = req.t('Valid expiry date required.');
+    const startDate = String(req.body.start_date || '').slice(0, 10);
+    const dueDate = String(req.body.due_date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      errors.start_date = req.t('Valid start date required.');
+    }
+    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      errors.due_date = req.t('Valid due date required.');
+    }
+    if (!errors.start_date && !errors.due_date && dueDate && dueDate < startDate) {
+      errors.due_date = req.t('Due date cannot be before the start date.');
     }
 
-    if (Object.keys(errors).length) {
-      const boms = await query(
-        `SELECT b.id, b.name, b.version, b.output_qty, p.name AS product_name, p.sku, p.unit
-           FROM boms b JOIN products p ON p.id = b.product_id WHERE b.status = 'active' ORDER BY p.name`,
-      );
-      const salesOrders = await query(
-        `SELECT so.id, so.order_no, so.expected_date, c.company_name FROM sales_orders so
-           JOIN customers c ON c.id = so.customer_id
-          WHERE so.status IN ('confirmed','partially_delivered') ORDER BY so.order_date DESC LIMIT 100`,
-      );
-      return res.status(422).render('manufacturing/production/form', {
+    if (Object.keys(errors).length || lineErrors.length) {
+      return res.status(422).render('manufacturing/production/form', productionFormLocals(req, {
         title: req.t('Edit {number}', { number: order.production_no }),
-        active: 'manufacturing-production',
-        breadcrumbs: [
-          { label: req.t('Manufacturing') },
-          { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
-          { label: order.production_no, href: `/manufacturing/production-orders/${order.id}` },
-          { label: req.t('Edit') },
-        ],
-        boms,
-        salesOrders,
-        row: { ...order, ...req.body },
-        errors,
         mode: 'edit',
         action: `/manufacturing/production-orders/${order.id}`,
-      });
+        row: { ...order, ...req.body, start_date: startDate, due_date: dueDate },
+        lines: rows.length ? rows : [defaultProductionLine(startDate)],
+        errors,
+        lineErrors,
+        ...options,
+      }));
     }
 
     await withTransaction(async (conn) => {
       await conn.query(
         `UPDATE production_orders
-            SET sales_order_id = ?, bom_id = ?, product_id = ?, lot_number = ?, expiry_date = ?,
-                quantity = ?, start_date = ?, due_date = ?, notes = ?
+            SET sales_order_id = ?, start_date = ?, due_date = ?, notes = ?
           WHERE id = ?`,
         [
           Number.parseInt(req.body.sales_order_id, 10) || null,
-          bom.id,
-          bom.product_id,
-          lotNumber,
-          expiryDate,
-          quantity,
-          startDate || null,
-          req.body.due_date || null,
+          startDate,
+          dueDate || null,
           (req.body.notes || '').slice(0, 5000) || null,
           order.id,
         ],
       );
-      await snapshotMaterials(conn, order.id, bom.id, quantity);
+      await conn.query('DELETE FROM production_order_lines WHERE production_order_id = ?', [order.id]);
+      let sort = 0;
+      for (const line of lines) {
+        await conn.query(
+          `INSERT INTO production_order_lines
+             (production_order_id, bom_id, product_id, quantity, lot_number, expiry_date, notes, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            order.id,
+            line.bom_id,
+            line.product_id,
+            line.quantity,
+            line.lot_number,
+            line.expiry_date,
+            line.notes,
+            sort++,
+          ],
+        );
+      }
+      await snapshotMaterials(conn, order.id);
     });
 
     req.flash('success', 'Production order updated.');
     res.redirect(`/manufacturing/production-orders/${order.id}`);
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'Each BOM can only appear once in a production order.');
+      return res.redirect(`/manufacturing/production-orders/${req.params.id}/edit`);
+    }
     next(err);
   }
 });
 
-router.post('/production-orders/:id(\\d+)/batch', async (req, res, next) => {
+router.get('/production-orders/:id(\\d+)/batches', async (req, res, next) => {
   try {
-    const order = await one('SELECT * FROM production_orders WHERE id = ?', [req.params.id]);
+    const order = await loadProductionOrder(req.params.id);
     if (!order) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
     }
@@ -822,22 +952,94 @@ router.post('/production-orders/:id(\\d+)/batch', async (req, res, next) => {
       req.flash('error', 'Batch details cannot be changed for this production order.');
       return res.redirect(`/manufacturing/production-orders/${order.id}`);
     }
+    const lines = await loadProductionLines(order.id);
+    res.render('manufacturing/production/batches', {
+      title: req.t('Batch details'),
+      active: 'manufacturing-production',
+      breadcrumbs: [
+        { label: req.t('Manufacturing') },
+        { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
+        { label: order.production_no, href: `/manufacturing/production-orders/${order.id}` },
+        { label: req.t('Batch details') },
+      ],
+      order,
+      lines,
+      errors: [],
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
-    const lotNumber = String(req.body.lot_number || '').trim().slice(0, 60);
-    const expiryDate = String(req.body.expiry_date || '').slice(0, 10);
-    if (!lotNumber) {
-      req.flash('error', 'Lot number is required.');
+router.post('/production-orders/:id(\\d+)/batches', async (req, res, next) => {
+  try {
+    const order = await loadProductionOrder(req.params.id);
+    if (!order) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
+    }
+    if (!['planned', 'released', 'in_progress'].includes(order.status)) {
+      req.flash('error', 'Batch details cannot be changed for this production order.');
       return res.redirect(`/manufacturing/production-orders/${order.id}`);
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
-      req.flash('error', 'Valid expiry date required.');
-      return res.redirect(`/manufacturing/production-orders/${order.id}`);
+    const lines = await loadProductionLines(order.id);
+    const ids = arr(req.body.line_id);
+    const lots = arr(req.body.line_lot_number);
+    const expiries = arr(req.body.line_expiry_date);
+    const notes = arr(req.body.line_notes);
+    const errors = [];
+    const updates = [];
+    const byId = new Map(lines.map((line) => [String(line.id), line]));
+    const submitted = lines.map((line) => {
+      const index = ids.indexOf(String(line.id));
+      if (index < 0) return line;
+      return {
+        ...line,
+        lot_number: String(lots[index] || '').trim(),
+        expiry_date: String(expiries[index] || '').slice(0, 10),
+        notes: String(notes[index] || '').trim(),
+      };
+    });
+
+    submitted.forEach((line, index) => {
+      if (!line.lot_number) errors.push(req.t('Line {line}: lot number is required.', { line: index + 1 }));
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(line.expiry_date)) {
+        errors.push(req.t('Line {line}: valid expiry date required.', { line: index + 1 }));
+      }
+      if (byId.has(String(line.id)) && line.lot_number && /^\d{4}-\d{2}-\d{2}$/.test(line.expiry_date)) {
+        updates.push({
+          id: line.id,
+          lot_number: line.lot_number.slice(0, 60),
+          expiry_date: line.expiry_date,
+          notes: line.notes.slice(0, 5000) || null,
+        });
+      }
+    });
+
+    if (errors.length) {
+      return res.status(422).render('manufacturing/production/batches', {
+        title: req.t('Batch details'),
+        active: 'manufacturing-production',
+        breadcrumbs: [
+          { label: req.t('Manufacturing') },
+          { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
+          { label: order.production_no, href: `/manufacturing/production-orders/${order.id}` },
+          { label: req.t('Batch details') },
+        ],
+        order,
+        lines: submitted,
+        errors,
+      });
     }
 
-    await getPool().query(
-      'UPDATE production_orders SET lot_number = ?, expiry_date = ? WHERE id = ?',
-      [lotNumber, expiryDate, order.id],
-    );
+    await withTransaction(async (conn) => {
+      for (const update of updates) {
+        await conn.query(
+          'UPDATE production_order_lines SET lot_number = ?, expiry_date = ?, notes = ? WHERE id = ? AND production_order_id = ?',
+          [update.lot_number, update.expiry_date, update.notes, update.id, order.id],
+        );
+      }
+    });
+
     req.flash('success', 'Batch details updated.');
     res.redirect(`/manufacturing/production-orders/${order.id}`);
   } catch (err) {
@@ -847,7 +1049,7 @@ router.post('/production-orders/:id(\\d+)/batch', async (req, res, next) => {
 
 router.post('/production-orders/:id(\\d+)/status', async (req, res, next) => {
   try {
-    const order = await one('SELECT * FROM production_orders WHERE id = ?', [req.params.id]);
+    const order = await loadProductionOrder(req.params.id);
     if (!order) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
     }
@@ -866,12 +1068,10 @@ router.post('/production-orders/:id(\\d+)/status', async (req, res, next) => {
     }
 
     if (target === 'completed') {
-      if (!order.lot_number || !order.expiry_date) {
-        req.flash('error', 'Enter lot number and expiry date before completing production.');
-        return res.redirect(`/manufacturing/production-orders/${order.id}`);
-      }
-      await completeProductionOrder(order.id, req.session.user.id);
-      req.flash('success', 'Production completed. Materials consumed and finished goods added to stock.');
+      const result = await completeProductionOrder(order.id, req.session.user.id);
+      req.flash('success', 'Production completed. {lines} products produced and materials consumed.', {
+        lines: result.lines,
+      });
     } else {
       await getPool().query('UPDATE production_orders SET status = ? WHERE id = ?', [target, order.id]);
       req.flash('success', 'Production order marked as {status}.', {
@@ -890,7 +1090,7 @@ router.post('/production-orders/:id(\\d+)/status', async (req, res, next) => {
 
 router.post('/production-orders/:id(\\d+)/delete', async (req, res, next) => {
   try {
-    const order = await one('SELECT * FROM production_orders WHERE id = ?', [req.params.id]);
+    const order = await loadProductionOrder(req.params.id);
     if (!order) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
     }
@@ -905,6 +1105,7 @@ router.post('/production-orders/:id(\\d+)/delete', async (req, res, next) => {
     next(err);
   }
 });
+
 
 // ------------------------------------------------------------- scale records
 router.get('/scale-records', async (req, res, next) => {

@@ -1,0 +1,93 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Batch details') %></h1>
+            <%- statusBadge(order.status) %>
+          </div>
+          <p class="page-subtitle"><%= order.production_no %> · <%= t('Set the lot number and expiry date for each produced product.') %></p>
+        </div>
+        <a href="/manufacturing/production-orders/<%= order.id %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+        </a>
+      </div>
+
+      <% if (errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the batch details:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errors.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="mb-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+        <p><%= t('All lines need a lot number and expiry date before the order can be completed.') %></p>
+      </div>
+
+      <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/batches" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <h2 class="card-title"><%= t('Production lines') %></h2>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(lines.length, 'BOM line') %></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[1000px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Product') %></th>
+                <th class="table-th text-right"><%= t('Quantity') %></th>
+                <th class="table-th"><%= t('Lot number') %></th>
+                <th class="table-th"><%= t('Expiry date') %></th>
+                <th class="table-th"><%= t('Line notes') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% lines.forEach(line => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <input type="hidden" name="line_id" value="<%= line.id %>">
+                    <p class="font-medium text-gray-800 dark:text-gray-200"><%= line.product_name %></p>
+                    <p class="mt-0.5 text-xs text-gray-400"><%= line.sku %> · <%= line.bom_name %> (<%= line.version %>)</p>
+                  </td>
+                  <td class="table-td text-right font-medium"><%= h.formatQty(line.quantity) %> <span class="text-xs font-normal text-gray-400"><%= line.unit %></span></td>
+                  <td class="table-td">
+                    <input name="line_lot_number" type="text" maxlength="60" value="<%= line.lot_number || '' %>" class="form-input min-w-[140px]" required>
+                  </td>
+                  <td class="table-td">
+                    <input name="line_expiry_date" type="date" value="<%= String(line.expiry_date || '').slice(0, 10) %>" class="form-input" required>
+                  </td>
+                  <td class="table-td">
+                    <input name="line_notes" type="text" maxlength="5000" value="<%= line.notes || '' %>" class="form-input min-w-[200px]" placeholder="<%= t('Optional line notes') %>">
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!lines.length) { %>
+                <tr><td colspan="5" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No BOM lines have been added to this order.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+          <a href="/manufacturing/production-orders/<%= order.id %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= t('Save batch details') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

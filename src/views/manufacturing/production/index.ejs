@@ -89,11 +89,10 @@
             <thead>
               <tr>
                 <th class="table-th">Production</th>
-                <th class="table-th">Product</th>
+                <th class="table-th">Products</th>
                 <th class="table-th"><%= t('Lot / expiry') %></th>
-                <th class="table-th">BOM</th>
+                <th class="table-th text-right"><%= t('Lines') %></th>
                 <th class="table-th">Sales order</th>
-                <th class="table-th text-right">Quantity</th>
                 <th class="table-th">Start</th>
                 <th class="table-th">Due</th>
                 <th class="table-th">Status</th>
@@ -107,20 +106,26 @@
                     <a href="/manufacturing/production-orders/<%= row.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.production_no %></a>
                   </td>
                   <td class="table-td">
-                    <span class="text-gray-700 dark:text-gray-300"><%= row.product_name %></span>
-                    <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= row.product_sku %></span>
-                  </td>
-                  <td class="table-td">
-                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= row.lot_number || '—' %></span>
-                    <% if (row.expiry_date) { %>
-                      <span class="mt-0.5 block text-xs text-gray-400"><%= t('Expires {date}', { date: h.formatDate(row.expiry_date) }) %></span>
+                    <% if (row.first_product_name) { %>
+                      <span class="text-gray-700 dark:text-gray-300"><%= row.first_product_name %></span>
+                      <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= row.first_product_sku %></span>
+                      <% if (Number(row.line_count) > 1) { %>
+                        <span class="mt-0.5 block text-xs text-gray-400"><%= t('{count} BOM lines', { count: row.line_count }) %></span>
+                      <% } %>
+                    <% } else { %>
+                      <span class="text-gray-400">—</span>
                     <% } %>
                   </td>
-                  <td class="table-td"><%= row.bom_name %></td>
+                  <td class="table-td">
+                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= row.lot_summary || '—' %></span>
+                    <% if (row.next_expiry) { %>
+                      <span class="mt-0.5 block text-xs text-gray-400"><%= t('Next expiry {date}', { date: h.formatDate(row.next_expiry) }) %></span>
+                    <% } %>
+                  </td>
+                  <td class="table-td text-right font-medium"><%= h.formatNumber(row.line_count, 0) %></td>
                   <td class="table-td">
                     <% if (row.order_no) { %><a href="/sales-orders/<%= row.sales_order_id %>" class="link"><%= row.order_no %></a><% } else { %><span class="text-gray-400">—</span><% } %>
                   </td>
-                  <td class="table-td text-right font-medium"><%= h.formatQty(row.quantity) %></td>
                   <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(row.start_date) %></td>
                   <td class="table-td <%= row.due_date && row.status !== 'completed' && row.status !== 'cancelled' && String(row.due_date).slice(0, 10) < new Date().toISOString().slice(0, 10) ? 'text-error-600 dark:text-error-400 font-medium' : 'text-gray-500 dark:text-gray-400' %>"><%= h.formatDate(row.due_date) %></td>
                   <td class="table-td"><%- statusBadge(row.status) %></td>
@@ -140,12 +145,12 @@
               <% }) %>
               <% if (!rows.length) { %>
                 <tr>
-                  <td colspan="10" class="px-6 py-16 text-center">
+                  <td colspan="9" class="px-6 py-16 text-center">
                     <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
                       <%- include('/partials/icon', { name: 'factory', className: 'h-6 w-6' }) %>
                     </span>
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300">No production orders found</p>
-                    <p class="mt-1 text-sm text-gray-400">Create an order from an active BOM to start manufacturing.</p>
+                    <p class="mt-1 text-sm text-gray-400"><%= t('Create an order with one or more active BOMs to start manufacturing.') %></p>
                     <a href="/manufacturing/production-orders/new" class="btn btn-primary btn-sm mt-4">New production order</a>
                   </td>
                 </tr>

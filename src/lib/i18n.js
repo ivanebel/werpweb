@@ -977,6 +977,69 @@ const ES = {
   'New production order': 'Nueva orden de producción',
   'No production orders found': 'No se encontraron órdenes de producción',
   'Create an order from an active BOM to start manufacturing.': 'Creá una orden a partir de una BOM activa para empezar a fabricar.',
+  'Create an order with one or more active BOMs to start manufacturing.':
+    'Creá una orden con una o más BOM activas para empezar a fabricar.',
+  'Add one or more active BOMs. Each line is a different product with its own quantity, lot and expiry.':
+    'Agregá una o más BOM activas. Cada línea es un producto diferente con su propia cantidad, lote y vencimiento.',
+  'Update the schedule, BOM lines or batch details while the order is still planned.':
+    'Actualizá el cronograma, las líneas de BOM o los datos del lote mientras la orden sigue planificada.',
+  'Order notes': 'Notas de la orden',
+  'Work centre, shift, special instructions…': 'Centro de trabajo, turno, instrucciones especiales…',
+  'BOM lines': 'Líneas de BOM',
+  'BOM line': 'Línea de BOM',
+  'Each BOM line produces one product. Shared materials are combined in the final material list.':
+    'Cada línea de BOM produce un producto. Los materiales compartidos se combinan en la lista final.',
+  'Add BOM line': 'Agregar línea de BOM',
+  'Line notes': 'Notas de la línea',
+  'Select an active BOM…': 'Seleccioná una BOM activa…',
+  'Remove line': 'Quitar línea',
+  'Optional line notes': 'Notas opcionales de la línea',
+  'Add each BOM you want to manufacture in this run.':
+    'Agregá cada BOM que quieras fabricar en esta corrida.',
+  'Set the quantity, lot number and expiry date for every line.':
+    'Definí la cantidad, el número de lote y la fecha de vencimiento de cada línea.',
+  'Shared components are merged into one material requirement.':
+    'Los componentes compartidos se unifican en un solo requerimiento de material.',
+  'Completing the order consumes materials and adds every finished product to stock.':
+    'Completar la orden consume materiales y agrega cada producto terminado al stock.',
+  'Material availability': 'Disponibilidad de materiales',
+  'Materials are recalculated from all BOM lines when you save the order.':
+    'Los materiales se recalculan desde todas las líneas de BOM al guardar la orden.',
+  'Production lines': 'Líneas de producción',
+  'Each line is a different BOM and manufactured product.':
+    'Cada línea es una BOM y un producto fabricado diferente.',
+  'output': 'salida',
+  'Shared by {count} BOM lines': 'Compartido por {count} líneas de BOM',
+  'Aggregated from {count} BOM lines. Shared components are combined.':
+    'Agregado de {count} líneas de BOM. Los componentes compartidos se combinan.',
+  'No BOM lines have been added to this order.': 'No se agregaron líneas de BOM a esta orden.',
+  'Some BOM lines are missing a lot number or expiry date. Set them in Edit batch details before completing production.':
+    'Algunas líneas de BOM no tienen número de lote o fecha de vencimiento. Completalas en Editar datos del lote antes de finalizar la producción.',
+  'Edit batch details': 'Editar datos del lote',
+  'Batch details': 'Datos del lote',
+  'Set the lot number and expiry date for each produced product.':
+    'Definí el número de lote y la fecha de vencimiento de cada producto fabricado.',
+  'Please review the batch details:': 'Revisá los datos del lote:',
+  'All lines need a lot number and expiry date before the order can be completed.':
+    'Todas las líneas necesitan un número de lote y fecha de vencimiento antes de completar la orden.',
+  'Line {line}: select a valid BOM.': 'Línea {line}: seleccioná una BOM válida.',
+  'Line {line}: this BOM is already in the order.': 'Línea {line}: esta BOM ya está en la orden.',
+  'Line {line}: this product is already produced by another BOM in the order.':
+    'Línea {line}: este producto ya se produce con otra BOM en la orden.',
+  'Line {line}: quantity must be greater than zero.': 'Línea {line}: la cantidad debe ser mayor que cero.',
+  'Line {line}: lot number is required.': 'Línea {line}: el número de lote es obligatorio.',
+  'Line {line}: valid expiry date required.': 'Línea {line}: ingresá una fecha de vencimiento válida.',
+  'Add at least one BOM line.': 'Agregá al menos una línea de BOM.',
+  'Valid due date required.': 'Ingresá una fecha de vencimiento válida.',
+  'Due date cannot be before the start date.': 'La fecha de vencimiento no puede ser anterior a la fecha de inicio.',
+  'Each BOM can only appear once in a production order.':
+    'Cada BOM puede aparecer una sola vez en una orden de producción.',
+  '{count} BOM lines': '{count} líneas de BOM',
+  'Next expiry {date}': 'Próximo vencimiento {date}',
+  'Production completed. {lines} products produced and materials consumed.':
+    'Producción completada. Se fabricaron {lines} productos y se consumieron los materiales.',
+  'Production order created. Skipped: {items}.':
+    'Orden de producción creada. Se omitieron: {items}.',
   'Production no., product, SKU or order…': 'N.º de producción, producto, SKU u orden…',
   'Start': 'Inicio',
   'Due': 'Vencimiento',
@@ -985,6 +1048,7 @@ const ES = {
   'Complete & consume stock': 'Completar y consumir stock',
   'Complete this production order? Material stock will be consumed and finished goods added.':
     '¿Completar esta orden de producción? Se consumirá el stock de materiales y se agregarán productos terminados.',
+  'Change this production order status?': '¿Cambiar el estado de esta orden de producción?',
   'Delete {number}? This cannot be undone.': '¿Eliminar {number}? Esta acción no se puede deshacer.',
   'Only planned production orders can be edited.': 'Solo se pueden editar órdenes de producción planificadas.',
   'Only planned or cancelled production orders can be deleted.': 'Solo se pueden eliminar órdenes de producción planificadas o canceladas.',

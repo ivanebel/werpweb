@@ -719,11 +719,13 @@ CREATE TABLE IF NOT EXISTS production_orders (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_no  VARCHAR(30) NOT NULL,
   sales_order_id INT UNSIGNED NULL,
-  bom_id         INT UNSIGNED NOT NULL,
-  product_id     INT UNSIGNED NOT NULL,
+  -- Legacy single-BOM columns kept nullable for older databases. New orders
+  -- store their output products and batches in production_order_lines.
+  bom_id         INT UNSIGNED NULL,
+  product_id     INT UNSIGNED NULL,
   lot_number     VARCHAR(60) NULL,
   expiry_date    DATE NULL,
-  quantity       DECIMAL(14,3) NOT NULL DEFAULT 0,
+  quantity       DECIMAL(14,3) NULL,
   start_date     DATE NULL,
   due_date       DATE NULL,
   status         ENUM('planned','released','in_progress','completed','cancelled') NOT NULL DEFAULT 'planned',
@@ -748,12 +750,36 @@ CREATE TABLE IF NOT EXISTS production_orders (
     REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS production_order_lines (
+  id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  production_order_id INT UNSIGNED NOT NULL,
+  bom_id             INT UNSIGNED NOT NULL,
+  product_id         INT UNSIGNED NOT NULL,
+  quantity           DECIMAL(14,3) NOT NULL DEFAULT 0,
+  lot_number         VARCHAR(60) NULL,
+  expiry_date        DATE NULL,
+  notes              TEXT NULL,
+  sort_order         INT NOT NULL DEFAULT 0,
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_production_order_lines_bom (production_order_id, bom_id),
+  KEY idx_production_order_lines_order (production_order_id),
+  KEY idx_production_order_lines_product (product_id),
+  CONSTRAINT fk_production_order_lines_order FOREIGN KEY (production_order_id)
+    REFERENCES production_orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_production_order_lines_bom FOREIGN KEY (bom_id)
+    REFERENCES boms (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_production_order_lines_product FOREIGN KEY (product_id)
+    REFERENCES products (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS production_order_materials (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_order_id INT UNSIGNED NOT NULL,
   component_id      INT UNSIGNED NOT NULL,
   quantity_required DECIMAL(14,3) NOT NULL DEFAULT 0,
   quantity_consumed DECIMAL(14,3) NOT NULL DEFAULT 0,
+  source_count      INT UNSIGNED NOT NULL DEFAULT 1,
   PRIMARY KEY (id),
   KEY idx_pom_order (production_order_id),
   CONSTRAINT fk_pom_order FOREIGN KEY (production_order_id)

@@ -775,8 +775,15 @@ function makeDocumentRouter(config) {
           [row.id],
         );
         productionOrders = await query(
-          `SELECT po.*, b.name AS bom_name FROM production_orders po JOIN boms b ON b.id = po.bom_id
-            WHERE po.sales_order_id = ? ORDER BY po.id DESC`,
+          `SELECT po.*,
+                  (SELECT COUNT(*) FROM production_order_lines l WHERE l.production_order_id = po.id) AS line_count,
+                  (SELECT p.name FROM production_order_lines l
+                     JOIN products p ON p.id = l.product_id
+                    WHERE l.production_order_id = po.id
+                    ORDER BY l.sort_order, l.id LIMIT 1) AS first_product_name
+             FROM production_orders po
+            WHERE po.sales_order_id = ?
+            ORDER BY po.id DESC`,
           [row.id],
         );
       }
@@ -1183,6 +1190,10 @@ function makeDocumentRouter(config) {
         const result = await createProductionFromSalesOrder(Number(req.params.id), req.session.user.id);
         if (result.created === 0) {
           req.flash('error', result.message || 'No production orders were created.');
+        } else if (result.skipped.length) {
+          req.flash('success', 'Production order created. Skipped: {items}.', {
+            items: result.skipped.join(', '),
+          });
         } else {
           req.flash(
             'success',
