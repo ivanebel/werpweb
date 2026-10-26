@@ -129,7 +129,7 @@
             <tbody>
               <% rows.forEach(row => { %>
                 <tr class="table-row">
-                  <% resource.columns.forEach(col => { const value = row[col.key]; %>
+                  <% resource.columns.forEach(col => { const value = row[col.key]; const display = typeof col.format === 'function' ? col.format(value, row, t) : value; %>
                     <td class="table-td <%= col.align === 'right' ? 'text-right' : '' %>">
                       <% if (col.type === 'primary') { %>
                         <a href="<%= resource.basePath %>/<%= row.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= value %></a>
@@ -172,7 +172,7 @@
                         %>
                         <span class="font-semibold <%= tone %>"><%= pct === null ? '—' : `${h.formatNumber(pct, 1)}%` %></span>
                       <% } else { %>
-                        <span class="text-gray-600 dark:text-gray-300"><%= value || '—' %></span>
+                        <span class="text-gray-600 dark:text-gray-300"><%= display || '—' %></span>
                       <% } %>
                     </td>
                   <% }) %>

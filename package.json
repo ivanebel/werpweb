@@ -15,7 +15,8 @@
     "db:setup": "node src/db/migrate.js && node src/db/seed.js",
     "test:checks": "node tests/checks-test.mjs",
     "test:finance": "node tests/finance-test.mjs",
-    "test:simulator": "node tests/simulator-test.mjs"
+    "test:simulator": "node tests/simulator-test.mjs",
+    "test:cashflow": "node tests/cashflow-test.mjs"
   },
   "dependencies": {
     "apexcharts": "^4.5.0",

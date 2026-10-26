@@ -1,0 +1,131 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Cash flow settings') %></h1>
+          <p class="page-subtitle"><%= t('Set the minimum cash buffer and the collection and payment assumptions used by the forecast.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/cash" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Cash flow') %>
+          </a>
+        </div>
+      </div>
+
+      <% if (errors && errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <p class="font-semibold"><%= t('The settings could not be saved:') %></p>
+          <ul class="mt-1 list-inside list-disc space-y-1">
+            <% errors.forEach((error) => { %><li><%= error %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/finance/cash/settings" class="space-y-5">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div class="card xl:col-span-1">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Buffer and timing') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The forecast alerts you when projected cash falls below the buffer.') %></p>
+              </div>
+            </div>
+            <div class="space-y-4 p-5">
+              <div>
+                <label for="minimum_cash_buffer" class="form-label"><%= t('Minimum cash buffer') %> <span class="text-error-500">*</span></label>
+                <input id="minimum_cash_buffer" name="minimum_cash_buffer" type="number" step="0.01" min="0" required value="<%= values.minimum_cash_buffer %>" class="form-input">
+                <p class="form-help"><%= t('A fixed amount you always want available. Enter zero to disable the buffer alert.') %></p>
+              </div>
+              <div>
+                <label for="payment_delay_days" class="form-label"><%= t('Supplier payment delay (days)') %></label>
+                <input id="payment_delay_days" name="payment_delay_days" type="number" step="1" min="0" max="365" value="<%= values.payment_delay_days %>" class="form-input">
+                <p class="form-help"><%= t('Extra days after the bill due date before cash leaves the company.') %></p>
+              </div>
+              <div>
+                <label for="week_start_day" class="form-label"><%= t('Week starts on') %></label>
+                <select id="week_start_day" name="week_start_day" class="form-select">
+                  <% weekDays.forEach((day) => { %>
+                    <option value="<%= day.value %>" <%= String(values.week_start_day) === String(day.value) ? 'selected' : '' %>><%= day.label %></option>
+                  <% }) %>
+                </select>
+                <p class="form-help"><%= t('Used to build the 13 weekly forecast buckets.') %></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Collection profile') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Estimated collection rate and delay for open receivables by aging bucket.') %></p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[720px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Aging bucket') %></th>
+                    <th class="table-th"><%= t('Expected collection rate') %></th>
+                    <th class="table-th"><%= t('Expected delay (days)') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% [
+                    ['current', t('Current')],
+                    ['1_30', t('1-30 days')],
+                    ['31_60', t('31-60 days')],
+                    ['61_90', t('61-90 days')],
+                    ['90_plus', t('90+ days')]
+                  ].forEach(([key, label]) => { %>
+                    <tr class="table-row">
+                      <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= label %></td>
+                      <td class="table-td">
+                        <div class="flex items-center gap-2">
+                          <input id="collection_rate_<%= key %>" name="collection_rate_<%= key %>" type="number" step="0.01" min="0" max="100" required value="<%= values[`collection_rate_${key}`] %>" class="form-input w-28 text-right">
+                          <span class="text-sm text-gray-400">%</span>
+                        </div>
+                      </td>
+                      <td class="table-td">
+                        <div class="flex items-center gap-2">
+                          <input id="collection_delay_<%= key %>" name="collection_delay_<%= key %>" type="number" step="1" min="0" max="365" required value="<%= values[`collection_delay_${key}`] %>" class="form-input w-28 text-right">
+                          <span class="text-sm text-gray-400"><%= t('days') %></span>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+              <%= t('The collection rate is applied to the open balance. The uncollected part is shown for information only. Supplier payments are assumed at 100% of the open balance plus the supplier delay above.') %>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <a href="/finance/cash" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= t('Save settings') %>
+          </button>
+        </div>
+      </form>
+
+      <div class="mt-5 rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How the forecast uses these settings') %></p>
+        <p class="mt-2"><%= t('Open invoices are grouped by aging and shifted by the matching collection delay. Open bills are assumed to be paid in full after the supplier delay.') %></p>
+        <p class="mt-1"><%= t('Checks use their due date. Recurring fixed costs use their configured payment day and are converted to gross cash, excluding non-cash items.') %></p>
+        <p class="mt-1"><%= t('Actual cash balances come from snapshots for every active cash account. The comparison is shown only when all active accounts have a snapshot inside the period and the snapshot date is not in the future.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

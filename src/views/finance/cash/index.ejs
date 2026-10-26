@@ -1,0 +1,681 @@
+<%- include('/layouts/head', { includeApex: true }) %>
+<%- include('/layouts/sidebar') %>
+<%
+  const totals = selected.totals;
+  const isWeekly = view === 'weekly';
+  const buffer = Number(result.settings.minimum_cash_buffer) || 0;
+  const forecastLabel = isWeekly ? t('13-week forecast') : t('12-month forecast');
+  const positive = 'text-success-600 dark:text-success-400';
+  const negative = 'text-error-600 dark:text-error-400';
+  const detailMax = 'max-h-[430px] overflow-y-auto';
+  const actualRows = selected.buckets.filter((bucket) => bucket.actual !== null);
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1800px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Cash flow') %></h1>
+            <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= forecastLabel %></span>
+          </div>
+          <p class="page-subtitle"><%= t('Plan cash from open invoices, bills, checks, fixed costs and planned events. Amounts are gross cash movements.') %></p>
+          <p class="mt-1 text-xs text-gray-400">
+            <%= t('Today') %>: <%= h.formatDate(result.today, locale) %>
+            · <%= t('Forecast range') %>: <%= h.formatDate(selected.buckets[0].start, locale) %> – <%= h.formatDate(selected.buckets[selected.buckets.length - 1].end, locale) %>
+            · <%= t('Minimum buffer') %>: <%= money(buffer) %>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/cash/events/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= t('New cash event') %>
+          </a>
+          <a href="/finance/cash/accounts" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %>
+            <%= t('Cash accounts') %>
+          </a>
+          <a href="/finance/cash/actuals" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'check-circle', className: 'h-4 w-4' }) %>
+            <%= t('Actual cash') %>
+          </a>
+          <a href="/finance/cash/settings" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'cog', className: 'h-4 w-4' }) %>
+            <%= t('Settings') %>
+          </a>
+          <a href="/finance/cash/export?view=<%= view %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'download', className: 'h-4 w-4' }) %>
+            <%= t('Export CSV') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
+          <a href="/finance/cash?view=weekly" class="rounded-md px-4 py-1.5 text-sm font-medium transition <%= isWeekly ? 'bg-brand-500 text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' %>"><%= t('Weekly') %></a>
+          <a href="/finance/cash?view=monthly" class="rounded-md px-4 py-1.5 text-sm font-medium transition <%= !isWeekly ? 'bg-brand-500 text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' %>"><%= t('Monthly') %></a>
+        </div>
+        <p class="text-xs text-gray-400">
+          <% if (isWeekly) { %><%= t('Thirteen weekly buckets starting on the configured week day.') %><% } else { %><%= t('Twelve calendar months starting with the current month.') %><% } %>
+        </p>
+      </div>
+
+      <% if (alerts && alerts.length) { %>
+        <div class="mb-5 space-y-3">
+          <% alerts.forEach((alert) => {
+            const tone = {
+              error: 'border-error-200 bg-error-50 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400',
+              warning: 'border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400',
+              info: 'border-blue-light-200 bg-blue-light-50 text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300',
+              success: 'border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400'
+            }[alert.tone] || 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300';
+          %>
+            <div class="flex flex-col gap-3 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between <%= tone %>">
+              <div class="flex items-start gap-3">
+                <%- include('/partials/icon', { name: alert.tone === 'error' || alert.tone === 'warning' ? 'exclamation-triangle' : 'info', className: 'mt-0.5 h-5 w-5 shrink-0' }) %>
+                <div>
+                  <p class="font-semibold"><%= alert.title %></p>
+                  <p class="mt-0.5 opacity-90"><%= alert.message %></p>
+                </div>
+              </div>
+              <% if (alert.href) { %><a href="<%= alert.href %>" class="btn btn-secondary btn-sm shrink-0"><%= alert.action || t('Open') %></a><% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <% if (!result.accounts.length) { %>
+        <div class="card mb-5 p-6 md:p-8">
+          <div class="mx-auto max-w-3xl text-center">
+            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+              <%- include('/partials/icon', { name: 'banknotes', className: 'h-7 w-7' }) %>
+            </span>
+            <h2 class="mt-4 text-xl font-bold text-gray-900 dark:text-white"><%= t('Start with your cash position') %></h2>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400"><%= t('Add each active bank or cash account with its opening balance. The forecast starts from the sum of those balances.') %></p>
+          </div>
+          <div class="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">1</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Add cash accounts') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Bank, cash, card and other accounts with their current balance.') %></p>
+              <a href="/finance/cash/accounts/new" class="btn btn-primary btn-sm mt-4"><%= t('Add cash account') %></a>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">2</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Plan large movements') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Taxes, payroll, loans, capex or expected future receipts that are not invoices yet.') %></p>
+              <a href="/finance/cash/events/new" class="btn btn-secondary btn-sm mt-4"><%= t('New cash event') %></a>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">3</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Track actual cash') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Enter a balance snapshot per account to compare actual cash with the forecast.') %></p>
+              <a href="/finance/cash/actuals/new" class="btn btn-secondary btn-sm mt-4"><%= t('Add snapshot') %></a>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Opening cash') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(result.opening_cash) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= h.pluralize(result.accounts.length, 'account', 'accounts', locale) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Closing cash') %></p>
+          <p class="mt-2 text-2xl font-bold <%= totals.closing_cash < 0 ? negative : 'text-gray-900 dark:text-white' %>"><%= money(totals.closing_cash) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= isWeekly ? t('At the end of week 13') : t('At the end of month 12') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Lowest cash') %></p>
+          <p class="mt-2 text-2xl font-bold <%= totals.lowest_cash < 0 ? negative : totals.lowest_cash < buffer ? 'text-warning-600 dark:text-warning-400' : 'text-gray-900 dark:text-white' %>"><%= money(totals.lowest_cash) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= totals.first_shortfall ? t('First shortfall in {period}', { period: periodLabels[totals.first_shortfall.key] || totals.first_shortfall.key }) : t('Never falls below the buffer') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Funding gap') %></p>
+          <p class="mt-2 text-2xl font-bold <%= totals.funding_gap > 0 ? negative : positive %>"><%= money(totals.funding_gap) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Below the minimum buffer') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Net movement') %></p>
+          <p class="mt-2 text-2xl font-bold <%= totals.net >= 0 ? positive : negative %>"><%= money(totals.net) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('{in} in · {out} out', { in: money(totals.total_in), out: money(totals.total_out) }) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Periods below buffer') %></p>
+          <p class="mt-2 text-2xl font-bold <%= totals.below_count > 0 ? 'text-warning-600 dark:text-warning-400' : positive %>"><%= totals.below_count %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Out of {count} periods', { count: selected.buckets.length }) %></p>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card xl:col-span-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Cash balance projection') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Inflows and outflows by period, closing cash and minimum buffer.') %></p>
+            </div>
+          </div>
+          <div id="cash-chart" class="p-4"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2 class="card-title"><%= t('Cash assumptions') %></h2></div>
+          <dl class="space-y-3 p-5 text-sm">
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Minimum buffer') %></dt><dd class="font-semibold text-gray-800 dark:text-gray-200"><%= money(buffer) %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Open receivables') %></dt><dd class="font-semibold text-gray-800 dark:text-gray-200"><%= money(result.ar_aging.total) %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Expected collections') %></dt><dd class="font-semibold text-gray-800 dark:text-gray-200"><%= money(result.ar_aging.expected) %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Open payables') %></dt><dd class="font-semibold text-gray-800 dark:text-gray-200"><%= money(result.ap_aging.total) %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Open checks') %></dt><dd class="font-semibold text-gray-800 dark:text-gray-200"><%= money(result.checks.reduce((sum, row) => sum + (Number(row.net_amount) || 0), 0)) %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Planned event occurrences') %></dt><dd class="font-semibold text-gray-800 dark:text-gray-200"><%= result.events.length %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Supplier payment delay') %></dt><dd class="font-semibold text-gray-800 dark:text-gray-200"><%= t('{count} days', { count: result.settings.payment_delay_days }) %></dd></div>
+          </dl>
+          <a href="/finance/cash/settings" class="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs font-medium text-brand-600 hover:text-brand-700 dark:border-gray-800 dark:text-brand-400">
+            <span><%= t('Edit cash assumptions') %></span>
+            <%- include('/partials/icon', { name: 'arrow-right', className: 'h-4 w-4' }) %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= isWeekly ? t('Weekly cash forecast') : t('Monthly cash forecast') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Opening cash plus expected inflows, less expected outflows. Actual cash is shown when snapshots exist.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(selected.buckets.length, 'period', 'periods', locale) %></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[1500px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Period') %></th>
+                <th class="table-th text-right"><%= t('Opening') %></th>
+                <th class="table-th text-right"><%= t('Receivables') %></th>
+                <th class="table-th text-right"><%= t('Checks in') %></th>
+                <th class="table-th text-right"><%= t('Planned in') %></th>
+                <th class="table-th text-right"><%= t('Total in') %></th>
+                <th class="table-th text-right"><%= t('Payables') %></th>
+                <th class="table-th text-right"><%= t('Fixed costs') %></th>
+                <th class="table-th text-right"><%= t('Checks out') %></th>
+                <th class="table-th text-right"><%= t('Planned out') %></th>
+                <th class="table-th text-right"><%= t('Total out') %></th>
+                <th class="table-th text-right"><%= t('Net') %></th>
+                <th class="table-th text-right"><%= t('Closing') %></th>
+                <th class="table-th text-right"><%= t('Actual') %></th>
+                <th class="table-th text-right"><%= t('Variance') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% selected.buckets.forEach((bucket) => { %>
+                <tr class="table-row <%= bucket.below_buffer ? 'bg-warning-50/60 dark:bg-warning-500/5' : '' %>">
+                  <td class="table-td whitespace-nowrap">
+                    <span class="font-medium text-gray-800 dark:text-gray-200"><%= periodLabels[bucket.key] %></span>
+                    <% if (bucket.below_buffer) { %><span class="ml-2 badge bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Below buffer') %></span><% } %>
+                  </td>
+                  <td class="table-td text-right"><%= money(bucket.opening) %></td>
+                  <td class="table-td text-right"><%= money(bucket.in.receivables) %></td>
+                  <td class="table-td text-right"><%= money(bucket.in.checks) %></td>
+                  <td class="table-td text-right"><%= money(bucket.in.events) %></td>
+                  <td class="table-td text-right font-medium"><%= money(bucket.total_in) %></td>
+                  <td class="table-td text-right"><%= money(bucket.out.payables) %></td>
+                  <td class="table-td text-right"><%= money(bucket.out.fixed_costs) %></td>
+                  <td class="table-td text-right"><%= money(bucket.out.checks) %></td>
+                  <td class="table-td text-right"><%= money(bucket.out.events) %></td>
+                  <td class="table-td text-right font-medium"><%= money(bucket.total_out) %></td>
+                  <td class="table-td text-right font-medium <%= bucket.net >= 0 ? positive : negative %>"><%= money(bucket.net) %></td>
+                  <td class="table-td text-right font-semibold <%= bucket.closing < 0 ? negative : bucket.below_buffer ? 'text-warning-600 dark:text-warning-400' : 'text-gray-900 dark:text-white' %>"><%= money(bucket.closing) %></td>
+                  <td class="table-td text-right"><%= bucket.actual === null ? '—' : money(bucket.actual) %></td>
+                  <td class="table-td text-right font-semibold <%= bucket.variance === null ? 'text-gray-400' : bucket.variance >= 0 ? positive : negative %>"><%= bucket.variance === null ? '—' : `${bucket.variance > 0 ? '+' : ''}${money(bucket.variance)}` %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                <td class="px-5 py-3 text-sm"><%= t('Totals') %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(totals.opening_cash) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(selected.buckets.reduce((sum, bucket) => sum + bucket.in.receivables, 0)) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(selected.buckets.reduce((sum, bucket) => sum + bucket.in.checks, 0)) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(selected.buckets.reduce((sum, bucket) => sum + bucket.in.events, 0)) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(totals.total_in) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(selected.buckets.reduce((sum, bucket) => sum + bucket.out.payables, 0)) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(selected.buckets.reduce((sum, bucket) => sum + bucket.out.fixed_costs, 0)) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(selected.buckets.reduce((sum, bucket) => sum + bucket.out.checks, 0)) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(selected.buckets.reduce((sum, bucket) => sum + bucket.out.events, 0)) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(totals.total_out) %></td>
+                <td class="px-3 py-3 text-right text-sm <%= totals.net >= 0 ? positive : negative %>"><%= money(totals.net) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(totals.closing_cash) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= actualRows.length ? money(actualRows[actualRows.length - 1].actual) : '—' %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= actualRows.length ? `${actualRows[actualRows.length - 1].variance > 0 ? '+' : ''}${money(actualRows[actualRows.length - 1].variance)}` : '—' %></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <% if (selected.beyond_in > 0 || selected.beyond_out > 0) { %>
+          <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+            <%= t('{in} of inflows and {out} of outflows fall after this forecast horizon and are not shown in the periods above.', { in: money(selected.beyond_in), out: money(selected.beyond_out) }) %>
+          </p>
+        <% } %>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Receivables aging') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Open customer invoices and credit notes by days overdue.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(result.ar_aging.count, 'invoice', 'invoices', locale) %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[720px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Bucket') %></th>
+                  <th class="table-th text-right"><%= t('Count') %></th>
+                  <th class="table-th text-right"><%= t('Open balance') %></th>
+                  <th class="table-th text-right"><%= t('Rate') %></th>
+                  <th class="table-th text-right"><%= t('Delay') %></th>
+                  <th class="table-th text-right"><%= t('Expected cash') %></th>
+                  <th class="table-th text-right"><%= t('Gap') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% result.ar_aging.buckets.forEach((bucket) => { %>
+                  <tr class="table-row">
+                    <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= t(bucket.label) %></td>
+                    <td class="table-td text-right"><%= bucket.count %></td>
+                    <td class="table-td text-right"><%= money(bucket.amount) %></td>
+                    <td class="table-td text-right"><%= h.formatNumber(bucket.rate, 0) %>%</td>
+                    <td class="table-td text-right"><%= t('{count} days', { count: bucket.delay }) %></td>
+                    <td class="table-td text-right font-medium"><%= money(bucket.expected) %></td>
+                    <td class="table-td text-right <%= bucket.uncollected > 0 ? 'text-warning-600 dark:text-warning-400' : 'text-gray-400' %>"><%= money(bucket.uncollected) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= result.ar_aging.count %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(result.ar_aging.total) %></td>
+                  <td colspan="2" class="px-3 py-3 text-right text-sm"><%= t('Overdue') %>: <%= money(result.ar_aging.overdue) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(result.ar_aging.expected) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(result.ar_aging.uncollected) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Payables aging') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Open supplier bills and credit notes by days overdue.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(result.ap_aging.count, 'bill', 'bills', locale) %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[720px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Bucket') %></th>
+                  <th class="table-th text-right"><%= t('Count') %></th>
+                  <th class="table-th text-right"><%= t('Open balance') %></th>
+                  <th class="table-th text-right"><%= t('Rate') %></th>
+                  <th class="table-th text-right"><%= t('Delay') %></th>
+                  <th class="table-th text-right"><%= t('Expected cash') %></th>
+                  <th class="table-th text-right"><%= t('Gap') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% result.ap_aging.buckets.forEach((bucket) => { %>
+                  <tr class="table-row">
+                    <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= t(bucket.label) %></td>
+                    <td class="table-td text-right"><%= bucket.count %></td>
+                    <td class="table-td text-right"><%= money(bucket.amount) %></td>
+                    <td class="table-td text-right"><%= h.formatNumber(bucket.rate, 0) %>%</td>
+                    <td class="table-td text-right"><%= t('{count} days', { count: bucket.delay }) %></td>
+                    <td class="table-td text-right font-medium"><%= money(bucket.expected) %></td>
+                    <td class="table-td text-right text-gray-400"><%= money(bucket.uncollected) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= result.ap_aging.count %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(result.ap_aging.total) %></td>
+                  <td colspan="2" class="px-3 py-3 text-right text-sm"><%= t('Overdue') %>: <%= money(result.ap_aging.overdue) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(result.ap_aging.expected) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(result.ap_aging.uncollected) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Actual vs forecast') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Closing cash from the forecast compared with the latest cash snapshots inside each period for all active accounts.') %></p>
+          </div>
+          <a href="/finance/cash/actuals" class="btn btn-secondary btn-sm"><%= t('Manage actual cash') %></a>
+        </div>
+        <% if (!result.accounts.length) { %>
+          <p class="px-5 py-10 text-center text-sm text-gray-400"><%= t('Add active cash accounts and snapshots to compare actual cash with the forecast.') %></p>
+        <% } else if (!actualRows.length) { %>
+          <div class="px-5 py-10 text-center">
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No complete actual cash comparison yet.') %></p>
+            <p class="mx-auto mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400"><%= t('Enter a snapshot for every active cash account with a date inside the period and not in the future. The comparison appears as soon as all accounts are covered.') %></p>
+            <a href="/finance/cash/actuals/new" class="btn btn-primary btn-sm mt-4"><%= t('Add snapshot') %></a>
+          </div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="table-base">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Period') %></th>
+                  <th class="table-th text-right"><%= t('Forecast closing cash') %></th>
+                  <th class="table-th text-right"><%= t('Actual cash') %></th>
+                  <th class="table-th text-right"><%= t('Variance') %></th>
+                  <th class="table-th"><%= t('Result') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% actualRows.forEach((bucket) => { %>
+                  <tr class="table-row">
+                    <td class="table-td whitespace-nowrap font-medium text-gray-800 dark:text-gray-200"><%= periodLabels[bucket.key] %></td>
+                    <td class="table-td text-right"><%= money(bucket.closing) %></td>
+                    <td class="table-td text-right font-medium"><%= money(bucket.actual) %></td>
+                    <td class="table-td text-right font-semibold <%= bucket.variance >= 0 ? positive : negative %>"><%= `${bucket.variance > 0 ? '+' : ''}${money(bucket.variance)}` %></td>
+                    <td class="table-td"><span class="badge <%= bucket.variance >= 0 ? 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400' : 'bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400' %>"><%= bucket.variance >= 0 ? t('Better than forecast') : t('Below forecast') %></span></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Open receivables') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Invoices and credit notes with an outstanding balance.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(result.receivables.length, 'invoice', 'invoices', locale) %></span>
+          </div>
+          <div class="table-wrap <%= detailMax %>">
+            <table class="table-base min-w-[1050px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Invoice') %></th>
+                  <th class="table-th"><%= t('Customer') %></th>
+                  <th class="table-th"><%= t('Due date') %></th>
+                  <th class="table-th text-right"><%= t('Days overdue') %></th>
+                  <th class="table-th text-right"><%= t('Open balance') %></th>
+                  <th class="table-th text-right"><%= t('Expected date') %></th>
+                  <th class="table-th text-right"><%= t('Expected cash') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% result.receivables.forEach((row) => { %>
+                  <tr class="table-row">
+                    <td class="table-td whitespace-nowrap">
+                      <a href="/sales/<%= row.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.invoice_no %></a>
+                      <% if (row.is_credit_note) { %><span class="ml-2 badge bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300"><%= t('Credit note') %></span><% } %>
+                    </td>
+                    <td class="table-td"><%= row.party_name %></td>
+                    <td class="table-td whitespace-nowrap"><%= h.formatDate(row.due_date, locale) %></td>
+                    <td class="table-td text-right <%= row.days_overdue > 0 ? 'text-warning-600 dark:text-warning-400' : 'text-gray-400' %>"><%= row.days_overdue %></td>
+                    <td class="table-td text-right"><%= money(row.net_amount) %></td>
+                    <td class="table-td text-right whitespace-nowrap"><%= h.formatDate(row.expected_date, locale) %></td>
+                    <td class="table-td text-right font-medium"><%= money(row.expected_amount) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!result.receivables.length) { %>
+                  <tr><td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No open receivables.') %></td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Open payables') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Bills and credit notes with an outstanding balance.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(result.payables.length, 'bill', 'bills', locale) %></span>
+          </div>
+          <div class="table-wrap <%= detailMax %>">
+            <table class="table-base min-w-[950px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Bill') %></th>
+                  <th class="table-th"><%= t('Supplier') %></th>
+                  <th class="table-th"><%= t('Due date') %></th>
+                  <th class="table-th text-right"><%= t('Days overdue') %></th>
+                  <th class="table-th text-right"><%= t('Open balance') %></th>
+                  <th class="table-th text-right"><%= t('Expected date') %></th>
+                  <th class="table-th text-right"><%= t('Expected cash') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% result.payables.forEach((row) => { %>
+                  <tr class="table-row">
+                    <td class="table-td whitespace-nowrap">
+                      <a href="/purchases/<%= row.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.bill_no %></a>
+                      <% if (row.is_credit_note) { %><span class="ml-2 badge bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300"><%= t('Credit note') %></span><% } %>
+                    </td>
+                    <td class="table-td"><%= row.party_name %></td>
+                    <td class="table-td whitespace-nowrap"><%= h.formatDate(row.due_date, locale) %></td>
+                    <td class="table-td text-right <%= row.days_overdue > 0 ? 'text-warning-600 dark:text-warning-400' : 'text-gray-400' %>"><%= row.days_overdue %></td>
+                    <td class="table-td text-right"><%= money(row.net_amount) %></td>
+                    <td class="table-td text-right whitespace-nowrap"><%= h.formatDate(row.expected_date, locale) %></td>
+                    <td class="table-td text-right font-medium"><%= money(row.expected_amount) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!result.payables.length) { %>
+                  <tr><td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No open payables.') %></td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Checks in the forecast') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Open received and issued checks scheduled by due date.') %></p>
+            </div>
+            <a href="/checks" class="btn btn-secondary btn-sm"><%= t('All checks') %></a>
+          </div>
+          <div class="table-wrap <%= detailMax %>">
+            <table class="table-base min-w-[720px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Check') %></th>
+                  <th class="table-th"><%= t('Party') %></th>
+                  <th class="table-th"><%= t('Direction') %></th>
+                  <th class="table-th"><%= t('Effective date') %></th>
+                  <th class="table-th text-right"><%= t('Amount') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% result.checks.forEach((row) => { %>
+                  <tr class="table-row">
+                    <td class="table-td whitespace-nowrap"><a href="/checks/<%= row.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.check_no %></a></td>
+                    <td class="table-td"><%= row.party_name || '—' %></td>
+                    <td class="table-td"><span class="badge <%= row.direction === 'in' ? 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400' : 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' %>"><%= row.direction === 'in' ? t('In') : t('Out') %></span></td>
+                    <td class="table-td whitespace-nowrap"><%= h.formatDate(row.effective_date, locale) %></td>
+                    <td class="table-td text-right font-medium"><%= money(row.net_amount) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!result.checks.length) { %>
+                  <tr><td colspan="5" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No open checks.') %></td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Planned cash events') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Recurring and one-off events inside the forecast range.') %></p>
+            </div>
+            <a href="/finance/cash/events" class="btn btn-secondary btn-sm"><%= t('Manage events') %></a>
+          </div>
+          <div class="table-wrap <%= detailMax %>">
+            <table class="table-base min-w-[760px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Event') %></th>
+                  <th class="table-th"><%= t('Category') %></th>
+                  <th class="table-th"><%= t('Direction') %></th>
+                  <th class="table-th"><%= t('Date') %></th>
+                  <th class="table-th text-right"><%= t('Amount') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% result.events.forEach((row) => { %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= row.name %></p>
+                      <p class="text-xs text-gray-400"><%= row.account_name || t('Company-wide') %></p>
+                    </td>
+                    <td class="table-td"><%= h.humanize(row.category) %></td>
+                    <td class="table-td"><span class="badge <%= row.direction === 'inflow' ? 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400' : 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' %>"><%= row.direction === 'inflow' ? t('In') : t('Out') %></span></td>
+                    <td class="table-td whitespace-nowrap"><%= h.formatDate(row.occurrence_date, locale) %></td>
+                    <td class="table-td text-right font-medium"><%= money(row.amount) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!result.events.length) { %>
+                  <tr><td colspan="5" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No planned cash events inside this horizon.') %></td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Cash accounts') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Active accounts define the opening cash and the actual cash comparison.') %></p>
+          </div>
+          <a href="/finance/cash/accounts" class="btn btn-secondary btn-sm"><%= t('Manage accounts') %></a>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Account') %></th>
+                <th class="table-th"><%= t('Type') %></th>
+                <th class="table-th"><%= t('Bank') %></th>
+                <th class="table-th"><%= t('Opening date') %></th>
+                <th class="table-th text-right"><%= t('Opening balance') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% result.accounts.forEach((account) => { %>
+                <tr class="table-row">
+                  <td class="table-td"><a href="/finance/cash/accounts/<%= account.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= account.name %></a><p class="text-xs text-gray-400"><%= account.account_number || '' %></p></td>
+                  <td class="table-td"><%= h.humanize(account.type) %></td>
+                  <td class="table-td"><%= account.bank_name || '—' %></td>
+                  <td class="table-td whitespace-nowrap"><%= account.opening_date ? h.formatDate(account.opening_date, locale) : '—' %></td>
+                  <td class="table-td text-right font-medium"><%= money(account.opening_balance) %></td>
+                  <td class="table-td"><%- statusBadge(account.status) %></td>
+                </tr>
+              <% }) %>
+              <% if (!result.accounts.length) { %>
+                <tr><td colspan="6" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No active cash accounts yet.') %></td></tr>
+              <% } %>
+            </tbody>
+            <% if (result.accounts.length) { %>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm" colspan="4"><%= t('Opening cash') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(result.opening_cash) %></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            <% } %>
+          </table>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How this forecast is calculated') %></p>
+        <p class="mt-2"><%= t('Opening cash is the sum of active cash account balances. Inflows include expected collections, open checks and planned inflows. Outflows include open bills, fixed-cost cash payments, open checks and planned outflows.') %></p>
+        <p class="mt-1"><%= t('Collection rates and delays are applied by receivable aging bucket. Credit notes reduce receivables or payables at their due date. Bills are assumed to be paid in full after the supplier delay.') %></p>
+        <p class="mt-1"><%= t('Fixed costs are converted from their cost item amount to gross cash using the VAT rate. Non-cash items such as depreciation are excluded. Payments dated before today are not forecast again.') %></p>
+        <p class="mt-1"><%= t('Future sales that are not invoiced yet are not forecast automatically. Add planned cash events or use the sales simulator for what-if planning.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+  (function () {
+    const currency = <%- JSON.stringify(currency || 'USD') %>;
+    const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
+    const labels = <%- JSON.stringify(chartLabels) %>;
+    const inflows = <%- JSON.stringify(selected.buckets.map((bucket) => bucket.total_in)) %>;
+    const outflows = <%- JSON.stringify(selected.buckets.map((bucket) => bucket.total_out)) %>;
+    const closing = <%- JSON.stringify(selected.buckets.map((bucket) => bucket.closing)) %>;
+    const bufferLine = <%- JSON.stringify(selected.buckets.map(() => buffer)) %>;
+    const chartEl = document.querySelector('#cash-chart');
+    if (!chartEl || typeof ApexCharts === 'undefined') return;
+
+    function money(value) {
+      try {
+        return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value || 0));
+      } catch (e) {
+        return currency + ' ' + Number(value || 0).toFixed(0);
+      }
+    }
+    const isDark = () => document.documentElement.classList.contains('dark');
+    const chart = new ApexCharts(chartEl, {
+      chart: { type: 'line', height: 320, toolbar: { show: false }, fontFamily: 'Outfit, sans-serif', foreColor: isDark() ? '#98A2B3' : '#667085' },
+      series: [
+        { name: <%- JSON.stringify(t('Total in')) %>, type: 'column', data: inflows },
+        { name: <%- JSON.stringify(t('Total out')) %>, type: 'column', data: outflows },
+        { name: <%- JSON.stringify(t('Closing cash')) %>, type: 'line', data: closing },
+        { name: <%- JSON.stringify(t('Minimum buffer')) %>, type: 'line', data: bufferLine }
+      ],
+      colors: ['#12B76A', '#F04438', '#465FFF', '#F79009'],
+      stroke: { curve: 'smooth', width: [0, 0, 3, 2], dashArray: [0, 0, 0, 6] },
+      plotOptions: { bar: { columnWidth: '50%', borderRadius: 4 } },
+      dataLabels: { enabled: false },
+      grid: { borderColor: isDark() ? '#1F2937' : '#F2F4F7', strokeDashArray: 4 },
+      xaxis: { categories: labels, axisBorder: { show: false }, axisTicks: { show: false }, labels: { rotate: -35, rotateAlways: labels.length > 8, trim: true } },
+      yaxis: { labels: { formatter: money } },
+      tooltip: { shared: true, intersect: false, theme: isDark() ? 'dark' : 'light', y: { formatter: money } },
+      legend: { position: 'top', horizontalAlign: 'right', markers: { radius: 4 } }
+    });
+    chart.render();
+    document.addEventListener('werp:theme', () => {
+      chart.updateOptions({
+        chart: { foreColor: isDark() ? '#98A2B3' : '#667085' },
+        grid: { borderColor: isDark() ? '#1F2937' : '#F2F4F7' },
+        tooltip: { theme: isDark() ? 'dark' : 'light' }
+      });
+    });
+  })();
+  </script>
+</div>

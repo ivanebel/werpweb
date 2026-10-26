@@ -22,6 +22,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Manufacturing** — bills of materials with component quantities and scrap, multi-BOM production orders where each line has its own quantity, lot, expiry and notes, aggregated material requirements across all BOM lines, material availability checks, component consumption and finished-goods posting, plus scale records from the Bizerba GLM-e labeler with lot/date filters, weight statistics, and box/pallet totals.
 - **Finance: costs and profitability** — a management-accounting workspace for fixed, variable, semi-variable and stepped costs. Cost centers and categories organise spending; cost items define recurring amounts or variable drivers such as units, net revenue, material cost, invoices, pallets or labour hours. The analysis dashboard combines BOM-based product costs with sales invoices to show contribution margin, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Monthly actual costs can be entered manually or imported from CSV and compared with the calculated plan. All analytical amounts are net of recoverable VAT.
 - **Finance: sales simulator** — build saved sales scenarios with a product/customer basket, monthly quantities, net prices, discounts and optional cost overrides. Each scenario projects revenue, contribution, fixed costs, operating profit, break-even, product and customer margins, a BOM-based purchase plan net of stock and open purchase orders, a production plan and a simplified cash/working-capital estimate. Scenarios can be duplicated, locked, archived and compared side by side.
+- **Finance: cash flow** — a 13-week weekly and 12-month monthly cash forecast built from cash account balances, open receivables and payables, collection and payment profiles, open checks, recurring fixed costs and planned cash events. It includes AR/AP aging, collection-rate assumptions, a minimum cash buffer with funding-gap alerts, planned-event and fixed-cost detail, cash snapshots for actual-vs-forecast tracking, CSV export and a settings page. Cash amounts are gross cash movements; non-cash costs and future uninvoiced sales are not forecast automatically.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
 - **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
@@ -168,6 +169,7 @@ Finance calculation helpers have standalone unit checks that do not touch the da
 ```bash
 npm run test:finance
 npm run test:simulator
+npm run test:cashflow
 ```
 
 ---
@@ -229,6 +231,17 @@ npm run test:simulator
    - a simplified cash and working-capital projection using collection, payment and inventory days.
 6. Product purchasing fields are maintained in the product form under **Purchasing**: lead time, minimum order quantity and order multiple.
 7. Use **Export CSV** for the monthly projection and **Purchase plan CSV** for the purchasing detail. Duplicate, lock or archive scenarios from the results page, and select two or more scenarios on the list page to compare them.
+
+### Cash flow
+
+1. Open **Finance → Cash flow**. The workspace is restricted to administrators and managers.
+2. Add each active **cash account** under **Cash accounts** with its type and current opening balance. The forecast starts from the sum of active account balances.
+3. Review **Cash flow settings** to set the minimum cash buffer, the week start day, the supplier payment delay and the collection rate and delay for each receivable aging bucket.
+4. The forecast includes open sales invoices and credit notes (using the collection profile), open purchase bills and credit notes (paid in full after the supplier delay), open received and issued checks (by due date), recurring fixed costs from the cost module (gross of VAT and excluding non-cash items) and **planned cash events** such as taxes, payroll, loans or capex.
+5. Switch between the **Weekly** (13 weeks) and **Monthly** (12 months) views. The dashboard shows opening and closing cash, the lowest cash point, funding gap, net movement and periods below the buffer, with an ApexCharts inflow/outflow projection.
+6. Use the aging, receivable, payable, check and event tables to see what drives each period. **Export CSV** downloads the selected view.
+7. Under **Actual cash**, enter a balance snapshot for each active cash account. A period shows actual cash and variance only when every active account has a snapshot inside that period and the snapshot is not future-dated.
+8. Future sales that are not invoiced yet are not forecast automatically. Add planned cash events for expected receipts, or use the sales simulator for what-if planning.
 
 ### Purchase invoice and stock
 
@@ -345,6 +358,9 @@ src/
     sequences.js         Per-year document numbering
     production.js        BOM snapshots and production completion
     checks.js            Check statuses, history, payment links and reversal
+    finance.js           Cost items, periods and profitability calculations
+    simulator.js         Sales scenario, purchase plan and cash calculations
+    cashflow.js          AR/AP, checks, fixed costs, events and cash forecast
     documentTypes.js     Shared order/invoice definitions
     email.js             SMTP transport, validation and email rendering
     emailDocuments.js    Document loaders and email content builders

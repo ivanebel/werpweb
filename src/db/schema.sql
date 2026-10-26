@@ -1020,6 +1020,96 @@ CREATE TABLE IF NOT EXISTS scenario_cost_overrides (
     REFERENCES cost_items (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------------
+-- Cash flow: company cash accounts, planned movements and actual snapshots.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS cash_accounts (
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name            VARCHAR(120) NOT NULL,
+  type            ENUM('bank','cash','card','other') NOT NULL DEFAULT 'bank',
+  bank_name       VARCHAR(120) NULL,
+  account_number  VARCHAR(60) NULL,
+  currency        VARCHAR(3) NOT NULL DEFAULT 'USD',
+  opening_balance DECIMAL(14,2) NOT NULL DEFAULT 0,
+  opening_date    DATE NULL,
+  status          ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  notes           VARCHAR(500) NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_cash_accounts_name (name),
+  KEY idx_cash_accounts_status (status),
+  KEY idx_cash_accounts_type (type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cash_events (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(180) NOT NULL,
+  direction   ENUM('inflow','outflow') NOT NULL,
+  category    ENUM('sales','purchases','payroll','tax','loan','capex','variable_cost','other_income','other')
+              NOT NULL DEFAULT 'other',
+  amount      DECIMAL(14,2) NOT NULL DEFAULT 0,
+  event_date  DATE NOT NULL,
+  recurrence  ENUM('one_off','monthly','quarterly','annual') NOT NULL DEFAULT 'one_off',
+  end_date    DATE NULL,
+  account_id  INT UNSIGNED NULL,
+  status      ENUM('planned','actual') NOT NULL DEFAULT 'planned',
+  notes       VARCHAR(500) NULL,
+  created_by  INT UNSIGNED NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_cash_events_date (event_date),
+  KEY idx_cash_events_direction (direction),
+  KEY idx_cash_events_status (status),
+  KEY idx_cash_events_category (category),
+  CONSTRAINT fk_cash_events_account FOREIGN KEY (account_id)
+    REFERENCES cash_accounts (id) ON DELETE SET NULL,
+  CONSTRAINT fk_cash_events_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cash_snapshots (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  account_id    INT UNSIGNED NOT NULL,
+  snapshot_date DATE NOT NULL,
+  balance       DECIMAL(14,2) NOT NULL DEFAULT 0,
+  notes         VARCHAR(500) NULL,
+  created_by    INT UNSIGNED NULL,
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_cash_snapshots_account_date (account_id, snapshot_date),
+  KEY idx_cash_snapshots_date (snapshot_date),
+  CONSTRAINT fk_cash_snapshots_account FOREIGN KEY (account_id)
+    REFERENCES cash_accounts (id) ON DELETE CASCADE,
+  CONSTRAINT fk_cash_snapshots_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cash_flow_settings (
+  id                        TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  minimum_cash_buffer       DECIMAL(14,2) NOT NULL DEFAULT 0,
+  collection_rate_current   DECIMAL(5,2) NOT NULL DEFAULT 100,
+  collection_rate_1_30      DECIMAL(5,2) NOT NULL DEFAULT 90,
+  collection_rate_31_60     DECIMAL(5,2) NOT NULL DEFAULT 75,
+  collection_rate_61_90     DECIMAL(5,2) NOT NULL DEFAULT 50,
+  collection_rate_90_plus   DECIMAL(5,2) NOT NULL DEFAULT 25,
+  collection_delay_current  INT UNSIGNED NOT NULL DEFAULT 0,
+  collection_delay_1_30     INT UNSIGNED NOT NULL DEFAULT 15,
+  collection_delay_31_60    INT UNSIGNED NOT NULL DEFAULT 30,
+  collection_delay_61_90    INT UNSIGNED NOT NULL DEFAULT 45,
+  collection_delay_90_plus  INT UNSIGNED NOT NULL DEFAULT 60,
+  payment_delay_days        INT UNSIGNED NOT NULL DEFAULT 0,
+  week_start_day            TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  updated_by                INT UNSIGNED NULL,
+  updated_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_cash_flow_settings_updated_by FOREIGN KEY (updated_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS production_orders (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_no  VARCHAR(30) NOT NULL,
