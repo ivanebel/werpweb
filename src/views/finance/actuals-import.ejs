@@ -1,0 +1,119 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Import monthly actuals') %></h1>
+          <p class="page-subtitle"><%= t('Upload a CSV file to create or update monthly actual costs in bulk.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/costs/actuals/import/template?period=<%= period %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'download', className: 'h-4 w-4' }) %>
+            <%= t('Download template') %>
+          </a>
+          <a href="/finance/costs/actuals?period=<%= period %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Back to monthly actuals') %>
+          </a>
+        </div>
+      </div>
+
+      <% if (errors && errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('The file could not be imported:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errors.forEach((message) => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div class="card lg:col-span-2">
+          <div class="card-header"><h2 class="card-title"><%= t('CSV file') %></h2></div>
+          <form method="POST" action="/finance/costs/actuals/import" enctype="multipart/form-data" class="space-y-4 p-5 md:p-6">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div>
+              <label for="file" class="form-label"><%= t('File') %> <span class="text-error-500">*</span></label>
+              <input id="file" name="file" type="file" accept=".csv,text/csv" required class="form-input">
+              <p class="form-help"><%= t('UTF-8 CSV, up to 2 MB and 1,000 data rows.') %></p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+              <p class="font-semibold text-gray-700 dark:text-gray-200"><%= t('Expected columns') %></p>
+              <pre class="mt-2 overflow-x-auto font-mono text-[11px] leading-relaxed">cost_item,period,amount,notes
+Factory rent,<%= period %>,1000.00,October rent
+Sales commission,<%= period %>,250.50,</pre>
+              <p class="mt-2"><%= t('cost_item can be the exact cost item name or its numeric ID. If two cost items share a name, use the ID.') %></p>
+              <p class="mt-1"><%= t('The period must use YYYY-MM. Amounts are net of recoverable VAT. Existing actuals for the same cost item and month are updated.') %></p>
+            </div>
+            <div class="flex justify-end gap-2">
+              <a href="/finance/costs/actuals?period=<%= period %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+              <button type="submit" class="btn btn-primary">
+                <%- include('/partials/icon', { name: 'upload', className: 'h-4 w-4' }) %>
+                <%= t('Import CSV') %>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="card-title"><%= t('How it works') %></h2>
+          <ol class="mt-3 list-inside list-decimal space-y-2 text-sm text-gray-600 dark:text-gray-300">
+            <li><%= t('Download the template to get one row per active cost item.') %></li>
+            <li><%= t('Fill the amount column and keep the period in YYYY-MM format.') %></li>
+            <li><%= t('Upload the file. Invalid rows stop the import so nothing is saved partially.') %></li>
+          </ol>
+          <p class="mt-3 text-xs text-gray-400"><%= t('Imported actuals are marked with source “import” so they can be identified later.') %></p>
+        </div>
+      </div>
+
+      <% if (preview && preview.length) { %>
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Import preview') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Rows that passed validation are not saved until the file is free of errors.') %></p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[800px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Row') %></th>
+                  <th class="table-th"><%= t('Cost item') %></th>
+                  <th class="table-th"><%= t('Period') %></th>
+                  <th class="table-th text-right"><%= t('Amount') %></th>
+                  <th class="table-th"><%= t('Notes') %></th>
+                  <th class="table-th"><%= t('Validation') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% preview.forEach((row) => { %>
+                  <tr class="table-row <%= row.error ? 'bg-error-50/50 dark:bg-error-500/5' : '' %>">
+                    <td class="table-td"><%= row.line %></td>
+                    <td class="table-td"><%= row.item_name || '—' %></td>
+                    <td class="table-td font-mono text-xs"><%= row.period || '—' %></td>
+                    <td class="table-td text-right"><%= row.amount %></td>
+                    <td class="table-td text-gray-500 dark:text-gray-400"><%= row.notes || '—' %></td>
+                    <td class="table-td text-xs">
+                      <% if (row.error) { %><span class="text-error-600 dark:text-error-400"><%= row.error %></span><% } else { %><span class="text-success-600 dark:text-success-400"><%= t('Valid') %></span><% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

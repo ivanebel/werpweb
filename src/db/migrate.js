@@ -292,6 +292,11 @@ async function upgradeSchema(conn, dbName) {
       "ALTER TABLE cost_items MODIFY COLUMN driver_type ENUM('unit','revenue_percent','material_percent','invoice','pallet','labor_hour') NULL",
     );
   }
+
+  // --------------------------------------------- sales simulator purchasing
+  await addColumn(conn, dbName, 'products', 'lead_time_days', 'INT UNSIGNED NOT NULL DEFAULT 0 AFTER packs_per_pallet');
+  await addColumn(conn, dbName, 'products', 'min_order_qty', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER lead_time_days');
+  await addColumn(conn, dbName, 'products', 'order_multiple', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER min_order_qty');
 }
 
 async function main() {

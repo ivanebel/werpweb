@@ -20,7 +20,8 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Purchasing** — purchase orders and purchase invoices (bills). Receiving a bill posts stock into inventory.
 - **Point of Sale (Unit #2)** — manage several shops as distinct points of sale, record completed POS sales with ticket type, ticket number and shop, and analyse revenue, average ticket, units, product rankings and category performance. POS sales are reporting records only: they do not create stock movements or change Unit #1 inventory.
 - **Manufacturing** — bills of materials with component quantities and scrap, multi-BOM production orders where each line has its own quantity, lot, expiry and notes, aggregated material requirements across all BOM lines, material availability checks, component consumption and finished-goods posting, plus scale records from the Bizerba GLM-e labeler with lot/date filters, weight statistics, and box/pallet totals.
-- **Finance: costs and profitability** — a management-accounting workspace for fixed, variable, semi-variable and stepped costs. Cost centers and categories organise spending; cost items define recurring amounts or variable drivers such as units, net revenue, material cost, invoices, pallets or labour hours. The analysis dashboard combines BOM-based product costs with sales invoices to show contribution margin, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Monthly actual costs can be entered and compared with the calculated plan. All analytical amounts are net of recoverable VAT.
+- **Finance: costs and profitability** — a management-accounting workspace for fixed, variable, semi-variable and stepped costs. Cost centers and categories organise spending; cost items define recurring amounts or variable drivers such as units, net revenue, material cost, invoices, pallets or labour hours. The analysis dashboard combines BOM-based product costs with sales invoices to show contribution margin, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Monthly actual costs can be entered manually or imported from CSV and compared with the calculated plan. All analytical amounts are net of recoverable VAT.
+- **Finance: sales simulator** — build saved sales scenarios with a product/customer basket, monthly quantities, net prices, discounts and optional cost overrides. Each scenario projects revenue, contribution, fixed costs, operating profit, break-even, product and customer margins, a BOM-based purchase plan net of stock and open purchase orders, a production plan and a simplified cash/working-capital estimate. Scenarios can be duplicated, locked, archived and compared side by side.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
 - **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
@@ -166,6 +167,7 @@ Finance calculation helpers have standalone unit checks that do not touch the da
 
 ```bash
 npm run test:finance
+npm run test:simulator
 ```
 
 ---
@@ -206,10 +208,27 @@ npm run test:finance
    - **Semi-variable** costs have both a fixed amount and a variable driver.
    - A variable cost can apply company-wide, to one product or to a product category.
 4. Enter **monthly actual costs** and compare them with the calculated recurring plan and variable drivers.
-5. The dashboard shows net revenue, contribution margin, fixed costs per month, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Product material cost uses the active BOM when available; otherwise it uses the product's net cost.
-6. Costs can be entered VAT-inclusive or net. Recoverable VAT is extracted so all analytical amounts use a consistent net basis. Depreciation and other non-cash fixed costs can be flagged and are excluded from cash break-even.
-7. One-off costs affect operating profit for the period but are excluded from the recurring break-even point.
-8. Revenue and units come from non-draft sales invoices in the selected month. Credit notes reduce revenue and units. Unit #2 POS sales are not included in this analysis.
+5. Use **Import CSV** on the monthly actuals page to upload many actuals at once. The file needs `cost_item`, `period`, `amount` and an optional `notes` column. `cost_item` can be the exact name or the numeric ID; invalid rows stop the whole import. A template with one row per active cost item can be downloaded from the import page.
+6. The dashboard shows net revenue, contribution margin, fixed costs per month, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Product material cost uses the active BOM when available; otherwise it uses the product's net cost.
+7. Costs can be entered VAT-inclusive or net. Recoverable VAT is extracted so all analytical amounts use a consistent net basis. Depreciation and other non-cash fixed costs can be flagged and are excluded from cash break-even.
+8. One-off costs affect operating profit for the period but are excluded from the recurring break-even point.
+9. Revenue and units come from non-draft sales invoices in the selected month. Credit notes reduce revenue and units. Unit #2 POS sales are not included in this analysis.
+
+### Sales simulator
+
+1. Open **Finance → Sales simulator** and create a scenario. Choose the start month, horizon (up to 24 months) and working-capital assumptions.
+2. Add products to the sales basket, choose an optional customer, and enter the planned quantity for each month. **Load last 12 months** fills the basket from the average monthly invoiced sales in the 12 months before the scenario. Use **Fill all months**, **Copy first month** or **Apply growth** for quick adjustments.
+3. Prices are net of VAT. Leave the price blank to use the product's current net sale price. Discounts are applied per line.
+4. Optionally override cost items in **Cost overrides**. Overrides are net amounts and apply to every month.
+5. Save the scenario to see:
+   - monthly revenue, material cost, other variable costs, contribution, fixed costs and operating profit;
+   - break-even revenue, break-even units and margin of safety;
+   - product and customer margins;
+   - a purchase plan net of stock and open purchase orders, with order-by dates based on lead times and quantities rounded to product minimums and order multiples;
+   - a production plan for manufactured products;
+   - a simplified cash and working-capital projection using collection, payment and inventory days.
+6. Product purchasing fields are maintained in the product form under **Purchasing**: lead time, minimum order quantity and order multiple.
+7. Use **Export CSV** for the monthly projection and **Purchase plan CSV** for the purchasing detail. Duplicate, lock or archive scenarios from the results page, and select two or more scenarios on the list page to compare them.
 
 ### Purchase invoice and stock
 

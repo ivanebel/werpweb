@@ -1,12 +1,18 @@
 'use strict';
 
 const express = require('express');
+const multer = require('multer');
 const { query, one, withTransaction } = require('../db');
 const { todayISO, toNumber, formatMoney } = require('../lib/helpers');
 const finance = require('../lib/finance');
+const { parseCsv, toCsv } = require('../lib/csv');
 
 const router = express.Router();
 const basePath = '/finance/costs';
+const actualsUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+}).single('file');
 
 const STATUSES = ['active', 'inactive'];
 
@@ -782,4 +788,185 @@ router.post('/costs/categories/:id(\\d+)/delete', async (req, res, next) => {
   }
 });
 
+// -------------------------------------------------------- actuals CSV import
+function csvNumber(value) {
+  const text = String(value === undefined || value === null ? '' : value).trim().replace(/\s+/g, '');
+  if (!text) return NaN;
+  if (text.includes(',') && text.includes('.')) {
+    const lastComma = text.lastIndexOf(',');
+    const lastDot = text.lastIndexOf('.');
+    return lastComma > lastDot
+      ? Number(text.replace(/\./g, '').replace(',', '.'))
+      : Number(text.replace(/,/g, ''));
+  }
+  if (text.includes(',') && !text.includes('.')) return Number(text.replace(',', '.'));
+  return Number(text);
+}
+
+function renderActualsImport(req, res, { errors = [], preview = [], period = currentPeriod(), status = 200 } = {}) {
+  res.status(status).render('finance/actuals-import', {
+    title: req.t('Import monthly actuals'),
+    active: 'finance-costs',
+    breadcrumbs: [
+      { label: req.t('Costs & profitability'), href: basePath },
+      { label: req.t('Monthly actuals'), href: `${basePath}/actuals` },
+      { label: req.t('Import CSV') },
+    ],
+    errors,
+    preview,
+    period,
+  });
+}
+
+router.get('/costs/actuals/import', (req, res) => {
+  const period = finance.normalizePeriod(req.query.period, currentPeriod());
+  renderActualsImport(req, res, { period });
+});
+
+router.get('/costs/actuals/import/template', async (req, res, next) => {
+  try {
+    const period = finance.normalizePeriod(req.query.period, currentPeriod());
+    const items = await finance.loadCostItems({ activeOnly: true, period });
+    const rows = items.map((item) => [item.name, period, '', '']);
+    const csv = `\uFEFF${toCsv(['cost_item', 'period', 'amount', 'notes'], rows)}`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="actual-costs-template-${period}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/costs/actuals/import', async (req, res, next) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return renderActualsImport(req, res, {
+        errors: [req.t('Choose a CSV file to import.')],
+        status: 422,
+      });
+    }
+    const source = req.file.buffer.toString('utf8');
+    const rows = parseCsv(source);
+    if (rows.length < 2) {
+      return renderActualsImport(req, res, {
+        errors: [req.t('The CSV file is empty or has no data rows.')],
+        status: 422,
+      });
+    }
+    if (rows.length > 1001) {
+      return renderActualsImport(req, res, {
+        errors: [req.t('The CSV file has too many rows. Import at most 1,000 rows at a time.')],
+        status: 422,
+      });
+    }
+
+    const header = rows[0].map((value) => String(value).trim().toLowerCase().replace(/[\s-]+/g, '_'));
+    const index = {
+      cost_item: header.indexOf('cost_item'),
+      period: header.indexOf('period'),
+      amount: header.indexOf('amount'),
+      notes: header.indexOf('notes'),
+    };
+    if (index.cost_item < 0 || index.period < 0 || index.amount < 0) {
+      return renderActualsImport(req, res, {
+        errors: [req.t('The CSV must include the columns cost_item, period and amount.')],
+        status: 422,
+      });
+    }
+
+    const costItems = await query('SELECT id, name FROM cost_items ORDER BY name');
+    const byId = new Map(costItems.map((item) => [Number(item.id), item]));
+    const byName = new Map();
+    for (const item of costItems) {
+      const key = String(item.name || '').trim().toLowerCase();
+      if (!byName.has(key)) byName.set(key, []);
+      byName.get(key).push(item);
+    }
+
+    const errors = [];
+    const preview = [];
+    const validRows = [];
+    for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
+      const line = rowIndex + 1;
+      const rawItem = String(row[index.cost_item] || '').trim();
+      const rawPeriod = String(row[index.period] || '').trim().slice(0, 7);
+      const rawAmount = row[index.amount];
+      const note = index.notes >= 0 ? String(row[index.notes] || '').trim().slice(0, 500) : '';
+
+      let item = null;
+      let error = null;
+      const numericId = Number.parseInt(rawItem, 10);
+      if (Number.isFinite(numericId) && byId.has(numericId)) {
+        item = byId.get(numericId);
+      } else {
+        const matches = byName.get(rawItem.toLowerCase()) || [];
+        if (matches.length === 1) item = matches[0];
+        else if (matches.length > 1) error = req.t('Row {row}: the cost item name "{name}" is ambiguous. Use the cost item ID instead.', { row: line, name: rawItem });
+        else error = req.t('Row {row}: cost item "{name}" was not found.', { row: line, name: rawItem });
+      }
+
+      if (!item && !error) error = req.t('Row {row}: cost item is required.', { row: line });
+      if (!error && !/^\d{4}-(0[1-9]|1[0-2])$/.test(rawPeriod)) {
+        error = req.t('Row {row}: period must use the YYYY-MM format.', { row: line });
+      }
+      const amount = csvNumber(rawAmount);
+      if (!error && (!Number.isFinite(amount) || amount < 0)) {
+        error = req.t('Row {row}: amount must be zero or more.', { row: line });
+      }
+
+      preview.push({
+        line,
+        item_name: item ? item.name : rawItem,
+        period: rawPeriod,
+        amount: Number.isFinite(amount) ? finance.round2(amount) : rawAmount,
+        notes: note,
+        error,
+      });
+      if (error) {
+        errors.push(error);
+      } else {
+        validRows.push({
+          cost_item_id: item.id,
+          period: rawPeriod,
+          amount: finance.round2(amount),
+          notes: note || null,
+        });
+      }
+    }
+
+    if (errors.length) {
+      return renderActualsImport(req, res, {
+        errors: errors.slice(0, 50),
+        preview: preview.slice(0, 100),
+        status: 422,
+      });
+    }
+
+    if (!validRows.length) {
+      return renderActualsImport(req, res, {
+        errors: [req.t('No valid rows were found in the CSV file.')],
+        status: 422,
+      });
+    }
+
+    await withTransaction(async (conn) => {
+      for (const row of validRows) {
+        await conn.query(
+          `INSERT INTO cost_actuals (cost_item_id, period, amount, source, notes, created_by)
+           VALUES (?, ?, ?, 'import', ?, ?)
+           ON DUPLICATE KEY UPDATE amount = VALUES(amount), source = 'import', notes = VALUES(notes), created_by = VALUES(created_by)`,
+          [row.cost_item_id, row.period, row.amount, row.notes, req.session.user.id],
+        );
+      }
+    });
+
+    req.flash('success', 'Imported {count} monthly actual costs.', { count: validRows.length });
+    res.redirect(`${basePath}/actuals?period=${validRows[0].period}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
+module.exports.actualsUpload = actualsUpload;

@@ -35,6 +35,7 @@ const bankAccountRoutes = require('./routes/bankAccounts');
 const manufacturingRoutes = require('./routes/manufacturing');
 const posRoutes = require('./routes/pos');
 const financeRoutes = require('./routes/finance');
+const simulatorRoutes = require('./routes/simulator');
 const emailRoutes = require('./routes/emails');
 const settingsRoutes = require('./routes/settings');
 
@@ -115,6 +116,7 @@ async function createApp() {
   app.use(sessionFlash);
   // Multipart bodies must be parsed before the CSRF middleware can read _csrf.
   app.use('/attendance/import/preview', attendanceRoutes.importUpload);
+  app.use('/finance/costs/actuals/import', financeRoutes.actualsUpload);
   app.use(csrf);
   app.use(webLocals);
   app.use((req, res, next) => {
@@ -148,6 +150,7 @@ async function createApp() {
   app.use('/bank-accounts', requireRole('admin', 'manager'), bankAccountRoutes);
   app.use('/manufacturing', manufacturingRoutes);
   app.use('/pos', posRoutes);
+  app.use('/finance/simulator', requireRole('admin', 'manager'), simulatorRoutes);
   app.use('/finance', requireRole('admin', 'manager'), financeRoutes);
   app.use('/emails', emailRoutes);
   app.use('/', settingsRoutes);

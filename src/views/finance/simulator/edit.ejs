@@ -1,0 +1,390 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1800px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= scenario.name || t('Edit scenario') %></h1>
+            <%- statusBadge(scenario.status || 'draft') %>
+          </div>
+          <p class="page-subtitle"><%= t('Build the sales basket, set cost assumptions and save to view the projection.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/simulator/<%= scenario.id %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %>
+            <%= t('View results') %>
+          </a>
+          <a href="/finance/simulator" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Sales simulator') %>
+          </a>
+        </div>
+      </div>
+
+      <% if (errors && errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please fix the following:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errors.forEach((message) => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/finance/simulator/<%= scenario.id %>" id="scenario-form" class="space-y-5">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header"><h2 class="card-title"><%= t('Scenario') %></h2></div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 xl:grid-cols-4 md:p-6">
+            <div class="md:col-span-2">
+              <label for="name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+              <input id="name" name="name" type="text" maxlength="180" required value="<%= scenario.name || '' %>" class="form-input">
+            </div>
+            <div class="md:col-span-2">
+              <label for="description" class="form-label"><%= t('Description') %></label>
+              <input id="description" name="description" type="text" maxlength="500" value="<%= scenario.description || '' %>" class="form-input">
+            </div>
+            <div>
+              <label for="start_period" class="form-label"><%= t('Start month') %></label>
+              <input id="start_period" name="start_period" type="month" required value="<%= scenario.start_period %>" class="form-input">
+            </div>
+            <div>
+              <label for="horizon_months" class="form-label"><%= t('Horizon (months)') %></label>
+              <input id="horizon_months" name="horizon_months" type="number" min="<%= 1 %>" max="<%= 24 %>" step="1" required value="<%= scenario.horizon_months %>" class="form-input text-right">
+            </div>
+            <div>
+              <label for="status" class="form-label"><%= t('Status') %></label>
+              <select id="status" name="status" class="form-select">
+                <% statuses.forEach((status) => { %>
+                  <option value="<%= status %>" <%= scenario.status === status ? 'selected' : '' %>><%= t(status.charAt(0).toUpperCase() + status.slice(1)) %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <p class="form-help"><%= t('Changing the start month or horizon rebuilds the monthly columns when you save.') %></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Working-capital assumptions') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Used for the simplified cash projection.') %></p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div>
+              <label for="collection_days" class="form-label"><%= t('Collection days') %></label>
+              <input id="collection_days" name="collection_days" type="number" min="0" max="365" step="1" value="<%= scenario.assumptions.collection_days %>" class="form-input text-right">
+            </div>
+            <div>
+              <label for="payment_days" class="form-label"><%= t('Supplier payment days') %></label>
+              <input id="payment_days" name="payment_days" type="number" min="0" max="365" step="1" value="<%= scenario.assumptions.payment_days %>" class="form-input text-right">
+            </div>
+            <div>
+              <label for="inventory_days" class="form-label"><%= t('Inventory days') %></label>
+              <input id="inventory_days" name="inventory_days" type="number" min="0" max="365" step="1" value="<%= scenario.assumptions.inventory_days %>" class="form-input text-right">
+            </div>
+            <div>
+              <label for="starting_cash" class="form-label"><%= t('Starting cash') %></label>
+              <input id="starting_cash" name="starting_cash" type="number" step="0.01" value="<%= scenario.assumptions.starting_cash %>" class="form-input text-right">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Sales basket') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Add products and enter the planned quantity for each month. Prices are net of VAT.') %></p>
+            </div>
+            <button type="button" id="add-basket-row" class="btn btn-primary btn-sm">
+              <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+              <%= t('Add product') %>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+            <div>
+              <label for="fill-quantity" class="form-label"><%= t('Fill all months') %></label>
+              <div class="flex gap-2">
+                <input id="fill-quantity" type="number" min="0" step="0.001" class="form-input w-32 text-right" placeholder="0">
+                <button type="button" id="fill-all" class="btn btn-secondary btn-sm"><%= t('Fill') %></button>
+              </div>
+            </div>
+            <button type="button" id="copy-first" class="btn btn-secondary btn-sm"><%= t('Copy first month') %></button>
+            <div>
+              <label for="growth-rate" class="form-label"><%= t('Apply growth') %></label>
+              <div class="flex gap-2">
+                <input id="growth-rate" type="number" step="0.1" class="form-input w-28 text-right" placeholder="0">
+                <span class="self-center text-sm text-gray-400">%</span>
+                <button type="button" id="apply-growth" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
+              </div>
+            </div>
+            <button type="button" id="clear-quantities" class="btn btn-ghost btn-sm"><%= t('Clear quantities') %></button>
+            <button type="button" id="load-baseline" class="btn btn-secondary btn-sm ml-auto">
+              <%- include('/partials/icon', { name: 'refresh', className: 'h-4 w-4' }) %>
+              <%= t('Load last 12 months') %>
+            </button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table-base min-w-[1200px]">
+              <thead>
+                <tr>
+                  <th class="table-th min-w-[280px]"><%= t('Product / customer') %></th>
+                  <th class="table-th text-right"><%= t('Net price') %></th>
+                  <th class="table-th text-right"><%= t('Discount %') %></th>
+                  <% periods.forEach((period) => { %>
+                    <th class="table-th text-right whitespace-nowrap"><%= periodLabels[period] %></th>
+                  <% }) %>
+                  <th class="table-th"></th>
+                </tr>
+              </thead>
+              <tbody id="basket-body">
+                <% rows.forEach((row) => { %>
+                  <tr class="table-row" data-basket-row>
+                    <td class="table-td">
+                      <input type="hidden" name="product_id[]" value="<%= row.product_id %>">
+                      <input type="hidden" name="customer_id[]" value="<%= row.customer_id || '' %>">
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= row.product_name || row.sku %></p>
+                      <p class="text-xs text-gray-400"><%= row.sku %><% if (row.customer_name) { %> · <%= row.customer_name %><% } else { %> · <%= t('No customer') %><% } %></p>
+                    </td>
+                    <td class="table-td">
+                      <input name="unit_price[]" type="number" min="0" step="0.01" value="<%= row.unit_price ? row.unit_price : '' %>" data-default-price="<%= productData[String(row.product_id)] ? productData[String(row.product_id)].price : 0 %>" class="form-input w-28 text-right basket-price" placeholder="<%= productData[String(row.product_id)] ? productData[String(row.product_id)].price : '' %>">
+                    </td>
+                    <td class="table-td">
+                      <input name="discount_pct[]" type="number" min="0" max="100" step="0.01" value="<%= row.discount_pct || '' %>" class="form-input w-24 text-right basket-discount" placeholder="0">
+                    </td>
+                    <% periods.forEach((period) => { %>
+                      <td class="table-td">
+                        <input name="qty[<%= period %>][]" type="number" min="0" step="0.001" value="<%= row.quantities[period] || '' %>" class="form-input w-24 text-right basket-qty" placeholder="0">
+                      </td>
+                    <% }) %>
+                    <td class="table-td text-right">
+                      <button type="button" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" data-remove-row title="<%= t('Remove row') %>">
+                        <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                      </button>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (!rows.length) { %>
+                  <tr id="empty-basket-row">
+                    <td colspan="<%= 4 + periods.length %>" class="px-6 py-12 text-center text-sm text-gray-400">
+                      <%= t('No products in the basket yet. Use Add product or load the last 12 months as a baseline.') %>
+                    </td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+          <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+            <%= t('To change the product or customer on an existing line, remove the row and add it again.') %>
+          </p>
+        </div>
+
+        <div class="card">
+          <details <%= costItems.length ? '' : 'open' %>>
+            <summary class="card-header cursor-pointer list-none">
+              <div>
+                <h2 class="card-title"><%= t('Cost overrides') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Optionally override the base cost items for this scenario. Overrides are net of VAT and apply to every month.') %></p>
+              </div>
+              <span class="flex items-center gap-2 text-xs text-gray-400">
+                <%= t('{count} active cost items', { count: costItems.length }) %>
+                <%- include('/partials/icon', { name: 'chevron-down', className: 'h-4 w-4' }) %>
+              </span>
+            </summary>
+            <div class="table-wrap">
+              <table class="table-base min-w-[900px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Cost item') %></th>
+                    <th class="table-th"><%= t('Behavior') %></th>
+                    <th class="table-th text-right"><%= t('Base') %></th>
+                    <th class="table-th text-right"><%= t('Override') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% costItems.forEach((item) => {
+                    const override = overrides.get(Number(item.id)) || {};
+                    const behaviorLabel = { fixed: t('Fixed'), variable: t('Variable'), semi_variable: t('Semi-variable'), stepped: t('Stepped') }[item.behavior] || item.behavior;
+                    const driverLabels = { unit: t('Units'), revenue_percent: t('% of revenue'), material_percent: t('% of material cost'), invoice: t('Invoices'), pallet: t('Pallets'), labor_hour: t('Labour hours') };
+                    const isPercent = ['revenue_percent', 'material_percent'].includes(String(item.driver_type));
+                  %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
+                        <p class="text-xs text-gray-400"><%= item.category_name || '—' %><% if (item.cost_center_name) { %> · <%= item.cost_center_name %><% } %></p>
+                      </td>
+                      <td class="table-td text-gray-600 dark:text-gray-300"><%= behaviorLabel %></td>
+                      <td class="table-td text-right text-xs text-gray-500 dark:text-gray-400">
+                        <% if (item.is_fixed) { %><p><%= money(item.base_fixed) %> / <%= t('month') %></p><% } %>
+                        <% if (item.is_variable) { %><p><%= h.formatNumber(item.base_rate, 4) %><%= isPercent ? '%' : '' %> · <%= driverLabels[item.driver_type] || item.driver_type %></p><% } %>
+                      </td>
+                      <td class="table-td">
+                        <div class="flex flex-col items-end gap-2">
+                          <% if (item.is_fixed) { %>
+                            <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                              <span><%= t('Monthly amount') %></span>
+                              <input name="override_amount_<%= item.id %>" type="number" min="0" step="0.01" value="<%= override.amount !== null && override.amount !== undefined ? override.amount : '' %>" class="form-input w-32 text-right" placeholder="<%= Number(item.base_fixed).toFixed(2) %>">
+                            </label>
+                          <% } %>
+                          <% if (item.is_variable) { %>
+                            <label class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                              <span><%= t('Driver rate') %></span>
+                              <input name="override_rate_<%= item.id %>" type="number" min="0" step="0.0001" value="<%= override.driver_rate !== null && override.driver_rate !== undefined ? override.driver_rate : '' %>" class="form-input w-32 text-right" placeholder="<%= Number(item.base_rate).toFixed(4) %>">
+                            </label>
+                          <% } %>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }) %>
+                  <% if (!costItems.length) { %>
+                    <tr><td colspan="4" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No active cost items. Add costs first to include them in the scenario.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+
+        <div class="flex flex-col-reverse justify-end gap-3 sm:flex-row">
+          <a href="/finance/simulator/<%= scenario.id %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= t('Save scenario') %>
+          </button>
+        </div>
+      </form>
+
+      <form method="POST" action="/finance/simulator/<%= scenario.id %>/load-baseline" id="baseline-form" class="hidden">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <template id="basket-row-template">
+    <tr class="table-row" data-basket-row>
+      <td class="table-td">
+        <select name="product_id[]" class="form-select basket-product">
+          <option value=""><%= t('Select a product…') %></option>
+          <% products.forEach((product) => { %>
+            <option value="<%= product.id %>" data-price="<%= productData[String(product.id)].price %>"><%= product.sku %> — <%= product.name %></option>
+          <% }) %>
+        </select>
+        <select name="customer_id[]" class="form-select mt-2 basket-customer">
+          <option value=""><%= t('No customer') %></option>
+          <% customers.forEach((customer) => { %>
+            <option value="<%= customer.id %>"><%= customer.company_name %></option>
+          <% }) %>
+        </select>
+      </td>
+      <td class="table-td">
+        <input name="unit_price[]" type="number" min="0" step="0.01" class="form-input w-28 text-right basket-price" placeholder="0">
+      </td>
+      <td class="table-td">
+        <input name="discount_pct[]" type="number" min="0" max="100" step="0.01" class="form-input w-24 text-right basket-discount" placeholder="0">
+      </td>
+      <% periods.forEach((period) => { %>
+        <td class="table-td">
+          <input name="qty[<%= period %>][]" type="number" min="0" step="0.001" class="form-input w-24 text-right basket-qty" placeholder="0">
+        </td>
+      <% }) %>
+      <td class="table-td text-right">
+        <button type="button" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" data-remove-row title="<%= t('Remove row') %>">
+          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+        </button>
+      </td>
+    </tr>
+  </template>
+
+  <script>
+  (function () {
+    const body = document.getElementById('basket-body');
+    const template = document.getElementById('basket-row-template');
+    const productData = <%- JSON.stringify(productData || {}) %>;
+
+    function removeEmptyRow() {
+      const empty = document.getElementById('empty-basket-row');
+      if (empty) empty.remove();
+    }
+
+    function setDefaultPrice(row) {
+      const select = row.querySelector('.basket-product');
+      if (!select) return;
+      const priceInput = row.querySelector('.basket-price');
+      if (!priceInput) return;
+      const data = productData[String(select.value)];
+      if (!data) return;
+      priceInput.placeholder = Number(data.price || 0).toFixed(2);
+      if (!priceInput.value) priceInput.value = Number(data.price || 0).toFixed(2);
+    }
+
+    function addRow() {
+      removeEmptyRow();
+      const fragment = template.content.cloneNode(true);
+      body.appendChild(fragment);
+      const row = body.lastElementChild;
+      const select = row.querySelector('.basket-product');
+      if (select) select.addEventListener('change', () => setDefaultPrice(row));
+    }
+
+    document.getElementById('add-basket-row').addEventListener('click', addRow);
+
+    body.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-remove-row]');
+      if (!button) return;
+      const row = button.closest('[data-basket-row]');
+      if (row) row.remove();
+    });
+
+    document.getElementById('fill-all').addEventListener('click', () => {
+      const value = document.getElementById('fill-quantity').value;
+      body.querySelectorAll('.basket-qty').forEach((input) => { input.value = value; });
+    });
+
+    document.getElementById('copy-first').addEventListener('click', () => {
+      body.querySelectorAll('[data-basket-row]').forEach((row) => {
+        const quantities = [...row.querySelectorAll('.basket-qty')];
+        if (!quantities.length) return;
+        const value = quantities[0].value;
+        quantities.forEach((input) => { input.value = value; });
+      });
+    });
+
+    document.getElementById('apply-growth').addEventListener('click', () => {
+      const growth = Number(document.getElementById('growth-rate').value) || 0;
+      body.querySelectorAll('[data-basket-row]').forEach((row) => {
+        const quantities = [...row.querySelectorAll('.basket-qty')];
+        if (!quantities.length) return;
+        const base = Number(quantities[0].value) || 0;
+        quantities.forEach((input, index) => {
+          input.value = base > 0 ? (base * Math.pow(1 + growth / 100, index)).toFixed(3) : '';
+        });
+      });
+    });
+
+    document.getElementById('clear-quantities').addEventListener('click', () => {
+      body.querySelectorAll('.basket-qty').forEach((input) => { input.value = ''; });
+    });
+
+    document.getElementById('load-baseline').addEventListener('click', () => {
+      if (window.confirm(<%- JSON.stringify(t('Replace the current basket with the average monthly sales from the 12 months before the scenario?')) %>)) {
+        document.getElementById('baseline-form').submit();
+      }
+    });
+  })();
+  </script>
+</div>

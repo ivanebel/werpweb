@@ -1,0 +1,105 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[900px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('New scenario') %></h1>
+          <p class="page-subtitle"><%= t('Define the planning horizon and working-capital assumptions. Add the sales basket next.') %></p>
+        </div>
+        <a href="/finance/simulator" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Sales simulator') %>
+        </a>
+      </div>
+
+      <% if (errors && errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please fix the following:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errors.forEach((message) => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/finance/simulator" class="space-y-5">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header"><h2 class="card-title"><%= t('Scenario') %></h2></div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+            <div class="md:col-span-2">
+              <label for="name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+              <input id="name" name="name" type="text" maxlength="180" required value="<%= values.name || '' %>" class="form-input" placeholder="<%= t('e.g. Base plan 2027') %>">
+            </div>
+            <div class="md:col-span-2">
+              <label for="description" class="form-label"><%= t('Description') %></label>
+              <input id="description" name="description" type="text" maxlength="500" value="<%= values.description || '' %>" class="form-input" placeholder="<%= t('Optional planning notes') %>">
+            </div>
+            <div>
+              <label for="start_period" class="form-label"><%= t('Start month') %> <span class="text-error-500">*</span></label>
+              <input id="start_period" name="start_period" type="month" required value="<%= values.start_period %>" class="form-input">
+            </div>
+            <div>
+              <label for="horizon_months" class="form-label"><%= t('Horizon (months)') %> <span class="text-error-500">*</span></label>
+              <input id="horizon_months" name="horizon_months" type="number" min="<%= horizonMin %>" max="<%= horizonMax %>" step="1" required value="<%= values.horizon_months %>" class="form-input text-right">
+              <p class="form-help"><%= t('Between {min} and {max} months.', { min: horizonMin, max: horizonMax }) %></p>
+            </div>
+            <div>
+              <label for="status" class="form-label"><%= t('Status') %></label>
+              <select id="status" name="status" class="form-select">
+                <% statuses.forEach((status) => { %>
+                  <option value="<%= status %>" <%= values.status === status ? 'selected' : '' %>><%= t(status.charAt(0).toUpperCase() + status.slice(1)) %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Working-capital assumptions') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Used for the simplified cash projection. The full cash-flow module will add more detail.') %></p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div>
+              <label for="collection_days" class="form-label"><%= t('Collection days') %></label>
+              <input id="collection_days" name="collection_days" type="number" min="0" max="365" step="1" value="<%= values.collection_days %>" class="form-input text-right">
+            </div>
+            <div>
+              <label for="payment_days" class="form-label"><%= t('Supplier payment days') %></label>
+              <input id="payment_days" name="payment_days" type="number" min="0" max="365" step="1" value="<%= values.payment_days %>" class="form-input text-right">
+            </div>
+            <div>
+              <label for="inventory_days" class="form-label"><%= t('Inventory days') %></label>
+              <input id="inventory_days" name="inventory_days" type="number" min="0" max="365" step="1" value="<%= values.inventory_days %>" class="form-input text-right">
+            </div>
+            <div>
+              <label for="starting_cash" class="form-label"><%= t('Starting cash') %></label>
+              <input id="starting_cash" name="starting_cash" type="number" step="0.01" value="<%= values.starting_cash %>" class="form-input text-right">
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col-reverse justify-end gap-3 sm:flex-row">
+          <a href="/finance/simulator" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= t('Create scenario') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

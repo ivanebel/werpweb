@@ -179,7 +179,10 @@ const fields = [
   { name: 'sold_by_weight', label: 'Sold / bought by weight', type: 'checkbox', default: 0, section: 'Packaging', help: 'Allows decimal quantities and indicates a weight-based product (kg / g).' },
   { name: 'weight_kg', label: 'Weight (kg)', type: 'decimal', min: 0, default: 0, section: 'Packaging', help: 'Weight of one selling unit. Used to calculate packing slip totals.' },
 
-  { name: 'supplier_id', label: 'Default supplier', type: 'select', section: 'Pricing', optionsFrom: supplierOptions, help: 'Selecting a supplier fills the cost VAT and levy rates from its defaults.' },
+  { name: 'supplier_id', label: 'Default supplier', type: 'select', section: 'Purchasing', optionsFrom: supplierOptions, help: 'Selecting a supplier fills the cost VAT and levy rates from its defaults.' },
+  { name: 'lead_time_days', label: 'Lead time (days)', type: 'number', min: 0, integer: true, default: 0, section: 'Purchasing', help: 'Days between placing a purchase order and receiving the product. Used by the sales simulator.' },
+  { name: 'min_order_qty', label: 'Minimum order quantity', type: 'decimal', min: 0, default: 0, section: 'Purchasing', help: 'Smallest quantity a supplier will accept. Used to round the suggested purchase quantity.' },
+  { name: 'order_multiple', label: 'Order multiple', type: 'decimal', min: 0, default: 0, section: 'Purchasing', help: 'Round suggested purchases up to this multiple, for example a full box or pallet. Leave zero for no rounding.' },
   { name: 'cost_gross_price', label: 'Cost gross price', type: 'decimal', min: 0, default: 0, section: 'Pricing' },
   { name: 'cost_vat_rate', label: 'Cost VAT rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Pricing' },
   { name: 'cost_levy_rate', label: 'Supplier levy rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Pricing', help: 'Levies vary by supplier; the default comes from the selected supplier.' },

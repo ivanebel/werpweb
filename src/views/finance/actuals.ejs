@@ -19,6 +19,10 @@
             <%- include('/partials/icon', { name: 'list', className: 'h-4 w-4' }) %>
             <%= t('Cost items') %>
           </a>
+          <a href="/finance/costs/actuals/import?period=<%= period %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'upload', className: 'h-4 w-4' }) %>
+            <%= t('Import CSV') %>
+          </a>
         </div>
       </div>
 

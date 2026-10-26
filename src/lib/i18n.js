@@ -2769,6 +2769,296 @@ const ES = {
   'Cost category': 'Categoría de costo',
   'This cost item has actual costs. Mark it inactive instead of deleting it.':
     'Este ítem de costo tiene costos reales. Marcalo inactivo en lugar de eliminarlo.',
+
+  // ------------------------------------------------------- sales simulator
+  'Sales simulator': 'Simulador de ventas',
+  'Scenario planning': 'Planificación de escenarios',
+  'Build a basket of sales and project revenue, margin, purchases and cash.':
+    'Armá una canasta de ventas y proyectá ingresos, margen, compras y caja.',
+  'New scenario': 'Nuevo escenario',
+  'Scenario': 'Escenario',
+  'Scenarios': 'Escenarios',
+  'scenario': 'escenario',
+  'scenarios': 'escenarios',
+  'Locked': 'Bloqueado',
+  'Search scenarios…': 'Buscar escenarios…',
+  'Compare selected': 'Comparar seleccionados',
+  'Start month': 'Mes de inicio',
+  'Horizon': 'Horizonte',
+  'View results': 'Ver resultados',
+  'Duplicate': 'Duplicar',
+  'Delete this scenario?': '¿Eliminar este escenario?',
+  'No scenarios found': 'No se encontraron escenarios',
+  'Create a scenario to simulate a group of sales and its impact on purchases and finances.':
+    'Creá un escenario para simular un grupo de ventas y su impacto en compras y finanzas.',
+  '{count} months': '{count} meses',
+  'Monthly lines': 'Líneas mensuales',
+  '% of revenue': '% de ingresos',
+  '% of material cost': '% del costo de materiales',
+  'Compare {name}': 'Comparar {name}',
+  'Compare scenarios': 'Comparar escenarios',
+  'Side-by-side view of revenue, margin, purchases and cash.':
+    'Vista comparativa de ingresos, margen, compras y caja.',
+  'Metric': 'Métrica',
+  'Select at least two scenarios to compare.': 'Seleccioná al menos dos escenarios para comparar.',
+  'Define the planning horizon and working-capital assumptions. Add the sales basket next.':
+    'Definí el horizonte de planificación y los supuestos de capital de trabajo. Después agregá la canasta de ventas.',
+  'Horizon (months)': 'Horizonte (meses)',
+  'Between {min} and {max} months.': 'Entre {min} y {max} meses.',
+  'Optional planning notes': 'Notas opcionales de planificación',
+  'e.g. Base plan 2027': 'p. ej. Plan base 2027',
+  'Working-capital assumptions': 'Supuestos de capital de trabajo',
+  'Used for the simplified cash projection.': 'Se usa para la proyección de caja simplificada.',
+  'Used for the simplified cash projection. The full cash-flow module will add more detail.':
+    'Se usa para la proyección de caja simplificada. El módulo completo de flujo de caja agregará más detalle.',
+  'Collection days': 'Días de cobro',
+  'Supplier payment days': 'Días de pago a proveedores',
+  'Inventory days': 'Días de inventario',
+  'Starting cash': 'Caja inicial',
+  'Create scenario': 'Crear escenario',
+  'Scenario name is required.': 'El nombre del escenario es obligatorio.',
+  'Select a valid start month.': 'Seleccioná un mes de inicio válido.',
+  'The horizon must be between {min} and {max} months.':
+    'El horizonte debe estar entre {min} y {max} meses.',
+  'Select a valid scenario status.': 'Seleccioná un estado de escenario válido.',
+  'Build the sales basket, set cost assumptions and save to view the projection.':
+    'Armá la canasta de ventas, definí los supuestos de costos y guardá para ver la proyección.',
+  'Changing the start month or horizon rebuilds the monthly columns when you save.':
+    'Cambiar el mes de inicio o el horizonte reconstruye las columnas mensuales al guardar.',
+  'Sales basket': 'Canasta de ventas',
+  'Add products and enter the planned quantity for each month. Prices are net of VAT.':
+    'Agregá productos e ingresá la cantidad planificada para cada mes. Los precios son netos de IVA.',
+  'Add product': 'Agregar producto',
+  'Fill all months': 'Completar todos los meses',
+  'Fill': 'Completar',
+  'Copy first month': 'Copiar primer mes',
+  'Apply growth': 'Aplicar crecimiento',
+  'Clear quantities': 'Borrar cantidades',
+  'Load last 12 months': 'Cargar últimos 12 meses',
+  'Product / customer': 'Producto / cliente',
+  'Net price': 'Precio neto',
+  'Discount %': 'Descuento %',
+  'No customer': 'Sin cliente',
+  'To change the product on an existing line, remove the row and add it again.':
+    'Para cambiar el producto de una línea existente, quitá la fila y agregala de nuevo.',
+  'To change the product or customer on an existing line, remove the row and add it again.':
+    'Para cambiar el producto o cliente de una línea existente, quitá la fila y agregala de nuevo.',
+  'Remove row': 'Quitar fila',
+  'No products in the basket yet. Use Add product or load the last 12 months as a baseline.':
+    'Todavía no hay productos en la canasta. Usá Agregar producto o cargá los últimos 12 meses como base.',
+  'Select a product…': 'Seleccioná un producto…',
+  'Add at least one product and a quantity greater than zero.':
+    'Agregá al menos un producto y una cantidad mayor que cero.',
+  'Invalid product in basket row {row}.': 'Producto inválido en la fila {row} de la canasta.',
+  'Invalid customer in basket row {row}.': 'Cliente inválido en la fila {row} de la canasta.',
+  'Enter a valid net price in basket row {row}.': 'Ingresá un precio neto válido en la fila {row}.',
+  'The discount in basket row {row} must be between 0 and 100.':
+    'El descuento de la fila {row} debe estar entre 0 y 100.',
+  'Cost overrides': 'Ajustes de costos',
+  'Optionally override the base cost items for this scenario. Overrides are net of VAT and apply to every month.':
+    'Opcionalmente ajustá los ítems de costo base para este escenario. Los ajustes son netos de IVA y se aplican a todos los meses.',
+  '{count} active cost items': '{count} ítems de costo activos',
+  'Base': 'Base',
+  'Override': 'Ajuste',
+  'Monthly amount': 'Importe mensual',
+  'month': 'mes',
+  'No active cost items. Add costs first to include them in the scenario.':
+    'No hay ítems de costo activos. Agregá costos primero para incluirlos en el escenario.',
+  'The fixed-cost override for {item} must be zero or more.':
+    'El ajuste de costo fijo para {item} debe ser cero o mayor.',
+  'The driver-rate override for {item} must be zero or more.':
+    'La tasa de driver ajustada para {item} debe ser cero o mayor.',
+  'The percentage override for {item} cannot exceed 100%.':
+    'El ajuste porcentual para {item} no puede superar el 100%.',
+  'Save scenario': 'Guardar escenario',
+  'Replace the current basket with the average monthly sales from the 12 months before the scenario?':
+    '¿Reemplazar la canasta actual con el promedio mensual de ventas de los 12 meses anteriores al escenario?',
+  'Unlock this scenario before editing it.': 'Desbloqueá este escenario antes de editarlo.',
+  'No invoiced sales were found in the 12 months before this scenario.':
+    'No se encontraron ventas facturadas en los 12 meses anteriores a este escenario.',
+  'No usable historical sales were found for this baseline.':
+    'No se encontraron ventas históricas utilizables para esta base.',
+  'Scenario created. Add products to the sales basket.':
+    'Escenario creado. Agregá productos a la canasta de ventas.',
+  'Scenario saved.': 'Escenario guardado.',
+  'Scenario duplicated.': 'Escenario duplicado.',
+  'Scenario status updated.': 'Estado del escenario actualizado.',
+  'Scenario deleted.': 'Escenario eliminado.',
+  'Baseline loaded from the last 12 months of invoiced sales.':
+    'Base cargada desde los últimos 12 meses de ventas facturadas.',
+  'Edit scenario': 'Editar escenario',
+  'Add products': 'Agregar productos',
+  'This scenario has no sales lines': 'Este escenario no tiene líneas de venta',
+  'Add products and monthly quantities to see revenue, profit and purchase projections.':
+    'Agregá productos y cantidades mensuales para ver ingresos, resultado y proyección de compras.',
+  'Add products and monthly quantities to start the projection.':
+    'Agregá productos y cantidades mensuales para iniciar la proyección.',
+  'Add fixed and variable costs to include them in the projection.':
+    'Agregá costos fijos y variables para incluirlos en la proyección.',
+  'Product or category-scope variable costs are included in company and product totals but not in customer margins.':
+    'Los costos variables con alcance de producto o categoría se incluyen en los totales de empresa y producto, pero no en el margen por cliente.',
+  'Revenue uses the planned net price and discount. Material cost uses the active BOM when available; otherwise the product net cost.':
+    'Los ingresos usan el precio neto y descuento planificados. El costo de materiales usa la lista de materiales activa cuando está disponible; si no, el costo neto del producto.',
+  'Purchase requirements are net of stock and open purchase orders, rounded to the product minimum order quantity and order multiple.':
+    'Los requerimientos de compra son netos de stock y órdenes de compra abiertas, redondeados a la cantidad mínima y al múltiplo de pedido del producto.',
+  'Invoice-driven costs use the number of simulated sales lines as a proxy for invoices.':
+    'Los costos basados en facturas usan la cantidad de líneas de venta simuladas como aproximación de facturas.',
+  'The cash projection shifts collections and supplier payments by the assumptions and uses a simplified inventory balance. It is not a substitute for the cash-flow module.':
+    'La proyección de caja desplaza cobros y pagos a proveedores según los supuestos y usa un inventario simplificado. No reemplaza al módulo de flujo de caja.',
+  'Projected revenue': 'Ingresos proyectados',
+  'of revenue': 'de los ingresos',
+  'Over the full horizon': 'Durante todo el horizonte',
+  'After fixed and one-off costs': 'Después de costos fijos y extraordinarios',
+  'Break-even / month': 'Equilibrio / mes',
+  'At the planned gross margin': 'Con el margen bruto planificado',
+  'Purchase plan value': 'Valor del plan de compras',
+  'Net of stock and open POs': 'Neto de stock y OC abiertas',
+  'Lowest cash point': 'Punto de caja más bajo',
+  'Simplified cash estimate': 'Estimación simplificada de caja',
+  'Monthly projection': 'Proyección mensual',
+  'Revenue, contribution, operating profit and closing cash.':
+    'Ingresos, contribución, resultado operativo y caja final.',
+  'Break-even summary': 'Resumen de equilibrio',
+  'Break-even units / month': 'Unidades de equilibrio / mes',
+  'Break-even revenue total': 'Ingresos de equilibrio totales',
+  'Working capital at end': 'Capital de trabajo al final',
+  'Collection {collection} days · Supplier payment {payment} days · Inventory {inventory} days.':
+    'Cobro {collection} días · Pago a proveedores {payment} días · Inventario {inventory} días.',
+  'Monthly P&L': 'Estado de resultados mensual',
+  'All amounts are net of recoverable VAT.': 'Todos los importes son netos de IVA recuperable.',
+  'Month': 'Mes',
+  'Other variable costs': 'Otros costos variables',
+  'Closing cash': 'Caja final',
+  'Customer breakdown': 'Detalle por cliente',
+  'No customer breakdown available.': 'No hay detalle por cliente disponible.',
+  'Purchase plan': 'Plan de compras',
+  'Net requirements after stock and open purchase orders, rounded to supplier minimums and multiples.':
+    'Requerimientos netos después de stock y órdenes de compra abiertas, redondeados a mínimos y múltiplos del proveedor.',
+  'Required': 'Requerido',
+  'Open POs': 'OC abiertas',
+  'Net required': 'Neto requerido',
+  'Order qty': 'Cantidad a comprar',
+  'Total cost': 'Costo total',
+  'First need': 'Primera necesidad',
+  'Order by': 'Pedir antes de',
+  'No supplier': 'Sin proveedor',
+  'No purchase requirements. This scenario may only contain services or already covered stock.':
+    'No hay requerimientos de compra. Este escenario puede contener solo servicios o stock ya cubierto.',
+  'Purchase plan total': 'Total del plan de compras',
+  'Production plan': 'Plan de producción',
+  'Finished goods to produce from the sales basket.':
+    'Productos terminados a producir según la canasta de ventas.',
+  'Simplified cash and working capital': 'Caja y capital de trabajo simplificados',
+  'Estimated from the scenario assumptions. Taxes, financing and payroll timing are not included.':
+    'Estimado a partir de los supuestos del escenario. No incluye impuestos, financiamiento ni el calendario de sueldos.',
+  'Collections': 'Cobros',
+  'Supplier payments': 'Pagos a proveedores',
+  'Fixed + one-off': 'Fijos + extraordinarios',
+  'Net cash': 'Caja neta',
+  'How this scenario is calculated': 'Cómo se calcula este escenario',
+  'Export CSV': 'Exportar CSV',
+  'Purchase plan CSV': 'CSV del plan de compras',
+  'Lock scenario': 'Bloquear escenario',
+  'Unlock': 'Desbloquear',
+  'Archive': 'Archivar',
+  'Restore': 'Restaurar',
+  'Manufactured products without a BOM': 'Productos fabricados sin lista de materiales',
+  'Products with no cost': 'Productos sin costo',
+  'Purchase plan items without a supplier': 'Ítems del plan de compras sin proveedor',
+  'Labour-hour costs are not estimated': 'Los costos por horas de trabajo no se estiman',
+  'Some variable costs are not allocated to customers': 'Algunos costos variables no se asignan a clientes',
+  'Contribution is negative': 'La contribución es negativa',
+  'Operating loss in this scenario': 'Pérdida operativa en este escenario',
+  'No fixed costs': 'Sin costos fijos',
+  'Contribution does not cover the fixed costs in the scenario horizon.':
+    'La contribución no cubre los costos fijos del horizonte del escenario.',
+  'Variable costs are higher than projected revenue. Review prices, discounts and product costs.':
+    'Los costos variables superan los ingresos proyectados. Revisá precios, descuentos y costos de producto.',
+  '{count} products have no cost. Contribution may be overstated.':
+    '{count} productos no tienen costo. La contribución puede estar sobreestimada.',
+  'Products without a cost: {count}. Contribution may be overstated.':
+    'Productos sin costo: {count}. La contribución puede estar sobreestimada.',
+  '{count} manufactured products have no active BOM and were treated as purchased.':
+    '{count} productos fabricados no tienen lista de materiales activa y se trataron como comprados.',
+  'Manufactured products without an active BOM: {count}. They were treated as purchased.':
+    'Productos fabricados sin lista de materiales activa: {count}. Se trataron como comprados.',
+  '{count} purchase plan items have no supplier. Assign a default supplier to group them correctly.':
+    '{count} ítems del plan de compras no tienen proveedor. Asigná un proveedor predeterminado para agruparlos correctamente.',
+  'Purchase plan items without a supplier: {count}. Assign a default supplier to group them correctly.':
+    'Ítems del plan de compras sin proveedor: {count}. Asigná un proveedor predeterminado para agruparlos correctamente.',
+  '{count} cost items use labour hours. The simulator cannot estimate labour hours, so those costs contribute zero.':
+    '{count} ítems de costo usan horas de trabajo. El simulador no puede estimar horas, por lo que esos costos aportan cero.',
+  'Cost items using labour hours: {count}. The simulator cannot estimate labour hours, so those costs contribute zero.':
+    'Ítems de costo que usan horas de trabajo: {count}. El simulador no puede estimar horas, por lo que esos costos aportan cero.',
+  '{count} product or category-scope variable costs are included in company and product totals but not in customer margins.':
+    '{count} costos variables con alcance de producto o categoría se incluyen en los totales de empresa y producto, pero no en el margen por cliente.',
+  'Variable costs with product or category scope: {count}. They are included in company and product totals but not in customer margins.':
+    'Costos variables con alcance de producto o categoría: {count}. Se incluyen en los totales de empresa y producto, pero no en el margen por cliente.',
+  'Review BOMs': 'Revisar listas de materiales',
+  'Add fixed cost': 'Agregar costo fijo',
+  'Add cost item': 'Agregar ítem de costo',
+  'Add fixed costs to calculate a meaningful break-even point.':
+    'Agregá costos fijos para calcular un punto de equilibrio significativo.',
+  'Add fixed and variable costs to include them in the projection.':
+    'Agregá costos fijos y variables para incluirlos en la proyección.',
+
+  // ------------------------------------------------------- actuals CSV import
+  'Import monthly actuals': 'Importar costos reales mensuales',
+  'Upload a CSV file to create or update monthly actual costs in bulk.':
+    'Subí un archivo CSV para crear o actualizar costos reales mensuales en lote.',
+  'Download template': 'Descargar plantilla',
+  'Back to monthly actuals': 'Volver a costos reales mensuales',
+  'The file could not be imported:': 'No se pudo importar el archivo:',
+  'CSV file': 'Archivo CSV',
+  'File': 'Archivo',
+  'UTF-8 CSV, up to 2 MB and 1,000 data rows.': 'CSV UTF-8, hasta 2 MB y 1.000 filas de datos.',
+  'Expected columns': 'Columnas esperadas',
+  'cost_item can be the exact cost item name or its numeric ID. If two cost items share a name, use the ID.':
+    'cost_item puede ser el nombre exacto del ítem de costo o su ID numérico. Si dos ítems comparten nombre, usá el ID.',
+  'The period must use YYYY-MM. Amounts are net of recoverable VAT. Existing actuals for the same cost item and month are updated.':
+    'El período debe usar AAAA-MM. Los importes son netos de IVA recuperable. Los costos reales existentes para el mismo ítem y mes se actualizan.',
+  'How it works': 'Cómo funciona',
+  'Download the template to get one row per active cost item.':
+    'Descargá la plantilla para obtener una fila por cada ítem de costo activo.',
+  'Fill the amount column and keep the period in YYYY-MM format.':
+    'Completá la columna de importe y mantené el período en formato AAAA-MM.',
+  'Upload the file. Invalid rows stop the import so nothing is saved partially.':
+    'Subí el archivo. Las filas inválidas detienen la importación para no guardar nada parcialmente.',
+  'Imported actuals are marked with source “import” so they can be identified later.':
+    'Los costos reales importados se marcan con origen “import” para identificarlos luego.',
+  'Import preview': 'Vista previa de importación',
+  'Rows that passed validation are not saved until the file is free of errors.':
+    'Las filas que pasaron la validación no se guardan hasta que el archivo no tenga errores.',
+  'Row': 'Fila',
+  'Amount': 'Importe',
+  'Validation': 'Validación',
+  'Valid': 'Válido',
+  'Import CSV': 'Importar CSV',
+  'Choose a CSV file to import.': 'Elegí un archivo CSV para importar.',
+  'The CSV file is empty or has no data rows.': 'El archivo CSV está vacío o no tiene filas de datos.',
+  'The CSV file has too many rows. Import at most 1,000 rows at a time.':
+    'El archivo CSV tiene demasiadas filas. Importá como máximo 1.000 filas por vez.',
+  'The CSV must include the columns cost_item, period and amount.':
+    'El CSV debe incluir las columnas cost_item, period y amount.',
+  'Row {row}: amount must be zero or more.': 'Fila {row}: el importe debe ser cero o mayor.',
+  'Row {row}: cost item "{name}" was not found.': 'Fila {row}: no se encontró el ítem de costo "{name}".',
+  'Row {row}: cost item is required.': 'Fila {row}: el ítem de costo es obligatorio.',
+  'Row {row}: period must use the YYYY-MM format.': 'Fila {row}: el período debe usar el formato AAAA-MM.',
+  'Row {row}: the cost item name "{name}" is ambiguous. Use the cost item ID instead.':
+    'Fila {row}: el nombre de ítem de costo "{name}" es ambiguo. Usá el ID del ítem.',
+  'No valid rows were found in the CSV file.': 'No se encontraron filas válidas en el archivo CSV.',
+  'Imported {count} monthly actual costs.': 'Se importaron {count} costos reales mensuales.',
+
+  // --------------------------------------------------- product purchasing
+  'Lead time (days)': 'Plazo de entrega (días)',
+  'Minimum order quantity': 'Cantidad mínima de pedido',
+  'Order multiple': 'Múltiplo de pedido',
+  'Days between placing a purchase order and receiving the product. Used by the sales simulator.':
+    'Días entre emitir una orden de compra y recibir el producto. Se usa en el simulador de ventas.',
+  'Smallest quantity a supplier will accept. Used to round the suggested purchase quantity.':
+    'Cantidad mínima que acepta el proveedor. Se usa para redondear la cantidad de compra sugerida.',
+  'Round suggested purchases up to this multiple, for example a full box or pallet. Leave zero for no rounding.':
+    'Redondea las compras sugeridas a este múltiplo, por ejemplo una caja o un pallet completo. Dejá cero para no redondear.',
 };
 
 function normalizeLocale(value) {

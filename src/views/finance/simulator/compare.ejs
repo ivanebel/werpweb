@@ -1,0 +1,72 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Compare scenarios') %></h1>
+          <p class="page-subtitle"><%= t('Side-by-side view of revenue, margin, purchases and cash.') %></p>
+        </div>
+        <a href="/finance/simulator" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Sales simulator') %>
+        </a>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table class="table-base min-w-[1000px]">
+            <thead>
+              <tr>
+                <th class="table-th min-w-[220px]"><%= t('Metric') %></th>
+                <% scenarios.forEach(({ scenario, start_label }) => { %>
+                  <th class="table-th text-right">
+                    <a href="/finance/simulator/<%= scenario.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= scenario.name %></a>
+                    <span class="mt-0.5 block text-xs font-normal text-gray-400"><%= start_label %> · <%= t('{count} months', { count: scenario.horizon_months }) %></span>
+                  </th>
+                <% }) %>
+              </tr>
+            </thead>
+            <tbody>
+              <% const metrics = [
+                { key: 'units', label: t('Units'), type: 'qty', get: (r) => r.totals.units },
+                { key: 'revenue', label: t('Revenue'), type: 'money', get: (r) => r.totals.revenue },
+                { key: 'material', label: t('Material cost'), type: 'money', get: (r) => r.totals.material },
+                { key: 'variable', label: t('Other variable costs'), type: 'money', get: (r) => r.totals.variable },
+                { key: 'contribution', label: t('Contribution'), type: 'money', get: (r) => r.totals.contribution, tone: true },
+                { key: 'cm', label: t('CM %'), type: 'percent', get: (r) => r.breakEven.cmPct },
+                { key: 'fixed', label: t('Fixed costs'), type: 'money', get: (r) => r.totals.fixed },
+                { key: 'oneOff', label: t('One-off costs'), type: 'money', get: (r) => r.totals.oneOff },
+                { key: 'profit', label: t('Operating profit'), type: 'money', get: (r) => r.totals.operatingProfit, tone: true },
+                { key: 'breakEven', label: t('Break-even / month'), type: 'money', get: (r) => r.breakEven.revenuePerMonth },
+                { key: 'safety', label: t('Margin of safety'), type: 'percent', get: (r) => r.breakEven.marginOfSafety },
+                { key: 'purchase', label: t('Purchase plan value'), type: 'money', get: (r) => r.totals.purchaseValue },
+                { key: 'cash', label: t('Lowest cash point'), type: 'money', get: (r) => r.totals.lowestCash, tone: true },
+                { key: 'wc', label: t('Working capital at end'), type: 'money', get: (r) => r.totals.netWorkingCapital },
+              ]; %>
+              <% metrics.forEach((metric) => { %>
+                <tr class="table-row">
+                  <td class="table-td font-medium text-gray-700 dark:text-gray-300"><%= metric.label %></td>
+                  <% scenarios.forEach(({ result }) => {
+                    const value = metric.get(result);
+                    const tone = metric.tone && value !== null && value !== undefined
+                      ? value < 0 ? 'text-error-600 dark:text-error-400' : 'text-success-600 dark:text-success-400'
+                      : '';
+                  %>
+                    <td class="table-td text-right font-medium <%= tone %>">
+                      <% if (value === null || value === undefined) { %>—<% } else if (metric.type === 'qty') { %><%= h.formatQty(value) %><% } else if (metric.type === 'percent') { %><%= h.formatNumber(value, 1) %>%<% } else { %><%= money(value) %><% } %>
+                    </td>
+                  <% }) %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

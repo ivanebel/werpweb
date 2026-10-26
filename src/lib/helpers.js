@@ -7,6 +7,7 @@ const STATUS = {
   active: { label: 'Active', tone: 'success' },
   inactive: { label: 'Inactive', tone: 'gray' },
   archived: { label: 'Archived', tone: 'gray' },
+  locked: { label: 'Locked', tone: 'warning' },
   // orders
   draft: { label: 'Draft', tone: 'gray' },
   confirmed: { label: 'Confirmed', tone: 'info' },

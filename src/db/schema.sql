@@ -262,6 +262,9 @@ CREATE TABLE IF NOT EXISTS products (
   plu           INT UNSIGNED NULL,
   units_per_pack   INT UNSIGNED NULL,
   packs_per_pallet INT UNSIGNED NULL,
+  lead_time_days   INT UNSIGNED NOT NULL DEFAULT 0,
+  min_order_qty    DECIMAL(14,3) NOT NULL DEFAULT 0,
+  order_multiple   DECIMAL(14,3) NOT NULL DEFAULT 0,
   sold_by_weight   TINYINT(1) NOT NULL DEFAULT 0,
   weight_kg        DECIMAL(14,3) NOT NULL DEFAULT 0,
   type          ENUM('finished_good','raw_material','consumable','service') NOT NULL DEFAULT 'finished_good',
@@ -960,6 +963,61 @@ CREATE TABLE IF NOT EXISTS cost_actuals (
     REFERENCES cost_items (id) ON DELETE CASCADE,
   CONSTRAINT fk_cost_actuals_created_by FOREIGN KEY (created_by)
     REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS planning_scenarios (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name           VARCHAR(180) NOT NULL,
+  description    VARCHAR(500) NULL,
+  start_period   CHAR(7) NOT NULL,
+  horizon_months TINYINT UNSIGNED NOT NULL DEFAULT 6,
+  status         ENUM('draft','active','locked','archived') NOT NULL DEFAULT 'draft',
+  assumptions    JSON NULL,
+  created_by     INT UNSIGNED NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_planning_scenarios_status (status),
+  KEY idx_planning_scenarios_start (start_period),
+  CONSTRAINT fk_planning_scenarios_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scenario_sales_lines (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  scenario_id  INT UNSIGNED NOT NULL,
+  product_id   INT UNSIGNED NOT NULL,
+  customer_id  INT UNSIGNED NULL,
+  period       CHAR(7) NOT NULL,
+  quantity     DECIMAL(14,3) NOT NULL DEFAULT 0,
+  unit_price   DECIMAL(14,2) NOT NULL DEFAULT 0,
+  discount_pct DECIMAL(5,2) NOT NULL DEFAULT 0,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_scenario_sales_lines_scenario (scenario_id, period),
+  KEY idx_scenario_sales_lines_product (product_id),
+  KEY idx_scenario_sales_lines_customer (customer_id),
+  CONSTRAINT fk_scenario_sales_lines_scenario FOREIGN KEY (scenario_id)
+    REFERENCES planning_scenarios (id) ON DELETE CASCADE,
+  CONSTRAINT fk_scenario_sales_lines_product FOREIGN KEY (product_id)
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_scenario_sales_lines_customer FOREIGN KEY (customer_id)
+    REFERENCES customers (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scenario_cost_overrides (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  scenario_id  INT UNSIGNED NOT NULL,
+  cost_item_id INT UNSIGNED NOT NULL,
+  amount       DECIMAL(14,2) NULL,
+  driver_rate  DECIMAL(14,4) NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_scenario_cost_override (scenario_id, cost_item_id),
+  CONSTRAINT fk_scenario_cost_overrides_scenario FOREIGN KEY (scenario_id)
+    REFERENCES planning_scenarios (id) ON DELETE CASCADE,
+  CONSTRAINT fk_scenario_cost_overrides_item FOREIGN KEY (cost_item_id)
+    REFERENCES cost_items (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS production_orders (
