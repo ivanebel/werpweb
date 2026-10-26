@@ -1,0 +1,177 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1300px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Cost setup') %></h1>
+          <p class="page-subtitle"><%= t('Organise costs by center and category. These groupings drive the analysis and reports.') %></p>
+        </div>
+        <a href="/finance/costs" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Costs & profitability') %>
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <% const centerPosted = errorForm === 'center' ? posted : null; %>
+        <% const categoryPosted = errorForm === 'category' ? posted : null; %>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Cost centers') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Production, administration, sales, logistics or any other responsibility area.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(centers.length, 'center') %></span>
+          </div>
+
+          <div class="border-b border-gray-100 p-5 dark:border-gray-800">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= editCenter ? t('Edit cost center') : t('Add cost center') %></h3>
+            <form method="POST" action="<%= editCenter ? `/finance/costs/centers/${editCenter.id}` : '/finance/costs/centers' %>" class="mt-3 space-y-3">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div class="sm:col-span-2">
+                  <label for="center-name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+                  <input id="center-name" name="name" type="text" maxlength="120" required value="<%= centerPosted && centerPosted.name !== undefined ? centerPosted.name : (editCenter && editCenter.name) || '' %>" class="form-input <%= errors.name && errorForm === 'center' ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Production') %>">
+                  <% if (errors.name && errorForm === 'center') { %><p class="form-error"><%= errors.name %></p><% } %>
+                </div>
+                <div>
+                  <label for="center-code" class="form-label"><%= t('Code') %></label>
+                  <input id="center-code" name="code" type="text" maxlength="30" value="<%= centerPosted && centerPosted.code !== undefined ? centerPosted.code : (editCenter && editCenter.code) || '' %>" class="form-input" placeholder="<%= t('Optional') %>">
+                </div>
+              </div>
+              <div>
+                <label for="center-description" class="form-label"><%= t('Description') %></label>
+                <input id="center-description" name="description" type="text" maxlength="255" value="<%= centerPosted && centerPosted.description !== undefined ? centerPosted.description : (editCenter && editCenter.description) || '' %>" class="form-input">
+              </div>
+              <div class="flex flex-wrap items-end justify-between gap-3">
+                <div class="w-full sm:w-40">
+                  <label for="center-status" class="form-label"><%= t('Status') %></label>
+                  <select id="center-status" name="status" class="form-select">
+                    <option value="active" <%= (centerPosted && centerPosted.status) === 'active' || (!centerPosted && (!editCenter || editCenter.status === 'active')) ? 'selected' : '' %>><%= t('Active') %></option>
+                    <option value="inactive" <%= (centerPosted && centerPosted.status) === 'inactive' || (!centerPosted && editCenter && editCenter.status === 'inactive') ? 'selected' : '' %>><%= t('Inactive') %></option>
+                  </select>
+                </div>
+                <div class="flex gap-2">
+                  <% if (editCenter) { %><a href="/finance/costs/setup" class="btn btn-secondary btn-sm"><%= t('Cancel') %></a><% } %>
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                    <%= editCenter ? t('Save') : t('Add') %>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="divide-y divide-gray-100 dark:divide-gray-800">
+            <% centers.forEach((center) => { %>
+              <div class="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div class="min-w-0">
+                  <p class="font-medium text-gray-800 dark:text-gray-200"><%= center.name %> <% if (center.code) { %><span class="ml-1 font-mono text-xs text-gray-400"><%= center.code %></span><% } %></p>
+                  <% if (center.description) { %><p class="truncate text-xs text-gray-400"><%= center.description %></p><% } %>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span class="text-xs text-gray-400"><%= h.pluralize(center.item_count, 'item') %></span>
+                  <%- statusBadge(center.status) %>
+                  <a href="/finance/costs/setup?edit_center=<%= center.id %>" class="btn-icon" title="<%= t('Edit') %>">
+                    <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                  </a>
+                  <% if (Number(center.item_count) === 0) { %>
+                    <form action="/finance/costs/centers/<%= center.id %>/delete" method="POST" class="inline" data-confirm="<%= t('Delete this cost center?') %>">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete') %>">
+                        <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                      </button>
+                    </form>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+            <% if (!centers.length) { %>
+              <p class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No cost centers yet. Add the first one above.') %></p>
+            <% } %>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Cost categories') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Rent, payroll, utilities, insurance, freight, packaging and similar groups.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(categories.length, 'category', 'categories') %></span>
+          </div>
+
+          <div class="border-b border-gray-100 p-5 dark:border-gray-800">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= editCategory ? t('Edit cost category') : t('Add cost category') %></h3>
+            <form method="POST" action="<%= editCategory ? `/finance/costs/categories/${editCategory.id}` : '/finance/costs/categories' %>" class="mt-3 space-y-3">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <div>
+                <label for="category-name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+                <input id="category-name" name="name" type="text" maxlength="120" required value="<%= categoryPosted && categoryPosted.name !== undefined ? categoryPosted.name : (editCategory && editCategory.name) || '' %>" class="form-input <%= errors.name && errorForm === 'category' ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Rent') %>">
+                <% if (errors.name && errorForm === 'category') { %><p class="form-error"><%= errors.name %></p><% } %>
+              </div>
+              <div>
+                <label for="category-description" class="form-label"><%= t('Description') %></label>
+                <input id="category-description" name="description" type="text" maxlength="255" value="<%= categoryPosted && categoryPosted.description !== undefined ? categoryPosted.description : (editCategory && editCategory.description) || '' %>" class="form-input">
+              </div>
+              <div class="flex flex-wrap items-end justify-between gap-3">
+                <div class="w-full sm:w-40">
+                  <label for="category-status" class="form-label"><%= t('Status') %></label>
+                  <select id="category-status" name="status" class="form-select">
+                    <option value="active" <%= (categoryPosted && categoryPosted.status) === 'active' || (!categoryPosted && (!editCategory || editCategory.status === 'active')) ? 'selected' : '' %>><%= t('Active') %></option>
+                    <option value="inactive" <%= (categoryPosted && categoryPosted.status) === 'inactive' || (!categoryPosted && editCategory && editCategory.status === 'inactive') ? 'selected' : '' %>><%= t('Inactive') %></option>
+                  </select>
+                </div>
+                <div class="flex gap-2">
+                  <% if (editCategory) { %><a href="/finance/costs/setup" class="btn btn-secondary btn-sm"><%= t('Cancel') %></a><% } %>
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                    <%= editCategory ? t('Save') : t('Add') %>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <div class="divide-y divide-gray-100 dark:divide-gray-800">
+            <% categories.forEach((category) => { %>
+              <div class="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div class="min-w-0">
+                  <p class="font-medium text-gray-800 dark:text-gray-200"><%= category.name %></p>
+                  <% if (category.description) { %><p class="truncate text-xs text-gray-400"><%= category.description %></p><% } %>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span class="text-xs text-gray-400"><%= h.pluralize(category.item_count, 'item') %></span>
+                  <%- statusBadge(category.status) %>
+                  <a href="/finance/costs/setup?edit_category=<%= category.id %>" class="btn-icon" title="<%= t('Edit') %>">
+                    <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                  </a>
+                  <% if (Number(category.item_count) === 0) { %>
+                    <form action="/finance/costs/categories/<%= category.id %>/delete" method="POST" class="inline" data-confirm="<%= t('Delete this cost category?') %>">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete') %>">
+                        <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                      </button>
+                    </form>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+            <% if (!categories.length) { %>
+              <p class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No cost categories yet. Add the first one above.') %></p>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <p><%= t('Centers and categories in use cannot be deleted. Mark them inactive instead so historical reports stay intact.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -34,6 +34,7 @@ const carrierRoutes = require('./routes/carriers');
 const bankAccountRoutes = require('./routes/bankAccounts');
 const manufacturingRoutes = require('./routes/manufacturing');
 const posRoutes = require('./routes/pos');
+const financeRoutes = require('./routes/finance');
 const emailRoutes = require('./routes/emails');
 const settingsRoutes = require('./routes/settings');
 
@@ -147,6 +148,7 @@ async function createApp() {
   app.use('/bank-accounts', requireRole('admin', 'manager'), bankAccountRoutes);
   app.use('/manufacturing', manufacturingRoutes);
   app.use('/pos', posRoutes);
+  app.use('/finance', requireRole('admin', 'manager'), financeRoutes);
   app.use('/emails', emailRoutes);
   app.use('/', settingsRoutes);
 

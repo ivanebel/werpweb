@@ -1,0 +1,341 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New cost item') : t('Edit cost item') %></h1>
+          <p class="page-subtitle"><%= t('Classify the cost, choose its driver and define when it applies.') %></p>
+        </div>
+        <a href="/finance/costs/items" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Back to cost items') %>
+        </a>
+      </div>
+
+      <% const errorList = Object.values(errors || {}); %>
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please fix the following:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach((message) => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>" id="cost-item-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="space-y-5">
+          <div class="card">
+            <div class="card-header"><h2 class="card-title"><%= t('Cost item') %></h2></div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div class="md:col-span-2">
+                <label for="name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+                <input id="name" name="name" type="text" maxlength="180" required value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Factory rent') %>">
+                <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+              </div>
+              <div>
+                <label for="category_id" class="form-label"><%= t('Category') %></label>
+                <select id="category_id" name="category_id" class="form-select">
+                  <option value=""><%= t('— None —') %></option>
+                  <% categories.forEach((category) => { %>
+                    <option value="<%= category.id %>" <%= String(row.category_id || '') === String(category.id) ? 'selected' : '' %>><%= category.name %><%= category.status === 'inactive' ? ` (${t('Inactive')})` : '' %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div>
+                <label for="cost_center_id" class="form-label"><%= t('Cost center') %></label>
+                <select id="cost_center_id" name="cost_center_id" class="form-select">
+                  <option value=""><%= t('— None —') %></option>
+                  <% centers.forEach((center) => { %>
+                    <option value="<%= center.id %>" <%= String(row.cost_center_id || '') === String(center.id) ? 'selected' : '' %>><%= center.name %><%= center.status === 'inactive' ? ` (${t('Inactive')})` : '' %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div>
+                <label for="status" class="form-label"><%= t('Status') %></label>
+                <select id="status" name="status" class="form-select">
+                  <% statuses.forEach((status) => { %>
+                    <option value="<%= status %>" <%= String(row.status || 'active') === status ? 'selected' : '' %>><%= status === 'active' ? t('Active') : t('Inactive') %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="md:col-span-2">
+                <p class="form-help"><a href="/finance/costs/setup" class="link"><%= t('Manage cost centers and categories') %></a></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Cost behavior') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Fixed costs repeat every period. Variable costs follow a driver such as units, revenue or pallets.') %></p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div>
+                <label for="behavior" class="form-label"><%= t('Behavior') %> <span class="text-error-500">*</span></label>
+                <select id="behavior" name="behavior" class="form-select">
+                  <% behaviors.forEach((behavior) => {
+                    const labels = { fixed: t('Fixed'), variable: t('Variable'), semi_variable: t('Semi-variable'), stepped: t('Stepped') };
+                  %>
+                    <option value="<%= behavior %>" <%= String(row.behavior || 'fixed') === behavior ? 'selected' : '' %>><%= labels[behavior] %></option>
+                  <% }) %>
+                </select>
+                <p class="form-help"><%= t('Semi-variable costs have a fixed component and a variable component. Stepped costs are treated as fixed for this analysis.') %></p>
+              </div>
+
+              <div id="fixed-fields" class="contents" data-display="contents">
+                <div>
+                  <label for="amount" class="form-label"><%= t('Fixed amount') %></label>
+                  <div class="relative">
+                    <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400"><%= currency %></span>
+                    <input id="amount" name="amount" type="number" min="0" step="0.01" value="<%= Number(row.amount || 0).toFixed(2) %>" class="form-input pl-14 text-right">
+                  </div>
+                  <p class="form-help"><%= t('The recurring amount for the selected frequency. Leave zero for pure variable costs.') %></p>
+                </div>
+                <div>
+                  <label for="frequency" class="form-label"><%= t('Frequency') %></label>
+                  <select id="frequency" name="frequency" class="form-select">
+                    <% frequencies.forEach((frequency) => {
+                      const labels = { monthly: t('Monthly'), quarterly: t('Quarterly'), annual: t('Annual'), one_off: t('One-off') };
+                    %>
+                      <option value="<%= frequency %>" <%= String(row.frequency || 'monthly') === frequency ? 'selected' : '' %>><%= labels[frequency] %></option>
+                    <% }) %>
+                  </select>
+                </div>
+              </div>
+
+              <div id="variable-fields" class="contents" data-display="contents">
+                <div>
+                  <label for="driver_type" class="form-label"><%= t('Driver') %></label>
+                  <select id="driver_type" name="driver_type" class="form-select">
+                    <option value=""><%= t('— None —') %></option>
+                    <% driverTypes.forEach((driver) => {
+                      const labels = {
+                        unit: t('Units sold'),
+                        revenue_percent: t('Percentage of net revenue'),
+                        material_percent: t('Percentage of material cost'),
+                        invoice: t('Sales invoices'),
+                        pallet: t('Pallets'),
+                        labor_hour: t('Labour hours')
+                      };
+                    %>
+                      <option value="<%= driver %>" <%= String(row.driver_type || '') === driver ? 'selected' : '' %>><%= labels[driver] %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <label for="driver_rate" class="form-label" id="driver-rate-label"><%= t('Driver rate') %></label>
+                  <div class="relative">
+                    <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400" id="driver-rate-prefix"><%= currency %></span>
+                    <input id="driver_rate" name="driver_rate" type="number" min="0" step="0.0001" value="<%= Number(row.driver_rate || 0) %>" class="form-input pl-14 text-right">
+                  </div>
+                  <p class="form-help" id="driver-rate-help"><%= t('Amount per driver unit, or a percentage when the driver is a percentage.') %></p>
+                </div>
+              </div>
+
+              <div id="scope-fields" class="contents" data-display="contents">
+                <div>
+                  <label for="scope_type" class="form-label"><%= t('Scope') %></label>
+                  <select id="scope_type" name="scope_type" class="form-select">
+                    <% scopes.forEach((scope) => {
+                      const labels = { company: t('Company-wide'), product: t('Product'), category: t('Product category') };
+                    %>
+                      <option value="<%= scope %>" <%= String(row.scope_type || 'company') === scope ? 'selected' : '' %>><%= labels[scope] %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div id="scope-product-field">
+                  <label for="scope_product_id" class="form-label"><%= t('Product') %></label>
+                  <select id="scope_product_id" name="scope_product_id" class="form-select">
+                    <option value=""><%= t('— None —') %></option>
+                    <% products.forEach((product) => { %>
+                      <option value="<%= product.id %>" <%= String(row.scope_product_id || '') === String(product.id) ? 'selected' : '' %>><%= product.sku %> — <%= product.name %><%= product.status === 'inactive' ? ` (${t('Inactive')})` : '' %></option>
+                    <% }) %>
+                  </select>
+                  <% if (errors.scope_product_id) { %><p class="form-error"><%= errors.scope_product_id %></p><% } %>
+                </div>
+                <div id="scope-category-field">
+                  <label for="scope_category_id" class="form-label"><%= t('Product category') %></label>
+                  <select id="scope_category_id" name="scope_category_id" class="form-select">
+                    <option value=""><%= t('— None —') %></option>
+                    <% productCategories.forEach((category) => { %>
+                      <option value="<%= category.id %>" <%= String(row.scope_category_id || '') === String(category.id) ? 'selected' : '' %>><%= category.name %><%= category.status === 'inactive' ? ` (${t('Inactive')})` : '' %></option>
+                    <% }) %>
+                  </select>
+                  <% if (errors.scope_category_id) { %><p class="form-error"><%= errors.scope_category_id %></p><% } %>
+                  <p class="form-help"><%= t('Product categories are managed in Inventory → Categories.') %> <a href="/product-categories" class="link"><%= t('Open product categories') %></a></p>
+                </div>
+              </div>
+
+              <div id="scope-note" class="md:col-span-2 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+                <p><%= t('A product or category scope makes a variable cost apply only to that part of sales. Company-wide costs apply to all sales.') %></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h2 class="card-title"><%= t('Tax and cash behavior') %></h2></div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-3 md:p-6">
+              <div>
+                <label for="amount_basis" class="form-label"><%= t('Amount basis') %></label>
+                <select id="amount_basis" name="amount_basis" class="form-select">
+                  <% amountBases.forEach((basis) => { %>
+                    <option value="<%= basis %>" <%= String(row.amount_basis || 'net') === basis ? 'selected' : '' %>><%= basis === 'net' ? t('Net of VAT') : t('VAT included') %></option>
+                  <% }) %>
+                </select>
+                <p class="form-help"><%= t('Analytical amounts are stored net of recoverable VAT.') %></p>
+              </div>
+              <div>
+                <label for="vat_rate" class="form-label"><%= t('VAT rate (%)') %></label>
+                <input id="vat_rate" name="vat_rate" type="number" min="0" max="100" step="0.01" value="<%= Number(row.vat_rate || 0).toFixed(2) %>" class="form-input text-right">
+              </div>
+              <div class="space-y-3">
+                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                  <input type="checkbox" name="vat_recoverable" value="1" class="form-checkbox mt-0.5" <%= Number(row.vat_recoverable) === 1 ? 'checked' : '' %>>
+                  <span>
+                    <span class="block text-sm font-medium text-gray-800 dark:text-gray-200"><%= t('VAT is recoverable') %></span>
+                    <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400"><%= t('If the amount is VAT-included, recoverable VAT is extracted.') %></span>
+                  </span>
+                </label>
+                <label id="non-cash-field" data-display="flex" class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+                  <input type="checkbox" name="is_non_cash" value="1" class="form-checkbox mt-0.5" <%= Number(row.is_non_cash) === 1 ? 'checked' : '' %>>
+                  <span>
+                    <span class="block text-sm font-medium text-gray-800 dark:text-gray-200"><%= t('Non-cash cost') %></span>
+                    <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400"><%= t('For example depreciation. Excluded from cash break-even.') %></span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h2 class="card-title"><%= t('Timing and reference') %></h2></div>
+            <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+              <div>
+                <label for="effective_from" class="form-label"><%= t('Effective from') %> <span class="text-error-500">*</span></label>
+                <input id="effective_from" name="effective_from" type="date" required value="<%= String(row.effective_from || '').slice(0, 10) %>" class="form-input <%= errors.effective_from ? 'form-input-error' : '' %>">
+                <% if (errors.effective_from) { %><p class="form-error"><%= errors.effective_from %></p><% } %>
+              </div>
+              <div>
+                <label for="effective_to" class="form-label"><%= t('Effective to') %></label>
+                <input id="effective_to" name="effective_to" type="date" value="<%= String(row.effective_to || '').slice(0, 10) %>" class="form-input <%= errors.effective_to ? 'form-input-error' : '' %>">
+                <% if (errors.effective_to) { %><p class="form-error"><%= errors.effective_to %></p><% } %>
+                <p class="form-help"><%= t('Leave blank for an open-ended cost.') %></p>
+              </div>
+              <div>
+                <label for="payment_days" class="form-label"><%= t('Payment days') %></label>
+                <input id="payment_days" name="payment_days" type="number" min="0" step="1" value="<%= Number(row.payment_days || 0) %>" class="form-input text-right">
+                <p class="form-help"><%= t('Days after the period before this cost is paid. Used by the cash flow phase.') %></p>
+              </div>
+              <div>
+                <label for="payment_day" class="form-label"><%= t('Payment day') %></label>
+                <input id="payment_day" name="payment_day" type="number" min="1" max="31" step="1" value="<%= row.payment_day || '' %>" class="form-input text-right" placeholder="<%= t('Optional day of month') %>">
+              </div>
+              <div class="md:col-span-2">
+                <label for="supplier_id" class="form-label"><%= t('Supplier') %></label>
+                <select id="supplier_id" name="supplier_id" class="form-select">
+                  <option value=""><%= t('— None —') %></option>
+                  <% suppliers.forEach((supplier) => { %>
+                    <option value="<%= supplier.id %>" <%= String(row.supplier_id || '') === String(supplier.id) ? 'selected' : '' %>><%= supplier.company_name %><%= supplier.status === 'inactive' ? ` (${t('Inactive')})` : '' %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="md:col-span-2">
+                <label for="notes" class="form-label"><%= t('Notes') %></label>
+                <textarea id="notes" name="notes" rows="3" class="form-textarea" placeholder="<%= t('Optional reference, contract or calculation notes.') %>"><%= row.notes || '' %></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-col-reverse justify-end gap-3 sm:flex-row">
+          <a href="/finance/costs/items" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= mode === 'create' ? t('Create') : t('Save changes') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+  (function () {
+    const $ = (id) => document.getElementById(id);
+    const behavior = $('behavior');
+    const driverType = $('driver_type');
+    const scopeType = $('scope_type');
+    const fixedFields = $('fixed-fields');
+    const variableFields = $('variable-fields');
+    const scopeFields = $('scope-fields');
+    const scopeProduct = $('scope-product-field');
+    const scopeCategory = $('scope-category-field');
+    const scopeNote = $('scope-note');
+    const nonCash = $('non-cash-field');
+    const rateLabel = $('driver-rate-label');
+    const ratePrefix = $('driver-rate-prefix');
+    const rateHelp = $('driver-rate-help');
+    const amountBasis = $('amount_basis');
+    const vatRate = $('vat_rate');
+    const defaultTaxRate = <%- JSON.stringify(Number(settings.default_tax_rate || 0)) %>;
+
+    const show = (element, visible) => {
+      if (!element) return;
+      element.style.display = visible ? (element.dataset.display || '') : 'none';
+    };
+
+    function update() {
+      const value = behavior.value;
+      const isFixed = value === 'fixed' || value === 'stepped';
+      const isVariable = value === 'variable';
+      const isSemi = value === 'semi_variable';
+      show(fixedFields, isFixed || isSemi);
+      show(variableFields, isVariable || isSemi);
+      show(scopeFields, isVariable || isSemi);
+      show(scopeNote, isVariable || isSemi);
+      show(nonCash, isFixed || isSemi);
+
+      const driver = driverType.value;
+      const percent = driver === 'revenue_percent' || driver === 'material_percent';
+      if (ratePrefix) ratePrefix.textContent = percent ? '%' : <%- JSON.stringify(currency) %>;
+      if (rateLabel) rateLabel.textContent = percent ? <%- JSON.stringify(t('Driver rate (%)')) %> : <%- JSON.stringify(t('Driver rate')) %>;
+      if (rateHelp) {
+        rateHelp.textContent = percent
+          ? <%- JSON.stringify(t('Percentage applied to the selected driver base.')) %>
+          : <%- JSON.stringify(t('Amount per driver unit.')) %>;
+      }
+
+      const scope = scopeType.value;
+      show(scopeProduct, scope === 'product');
+      show(scopeCategory, scope === 'category');
+    }
+
+    ['change', 'input'].forEach((event) => {
+      behavior.addEventListener(event, update);
+      driverType.addEventListener(event, update);
+      scopeType.addEventListener(event, update);
+    });
+    if (amountBasis && vatRate) {
+      amountBasis.addEventListener('change', () => {
+        if (amountBasis.value === 'gross' && Number(vatRate.value || 0) === 0 && defaultTaxRate > 0) {
+          vatRate.value = defaultTaxRate.toFixed(2);
+        }
+      });
+    }
+    update();
+  })();
+  </script>
+</div>

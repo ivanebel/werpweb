@@ -2470,6 +2470,305 @@ const ES = {
   'Pallet {current} of {total}': 'Pallet {current} de {total}',
   'Scan for slip details': 'Escanear para ver el detalle',
   '{count} pages': '{count} páginas',
+
+  // ---------------------------------------------------------- finance / costs
+  'Finance': 'Finanzas',
+  'center': 'centro',
+  'centers': 'centros',
+  'category': 'categoría',
+  'categories': 'categorías',
+  'cost item': 'ítem de costo',
+  'cost items': 'ítems de costo',
+  'Costs & profitability': 'Costos y rentabilidad',
+  'Management analysis': 'Análisis de gestión',
+  'Understand fixed and variable costs, contribution margin and the revenue needed to break even.':
+    'Entendé los costos fijos y variables, el margen de contribución y los ingresos necesarios para cubrir el punto de equilibrio.',
+  'New cost item': 'Nuevo ítem de costo',
+  'Cost items': 'Ítems de costo',
+  'Monthly actuals': 'Costos reales mensuales',
+  'Cost setup': 'Configuración de costos',
+  'Analysis period': 'Período de análisis',
+  'All analytical amounts are net of recoverable VAT.':
+    'Todos los importes analíticos son netos de IVA recuperable.',
+  'Previous month': 'Mes anterior',
+  'Next month': 'Mes siguiente',
+  'Period': 'Período',
+  'No cost items yet': 'Todavía no hay ítems de costo',
+  'Add your fixed and variable costs to start analysing profitability.':
+    'Agregá tus costos fijos y variables para empezar a analizar la rentabilidad.',
+  'Add cost item': 'Agregar ítem de costo',
+  'No invoiced sales in this period': 'No hay ventas facturadas en este período',
+  'Contribution margin and break-even need sales invoices in the selected month.':
+    'El margen de contribución y el punto de equilibrio necesitan facturas de venta en el mes seleccionado.',
+  'Open sales invoices': 'Abrir facturas de venta',
+  'No recurring fixed costs': 'No hay costos fijos recurrentes',
+  'Add fixed costs such as rent, salaries or insurance so break-even can be calculated.':
+    'Agregá costos fijos como alquiler, sueldos o seguros para calcular el punto de equilibrio.',
+  'Add fixed cost': 'Agregar costo fijo',
+  'Contribution margin is zero or negative': 'El margen de contribución es cero o negativo',
+  'Variable costs are equal to or higher than net revenue. Review product costs and variable cost rates.':
+    'Los costos variables son iguales o superiores a los ingresos netos. Revisá los costos de producto y las tasas variables.',
+  'Review cost items': 'Revisar ítems de costo',
+  'Revenue is below break-even': 'Los ingresos están por debajo del punto de equilibrio',
+  'The selected month is {amount} below break-even revenue.':
+    'El mes seleccionado está {amount} por debajo de los ingresos de equilibrio.',
+  'Review cost structure': 'Revisar estructura de costos',
+  'Operating loss in this period': 'Pérdida operativa en este período',
+  'Contribution margin does not cover fixed costs for the selected month.':
+    'El margen de contribución no cubre los costos fijos del mes seleccionado.',
+  '{count} products with sales have no cost': '{count} productos con ventas no tienen costo',
+  'Products with sales have no cost': 'Productos con ventas sin costo',
+  'Add a product cost or an active BOM so contribution margin is calculated correctly. Products: {names}':
+    'Agregá un costo de producto o una lista de materiales activa para calcular correctamente el margen de contribución. Productos: {names}',
+  '{count} products are missing a cost. Add a product cost or an active BOM so contribution margin is calculated correctly. Products: {names}':
+    'A {count} productos les falta un costo. Agregá un costo de producto o una lista de materiales activa para calcular correctamente el margen de contribución. Productos: {names}',
+  'Review products': 'Revisar productos',
+  '{count} variable cost items have no rate': '{count} ítems de costo variable no tienen tasa',
+  'Variable cost items without a rate': 'Ítems de costo variable sin tasa',
+  '{count} variable cost items have a zero driver rate and add nothing to the analysis.':
+    '{count} ítems de costo variable tienen tasa cero y no aportan nada al análisis.',
+  'Variable costs with a missing scope': 'Costos variables con alcance faltante',
+  '{count} active variable costs point to a product or category that no longer exists.':
+    '{count} costos variables activos apuntan a un producto o categoría que ya no existe.',
+  'A variable cost with a zero driver rate adds nothing to the analysis.':
+    'Un costo variable con tasa cero no aporta nada al análisis.',
+  'Review variable costs': 'Revisar costos variables',
+  '{count} fixed costs have no actual for this month': '{count} costos fijos no tienen real para este mes',
+  'Fixed costs without an actual this month': 'Costos fijos sin real este mes',
+  '{count} fixed costs have no actual for this month. Enter monthly actuals to compare the recurring plan with what was really spent.':
+    '{count} costos fijos no tienen real para este mes. Ingresá los costos reales mensuales para comparar el plan recurrente con lo realmente gastado.',
+  'Enter monthly actuals': 'Ingresar costos reales mensuales',
+  'Some variable costs are not allocated to products': 'Algunos costos variables no se asignan a los productos',
+  'Order, pallet and labour-hour drivers are included in the company totals but not in individual product margins.':
+    'Los drivers de pedidos, pallets y horas de trabajo se incluyen en los totales de la empresa pero no en el margen individual de cada producto.',
+  'Invoice, pallet and labour-hour drivers are included in the company totals but not in individual product margins.':
+    'Los drivers de facturas, pallets y horas de trabajo se incluyen en los totales de la empresa pero no en el margen individual de cada producto.',
+  'Build your cost model': 'Construí tu modelo de costos',
+  'Costs are the foundation for contribution margin, break-even and the sales simulator. Start with your fixed and variable costs.':
+    'Los costos son la base del margen de contribución, el punto de equilibrio y el simulador de ventas. Empezá por tus costos fijos y variables.',
+  'Set up cost centers': 'Configurá los centros de costo',
+  'Group costs by production, administration, sales and logistics.':
+    'Agrupá los costos por producción, administración, ventas y logística.',
+  'Add fixed and variable costs': 'Agregá costos fijos y variables',
+  'Rent, salaries, utilities, packaging, freight, commissions and more.':
+    'Alquiler, sueldos, servicios, embalaje, fletes, comisiones y más.',
+  'Compare the recurring plan with what was really spent.':
+    'Compará el plan recurrente con lo realmente gastado.',
+  'Sales for this period are already available: {amount}.':
+    'Las ventas de este período ya están disponibles: {amount}.',
+  'Net revenue': 'Ingresos netos',
+  'Contribution margin': 'Margen de contribución',
+  'of net revenue': 'de los ingresos netos',
+  'No sales in this period': 'Sin ventas en este período',
+  'Fixed costs / month': 'Costos fijos / mes',
+  'Recurring fixed and semi-variable costs': 'Costos fijos y semivariables recurrentes',
+  'Operating profit': 'Resultado operativo',
+  'Contribution covers fixed costs': 'El margen cubre los costos fijos',
+  'Contribution does not cover fixed costs': 'El margen no cubre los costos fijos',
+  'Break-even revenue': 'Ingresos de equilibrio',
+  'Per month at the current margin': 'Por mes con el margen actual',
+  'Margin of safety': 'Margen de seguridad',
+  'Revenue above or below break-even': 'Ingresos por encima o por debajo del equilibrio',
+  'Variable cost ratio': 'Ratio de costos variables',
+  '{amount} in variable costs': '{amount} en costos variables',
+  'Cash break-even': 'Equilibrio de caja',
+  'Excludes non-cash fixed costs': 'Excluye costos fijos no monetarios',
+  'Cost structure': 'Estructura de costos',
+  'Fixed, variable and one-off costs for the period': 'Costos fijos, variables y extraordinarios del período',
+  'Fixed costs': 'Costos fijos',
+  'Variable costs': 'Costos variables',
+  'One-off costs': 'Costos extraordinarios',
+  'Break-even position': 'Posición de equilibrio',
+  'Revenue compared with the monthly break-even point':
+    'Ingresos comparados con el punto de equilibrio mensual',
+  'Actual revenue': 'Ingresos reales',
+  'Add recurring fixed costs and sales to calculate break-even.':
+    'Agregá costos fijos recurrentes y ventas para calcular el equilibrio.',
+  'Revenue is {amount} above break-even.': 'Los ingresos están {amount} por encima del equilibrio.',
+  'Revenue is {amount} below break-even.': 'Los ingresos están {amount} por debajo del equilibrio.',
+  'Contribution / unit': 'Contribución / unidad',
+  'Break-even units': 'Unidades de equilibrio',
+  'Operating leverage': 'Apalancamiento operativo',
+  'Product profitability': 'Rentabilidad por producto',
+  'Net revenue, direct material cost and allocated variable costs by product.':
+    'Ingresos netos, costo directo de materiales y costos variables asignados por producto.',
+  'Material cost': 'Costo de materiales',
+  'Allocated variable costs': 'Costos variables asignados',
+  'Contribution': 'Contribución',
+  'CM %': 'MC %',
+  'BOM cost': 'Costo de lista de materiales',
+  'Product cost': 'Costo de producto',
+  'Missing cost': 'Costo faltante',
+  'No product sales in this period.': 'Sin ventas de productos en este período.',
+  '{amount} of company-level variable costs (orders, pallets or labour hours) are included in the totals but not allocated to individual products.':
+    '{amount} de costos variables de la empresa (pedidos, pallets u horas de trabajo) se incluyen en los totales pero no se asignan a productos individuales.',
+  '{amount} of company-level variable costs (invoices, pallets or labour hours) are included in the totals but not allocated to individual products.':
+    '{amount} de costos variables de la empresa (facturas, pallets u horas de trabajo) se incluyen en los totales pero no se asignan a productos individuales.',
+  'Cost items: calculated vs actual': 'Ítems de costo: calculado vs real',
+  'The calculated column uses the recurring plan and the variable drivers for the selected period.':
+    'La columna calculada usa el plan recurrente y los drivers variables del período seleccionado.',
+  'Behavior': 'Comportamiento',
+  'Driver / scope': 'Driver / alcance',
+  'Variable driver': 'Driver variable',
+  'Fixed / month': 'Fijo / mes',
+  'Calculated': 'Calculado',
+  'Actual': 'Real',
+  'Variance': 'Variación',
+  'Fixed': 'Fijo',
+  'Variable': 'Variable',
+  'Semi-variable': 'Semivariable',
+  'Stepped': 'Escalonado',
+  'Company-wide': 'Toda la empresa',
+  'of material cost': 'del costo de materiales',
+  'per unit': 'por unidad',
+  'per order': 'por pedido',
+  'per invoice': 'por factura',
+  'per pallet': 'por pallet',
+  'per labour hour': 'por hora de trabajo',
+  'How these numbers are calculated': 'Cómo se calculan estos números',
+  'Contribution margin = net revenue − variable costs. Break-even revenue = monthly fixed costs ÷ contribution margin ratio. Break-even units = monthly fixed costs ÷ contribution per unit.':
+    'Margen de contribución = ingresos netos − costos variables. Ingresos de equilibrio = costos fijos mensuales ÷ ratio de margen de contribución. Unidades de equilibrio = costos fijos mensuales ÷ contribución por unidad.',
+  'Product material cost uses the active BOM when available; otherwise the product net cost. Recoverable VAT is excluded. Cash break-even excludes non-cash fixed costs such as depreciation.':
+    'El costo de materiales del producto usa la lista de materiales activa cuando está disponible; si no, el costo neto del producto. El IVA recuperable se excluye. El equilibrio de caja excluye costos fijos no monetarios como la depreciación.',
+  'One-off costs are included in operating profit for the period but excluded from the recurring break-even point.':
+    'Los costos extraordinarios se incluyen en el resultado operativo del período pero se excluyen del punto de equilibrio recurrente.',
+  'Total costs': 'Costos totales',
+  'Fixed, variable, semi-variable and stepped costs used in the profitability analysis.':
+    'Costos fijos, variables, semivariables y escalonados usados en el análisis de rentabilidad.',
+  'Search cost items…': 'Buscar ítems de costo…',
+  'All behaviors': 'Todos los comportamientos',
+  'All statuses': 'Todos los estados',
+  'Cost item': 'Ítem de costo',
+  'Cost center': 'Centro de costo',
+  'Effective': 'Vigencia',
+  'Delete this cost item? Its monthly actuals will also be deleted.':
+    '¿Eliminar este ítem de costo? También se eliminarán sus costos reales mensuales.',
+  'Delete this cost item?': '¿Eliminar este ítem de costo?',
+  'No cost items found': 'No se encontraron ítems de costo',
+  'Add your fixed and variable costs to start the analysis.':
+    'Agregá tus costos fijos y variables para empezar el análisis.',
+  'No cost centers yet. Add the first one above.':
+    'Todavía no hay centros de costo. Agregá el primero arriba.',
+  'No cost categories yet. Add the first one above.':
+    'Todavía no hay categorías de costo. Agregá la primera arriba.',
+  'Edit cost item': 'Editar ítem de costo',
+  'Classify the cost, choose its driver and define when it applies.':
+    'Clasificá el costo, elegí su driver y definí cuándo aplica.',
+  'Manage cost centers and categories': 'Administrar centros y categorías de costo',
+  'Product categories are managed in Inventory → Categories.': 'Las categorías de producto se administran en Inventario → Categorías.',
+  'Open product categories': 'Abrir categorías de producto',
+  'Back to cost items': 'Volver a ítems de costo',
+  'Please fix the following:': 'Corregí lo siguiente:',
+  'e.g. Factory rent': 'p. ej. Alquiler de fábrica',
+  'Cost behavior': 'Comportamiento del costo',
+  'Fixed costs repeat every period. Variable costs follow a driver such as units, revenue or pallets.':
+    'Los costos fijos se repiten en cada período. Los costos variables siguen un driver como unidades, ingresos o pallets.',
+  'Semi-variable costs have a fixed component and a variable component. Stepped costs are treated as fixed for this analysis.':
+    'Los costos semivariables tienen un componente fijo y uno variable. Los costos escalonados se tratan como fijos en este análisis.',
+  'Fixed amount': 'Importe fijo',
+  'The recurring amount for the selected frequency. Leave zero for pure variable costs.':
+    'El importe recurrente para la frecuencia seleccionada. Dejá cero para costos puramente variables.',
+  'Frequency': 'Frecuencia',
+  'Monthly': 'Mensual',
+  'Quarterly': 'Trimestral',
+  'Annual': 'Anual',
+  'One-off': 'Extraordinario',
+  'Driver': 'Driver',
+  'Units sold': 'Unidades vendidas',
+  'Percentage of net revenue': 'Porcentaje de ingresos netos',
+  'Percentage of material cost': 'Porcentaje del costo de materiales',
+  'Sales orders': 'Pedidos de venta',
+  'Sales invoices': 'Facturas de venta',
+  'Labour hours': 'Horas de trabajo',
+  'Driver rate': 'Tasa del driver',
+  'Amount per driver unit, or a percentage when the driver is a percentage.':
+    'Importe por unidad de driver, o porcentaje cuando el driver es porcentual.',
+  'Scope': 'Alcance',
+  'Product category': 'Categoría de producto',
+  'A product or category scope makes a variable cost apply only to that part of sales. Company-wide costs apply to all sales.':
+    'Un alcance de producto o categoría hace que el costo variable se aplique solo a esa parte de las ventas. Los costos de toda la empresa se aplican a todas las ventas.',
+  'Tax and cash behavior': 'Impuestos y comportamiento de caja',
+  'Amount basis': 'Base del importe',
+  'Net of VAT': 'Neto de IVA',
+  'VAT included': 'IVA incluido',
+  'Analytical amounts are stored net of recoverable VAT.':
+    'Los importes analíticos se guardan netos de IVA recuperable.',
+  'VAT rate (%)': 'Tasa de IVA (%)',
+  'VAT is recoverable': 'El IVA es recuperable',
+  'If the amount is VAT-included, recoverable VAT is extracted.':
+    'Si el importe incluye IVA, se extrae el IVA recuperable.',
+  'Non-cash cost': 'Costo no monetario',
+  'For example depreciation. Excluded from cash break-even.':
+    'Por ejemplo, depreciación. Se excluye del equilibrio de caja.',
+  'Timing and reference': 'Fechas y referencia',
+  'Effective from': 'Vigente desde',
+  'Effective to': 'Vigente hasta',
+  'Leave blank for an open-ended cost.': 'Dejá vacío para un costo sin fecha de fin.',
+  'Payment days': 'Días de pago',
+  'Days after the period before this cost is paid. Used by the cash flow phase.':
+    'Días después del período antes de pagar este costo. Se usa en la fase de flujo de caja.',
+  'Payment day': 'Día de pago',
+  'Optional day of month': 'Día opcional del mes',
+  'Optional reference, contract or calculation notes.':
+    'Referencia opcional, contrato o notas de cálculo.',
+  'Driver rate (%)': 'Tasa del driver (%)',
+  'Percentage applied to the selected driver base.':
+    'Porcentaje aplicado a la base del driver seleccionado.',
+  'Amount per driver unit.': 'Importe por unidad de driver.',
+  'Monthly actual costs': 'Costos reales mensuales',
+  'Record what was actually spent so the recurring plan can be compared with reality.':
+    'Registrá lo realmente gastado para comparar el plan recurrente con la realidad.',
+  'Actual month': 'Mes real',
+  'Enter actual costs net of recoverable VAT. Leave a field blank to clear it.':
+    'Ingresá costos reales netos de IVA recuperable. Dejá un campo vacío para borrarlo.',
+  'Actual costs for the month': 'Costos reales del mes',
+  'The calculated column is the recurring plan plus variable drivers. Enter the real amount in the actual column.':
+    'La columna calculada es el plan recurrente más los drivers variables. Ingresá el importe real en la columna real.',
+  'Actual net amount': 'Importe real neto',
+  'Saved': 'Guardado',
+  'No active cost items for this month': 'No hay ítems de costo activos para este mes',
+  'Add a cost item or adjust its effective dates first.':
+    'Agregá un ítem de costo o ajustá primero sus fechas de vigencia.',
+  'Save actuals': 'Guardar costos reales',
+  'Enter a valid amount of zero or more.': 'Ingresá un importe válido de cero o mayor.',
+  'Organise costs by center and category. These groupings drive the analysis and reports.':
+    'Organizá los costos por centro y categoría. Estas agrupaciones alimentan el análisis y los informes.',
+  'Cost centers': 'Centros de costo',
+  'Production, administration, sales, logistics or any other responsibility area.':
+    'Producción, administración, ventas, logística o cualquier otra área de responsabilidad.',
+  'Add cost center': 'Agregar centro de costo',
+  'Edit cost center': 'Editar centro de costo',
+  'e.g. Production': 'p. ej. Producción',
+  'Add': 'Agregar',
+  'Cost categories': 'Categorías de costo',
+  'Rent, payroll, utilities, insurance, freight, packaging and similar groups.':
+    'Alquiler, sueldos, servicios, seguros, fletes, embalaje y grupos similares.',
+  'Add cost category': 'Agregar categoría de costo',
+  'Edit cost category': 'Editar categoría de costo',
+  'e.g. Rent': 'p. ej. Alquiler',
+  'Delete this cost center?': '¿Eliminar este centro de costo?',
+  'Delete this cost category?': '¿Eliminar esta categoría de costo?',
+  'Centers and categories in use cannot be deleted. Mark them inactive instead so historical reports stay intact.':
+    'Los centros y categorías en uso no se pueden eliminar. Marcalos inactivos para conservar los informes históricos.',
+  'This cost center is used by cost items. Mark it inactive instead.':
+    'Este centro de costo está en uso por ítems de costo. Marcalo inactivo en su lugar.',
+  'This cost category is used by cost items. Mark it inactive instead.':
+    'Esta categoría de costo está en uso por ítems de costo. Marcala inactiva en su lugar.',
+  'A record with this name already exists.': 'Ya existe un registro con este nombre.',
+  'Name is required.': 'El nombre es obligatorio.',
+  'Enter a valid effective-from date.': 'Ingresá una fecha de inicio de vigencia válida.',
+  'Enter a valid effective-to date.': 'Ingresá una fecha de fin de vigencia válida.',
+  'The effective-to date cannot be before the effective-from date.':
+    'La fecha de fin de vigencia no puede ser anterior a la fecha de inicio.',
+  'Select a driver for a variable cost.': 'Seleccioná un driver para el costo variable.',
+  'Enter a driver rate greater than zero.': 'Ingresá una tasa de driver mayor que cero.',
+  'A percentage driver cannot exceed 100%.': 'Un driver porcentual no puede superar el 100%.',
+  'Select the product this cost applies to.': 'Seleccioná el producto al que aplica este costo.',
+  'Select the category this cost applies to.': 'Seleccioná la categoría a la que aplica este costo.',
+  'Monthly actual costs saved.': 'Costos reales mensuales guardados.',
+  'Cost category': 'Categoría de costo',
+  'This cost item has actual costs. Mark it inactive instead of deleting it.':
+    'Este ítem de costo tiene costos reales. Marcalo inactivo en lugar de eliminarlo.',
 };
 
 function normalizeLocale(value) {

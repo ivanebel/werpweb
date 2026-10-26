@@ -1,0 +1,202 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Monthly actual costs') %></h1>
+          <p class="page-subtitle"><%= t('Record what was actually spent so the recurring plan can be compared with reality.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/costs" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Costs & profitability') %>
+          </a>
+          <a href="/finance/costs/items" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'list', className: 'h-4 w-4' }) %>
+            <%= t('Cost items') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card mb-5 p-4 md:p-5">
+        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><%= t('Actual month') %></p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= periodLabel %></p>
+            <p class="mt-0.5 text-xs text-gray-400"><%= t('Enter actual costs net of recoverable VAT. Leave a field blank to clear it.') %></p>
+          </div>
+          <form method="GET" action="/finance/costs/actuals" class="flex flex-wrap items-end gap-2">
+            <a href="/finance/costs/actuals?period=<%= previousPeriod %>" class="btn btn-secondary btn-sm" aria-label="<%= t('Previous month') %>">
+              <%- include('/partials/icon', { name: 'chevron-double-left', className: 'h-4 w-4' }) %>
+            </a>
+            <div>
+              <label for="period" class="sr-only"><%= t('Period') %></label>
+              <input id="period" name="period" type="month" value="<%= period %>" class="form-input">
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
+            <a href="/finance/costs/actuals?period=<%= nextPeriod %>" class="btn btn-secondary btn-sm" aria-label="<%= t('Next month') %>">
+              <%- include('/partials/icon', { name: 'chevron-right', className: 'h-4 w-4' }) %>
+            </a>
+          </form>
+        </div>
+      </div>
+
+      <form method="POST" action="/finance/costs/actuals" id="actuals-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="period" value="<%= period %>">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Actual costs for the month') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The calculated column is the recurring plan plus variable drivers. Enter the real amount in the actual column.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+              <%= h.pluralize(rows.length, 'cost item') %>
+            </span>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table-base min-w-[950px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Cost item') %></th>
+                  <th class="table-th"><%= t('Behavior') %></th>
+                  <th class="table-th text-right"><%= t('Calculated') %></th>
+                  <th class="table-th text-right"><%= t('Actual net amount') %></th>
+                  <th class="table-th text-right"><%= t('Variance') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% rows.forEach((row) => {
+                  const isFixed = ['fixed', 'semi_variable', 'stepped'].includes(row.behavior);
+                  const behaviorLabel = { fixed: t('Fixed'), variable: t('Variable'), semi_variable: t('Semi-variable'), stepped: t('Stepped') }[row.behavior] || row.behavior;
+                  const behaviorTone = { fixed: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400', variable: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400', semi_variable: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400', stepped: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' }[row.behavior];
+                  const saved = actuals.has(Number(row.id));
+                  const inputValue = posted && Object.prototype.hasOwnProperty.call(posted, row.id)
+                    ? posted[row.id]
+                    : saved ? actuals.get(Number(row.id)) : '';
+                  const errorKey = `amount_${row.id}`;
+                  const variance = saved ? Number(row.actual) - Number(row.calculated) : null;
+                %>
+                  <tr class="table-row" data-actual-row data-calculated="<%= Number(row.calculated) %>">
+                    <td class="table-td">
+                      <a href="/finance/costs/items/<%= row.id %>/edit" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.name %></a>
+                      <% if (row.status !== 'active') { %><span class="ml-2 badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('Inactive') %></span><% } %>
+                      <p class="mt-0.5 text-xs text-gray-400"><%= row.category_name || '—' %><% if (row.cost_center_name) { %> · <%= row.cost_center_name %><% } %></p>
+                    </td>
+                    <td class="table-td"><span class="badge <%= behaviorTone %>"><%= behaviorLabel %></span></td>
+                    <td class="table-td text-right whitespace-nowrap">
+                      <%= money(row.calculated) %>
+                      <% if (!isFixed && Number(row.variable_amount) > 0) { %><p class="mt-0.5 text-[10px] text-gray-400"><%= t('Variable') %></p><% } %>
+                    </td>
+                    <td class="table-td">
+                      <div class="relative ml-auto max-w-[220px]">
+                        <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400"><%= currency %></span>
+                        <input
+                          name="amount_<%= row.id %>"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value="<%= inputValue %>"
+                          class="form-input pl-14 text-right <%= errors[errorKey] ? 'form-input-error' : '' %>"
+                          placeholder="0.00"
+                          data-actual-input
+                        >
+                      </div>
+                      <% if (errors[errorKey]) { %><p class="form-error"><%= errors[errorKey] %></p><% } %>
+                      <% if (saved) { %><p class="mt-1 text-right text-[10px] text-success-600 dark:text-success-400"><%= t('Saved') %></p><% } %>
+                    </td>
+                    <td class="table-td text-right font-semibold" data-actual-variance>
+                      <% if (variance !== null) { %>
+                        <span class="<%= variance > 0 ? 'text-error-600 dark:text-error-400' : variance < 0 ? 'text-success-600 dark:text-success-400' : 'text-gray-400' %>"><%= `${variance > 0 ? '+' : ''}${money(variance)}` %></span>
+                      <% } else { %>—<% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (!rows.length) { %>
+                  <tr>
+                    <td colspan="5" class="px-6 py-16 text-center">
+                      <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No active cost items for this month') %></p>
+                      <p class="mt-1 text-sm text-gray-400"><%= t('Add a cost item or adjust its effective dates first.') %></p>
+                      <a href="/finance/costs/items/new" class="btn btn-primary btn-sm mt-4"><%= t('New cost item') %></a>
+                    </td>
+                  </tr>
+                <% } %>
+              </tbody>
+              <% if (rows.length) { %>
+                <tfoot>
+                  <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                    <td class="px-5 py-3 text-sm" colspan="2"><%= t('Totals') %></td>
+                    <td class="px-3 py-3 text-right text-sm" data-calculated-total><%= money(rows.reduce((sum, row) => sum + Number(row.calculated), 0)) %></td>
+                    <td class="px-3 py-3 text-right text-sm" data-actual-total><%= money(rows.reduce((sum, row) => sum + Number(row.actual || 0), 0)) %></td>
+                    <td class="px-3 py-3 text-right text-sm" data-variance-total><%= money(rows.reduce((sum, row) => sum + Number(row.variance || 0), 0)) %></td>
+                  </tr>
+                </tfoot>
+              <% } %>
+            </table>
+          </div>
+
+          <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+            <a href="/finance/costs" class="btn btn-secondary"><%= t('Cancel') %></a>
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              <%= t('Save actuals') %>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+  (function () {
+    const currency = <%- JSON.stringify(currency || 'USD') %>;
+    const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
+    function money(value) {
+      try {
+        return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(Number(value || 0));
+      } catch (e) {
+        return currency + ' ' + Number(value || 0).toFixed(2);
+      }
+    }
+    function updateTotals() {
+      let calculatedTotal = 0;
+      let actualTotal = 0;
+      document.querySelectorAll('[data-actual-row]').forEach((row) => {
+        const calculated = Number(row.dataset.calculated) || 0;
+        const input = row.querySelector('[data-actual-input]');
+        const raw = input && input.value.trim();
+        const actual = raw === '' ? null : Number(raw);
+        calculatedTotal += calculated;
+        if (actual !== null && Number.isFinite(actual)) actualTotal += actual;
+        const varianceCell = row.querySelector('[data-actual-variance]');
+        if (!varianceCell) return;
+        if (actual === null || !Number.isFinite(actual)) {
+          varianceCell.textContent = '—';
+          varianceCell.className = 'table-td text-right font-semibold';
+          return;
+        }
+        const variance = actual - calculated;
+        varianceCell.textContent = (variance > 0 ? '+' : '') + money(variance);
+        varianceCell.className = 'table-td text-right font-semibold ' +
+          (variance > 0 ? 'text-error-600 dark:text-error-400' : variance < 0 ? 'text-success-600 dark:text-success-400' : 'text-gray-400');
+      });
+      const calculatedCell = document.querySelector('[data-calculated-total]');
+      const actualCell = document.querySelector('[data-actual-total]');
+      const varianceCell = document.querySelector('[data-variance-total]');
+      if (calculatedCell) calculatedCell.textContent = money(calculatedTotal);
+      if (actualCell) actualCell.textContent = money(actualTotal);
+      if (varianceCell) varianceCell.textContent = money(actualTotal - calculatedTotal);
+    }
+    document.querySelectorAll('[data-actual-input]').forEach((input) => {
+      input.addEventListener('input', updateTotals);
+    });
+    updateTotals();
+  })();
+  </script>
+</div>

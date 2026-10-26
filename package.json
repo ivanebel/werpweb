@@ -13,7 +13,8 @@
     "db:seed": "node src/db/seed.js",
     "db:seed-pos": "node src/db/seedPos.js",
     "db:setup": "node src/db/migrate.js && node src/db/seed.js",
-    "test:checks": "node tests/checks-test.mjs"
+    "test:checks": "node tests/checks-test.mjs",
+    "test:finance": "node tests/finance-test.mjs"
   },
   "dependencies": {
     "apexcharts": "^4.5.0",

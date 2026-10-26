@@ -20,6 +20,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Purchasing** — purchase orders and purchase invoices (bills). Receiving a bill posts stock into inventory.
 - **Point of Sale (Unit #2)** — manage several shops as distinct points of sale, record completed POS sales with ticket type, ticket number and shop, and analyse revenue, average ticket, units, product rankings and category performance. POS sales are reporting records only: they do not create stock movements or change Unit #1 inventory.
 - **Manufacturing** — bills of materials with component quantities and scrap, multi-BOM production orders where each line has its own quantity, lot, expiry and notes, aggregated material requirements across all BOM lines, material availability checks, component consumption and finished-goods posting, plus scale records from the Bizerba GLM-e labeler with lot/date filters, weight statistics, and box/pallet totals.
+- **Finance: costs and profitability** — a management-accounting workspace for fixed, variable, semi-variable and stepped costs. Cost centers and categories organise spending; cost items define recurring amounts or variable drivers such as units, net revenue, material cost, invoices, pallets or labour hours. The analysis dashboard combines BOM-based product costs with sales invoices to show contribution margin, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Monthly actual costs can be entered and compared with the calculated plan. All analytical amounts are net of recoverable VAT.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
 - **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
@@ -161,6 +162,12 @@ npm run test:checks
 
 The test logs in with the seeded admin account, creates its own customer, supplier, invoices, payments and checks, verifies the check lifecycle and payment integration, and removes everything it created. Run it against a development database, not production.
 
+Finance calculation helpers have standalone unit checks that do not touch the database:
+
+```bash
+npm run test:finance
+```
+
 ---
 
 ## Common workflows
@@ -188,6 +195,21 @@ The test logs in with the seeded admin account, creates its own customer, suppli
 4. Each slip shows the brand and product name, customer product code, EAN-13, customer, customer purchase order, delivery totals for units/boxes/weight, lot and expiry. The EAN-13 and derived DUN-14 barcodes are printed at the bottom, and a QR code summarising the slip is placed in the middle-left area.
 5. Units, boxes and weight are **delivery totals**, not per-pallet totals, and are shared by every slip in the delivery.
 6. Use **Print / Save PDF** to print. Each slip is an A4 page and page breaks are inserted automatically.
+
+### Costs and profitability
+
+1. Open **Finance → Costs & profitability**. The workspace is restricted to administrators and managers.
+2. In **Cost setup**, create the cost centers (for example production, administration, sales and logistics) and cost categories (rent, payroll, utilities, insurance, freight, packaging, commissions).
+3. Create **cost items**:
+   - **Fixed** or **stepped** costs have a recurring amount and frequency (monthly, quarterly, annual or one-off).
+   - **Variable** costs have a driver: units sold, percentage of net revenue, percentage of material cost, invoices, pallets or labour hours.
+   - **Semi-variable** costs have both a fixed amount and a variable driver.
+   - A variable cost can apply company-wide, to one product or to a product category.
+4. Enter **monthly actual costs** and compare them with the calculated recurring plan and variable drivers.
+5. The dashboard shows net revenue, contribution margin, fixed costs per month, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Product material cost uses the active BOM when available; otherwise it uses the product's net cost.
+6. Costs can be entered VAT-inclusive or net. Recoverable VAT is extracted so all analytical amounts use a consistent net basis. Depreciation and other non-cash fixed costs can be flagged and are excluded from cash break-even.
+7. One-off costs affect operating profit for the period but are excluded from the recurring break-even point.
+8. Revenue and units come from non-draft sales invoices in the selected month. Credit notes reduce revenue and units. Unit #2 POS sales are not included in this analysis.
 
 ### Purchase invoice and stock
 

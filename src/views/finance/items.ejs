@@ -1,0 +1,154 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Cost items') %></h1>
+          <p class="page-subtitle"><%= t('Fixed, variable, semi-variable and stepped costs used in the profitability analysis.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/costs" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Costs & profitability') %>
+          </a>
+          <a href="/finance/costs/actuals" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'calendar', className: 'h-4 w-4' }) %>
+            <%= t('Monthly actuals') %>
+          </a>
+          <a href="/finance/costs/setup" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'cog', className: 'h-4 w-4' }) %>
+            <%= t('Cost setup') %>
+          </a>
+          <a href="/finance/costs/items/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= t('New cost item') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex flex-col gap-4 border-b border-gray-100 p-5 dark:border-gray-800 md:flex-row md:items-end md:justify-between">
+          <form method="GET" action="/finance/costs/items" class="flex flex-1 flex-wrap items-end gap-3">
+            <div class="min-w-[220px] flex-1 md:max-w-sm">
+              <label for="q" class="form-label"><%= t('Search') %></label>
+              <div class="relative">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
+                </span>
+                <input id="q" type="search" name="q" value="<%= search %>" class="form-input pl-10" placeholder="<%= t('Search cost items…') %>">
+              </div>
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="behavior" class="form-label"><%= t('Behavior') %></label>
+              <select id="behavior" name="behavior" class="form-select sm:w-44">
+                <option value=""><%= t('All behaviors') %></option>
+                <% behaviors.forEach((value) => {
+                  const labels = { fixed: t('Fixed'), variable: t('Variable'), semi_variable: t('Semi-variable'), stepped: t('Stepped') };
+                %>
+                  <option value="<%= value %>" <%= behavior === value ? 'selected' : '' %>><%= labels[value] %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="status" class="form-label"><%= t('Status') %></label>
+              <select id="status" name="status" class="form-select sm:w-40">
+                <option value=""><%= t('All statuses') %></option>
+                <option value="active" <%= status === 'active' ? 'selected' : '' %>><%= t('Active') %></option>
+                <option value="inactive" <%= status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-secondary"><%= t('Apply') %></button>
+            <% if (search || behavior || status) { %><a href="/finance/costs/items" class="btn btn-ghost"><%= t('Reset') %></a><% } %>
+          </form>
+          <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+            <%= h.pluralize(rows.length, 'cost item') %>
+          </span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table-base min-w-[1100px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Cost item') %></th>
+                <th class="table-th"><%= t('Behavior') %></th>
+                <th class="table-th"><%= t('Category') %></th>
+                <th class="table-th"><%= t('Cost center') %></th>
+                <th class="table-th text-right"><%= t('Fixed / month') %></th>
+                <th class="table-th"><%= t('Variable driver') %></th>
+                <th class="table-th"><%= t('Effective') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach((row) => {
+                const isFixed = ['fixed', 'semi_variable', 'stepped'].includes(row.behavior);
+                const isVariable = ['variable', 'semi_variable'].includes(row.behavior);
+                const behaviorLabel = { fixed: t('Fixed'), variable: t('Variable'), semi_variable: t('Semi-variable'), stepped: t('Stepped') }[row.behavior] || row.behavior;
+                const behaviorTone = { fixed: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400', variable: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400', semi_variable: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400', stepped: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' }[row.behavior];
+                let driverText = '—';
+                if (isVariable && row.driver_type) {
+                  const rate = Number(row.driver_rate) || 0;
+                  if (row.driver_type === 'revenue_percent') driverText = `${h.formatNumber(rate, 2)}% ${t('of net revenue')}`;
+                  else if (row.driver_type === 'material_percent') driverText = `${h.formatNumber(rate, 2)}% ${t('of material cost')}`;
+                  else if (row.driver_type === 'unit') driverText = `${money(rate)} ${t('per unit')}`;
+                  else if (row.driver_type === 'invoice') driverText = `${money(rate)} ${t('per invoice')}`;
+                  else if (row.driver_type === 'pallet') driverText = `${money(rate)} ${t('per pallet')}`;
+                  else if (row.driver_type === 'labor_hour') driverText = `${money(rate)} ${t('per labour hour')}`;
+                  if (row.scope_label) driverText += ` · ${row.scope_label}`;
+                }
+              %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <a href="/finance/costs/items/<%= row.id %>/edit" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.name %></a>
+                    <% if (row.notes) { %><p class="mt-0.5 max-w-xs truncate text-xs text-gray-400"><%= row.notes %></p><% } %>
+                  </td>
+                  <td class="table-td"><span class="badge <%= behaviorTone %>"><%= behaviorLabel %></span></td>
+                  <td class="table-td text-gray-600 dark:text-gray-300"><%= row.category_name || '—' %></td>
+                  <td class="table-td text-gray-600 dark:text-gray-300"><%= row.cost_center_name || '—' %></td>
+                  <td class="table-td text-right"><%= isFixed ? money(row.monthly_fixed) : '—' %></td>
+                  <td class="table-td text-xs text-gray-500 dark:text-gray-400"><%= driverText %></td>
+                  <td class="table-td text-xs text-gray-500 dark:text-gray-400">
+                    <%= h.formatDate(row.effective_from) %>
+                    <% if (row.effective_to) { %> → <%= h.formatDate(row.effective_to) %><% } else { %> → <%= t('Open') %><% } %>
+                  </td>
+                  <td class="table-td"><%- statusBadge(row.status) %></td>
+                  <td class="table-td">
+                    <div class="flex items-center justify-end gap-1">
+                      <a href="/finance/costs/items/<%= row.id %>/edit" class="btn-icon" title="<%= t('Edit') %>">
+                        <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                      </a>
+                      <form action="/finance/costs/items/<%= row.id %>/delete" method="POST" class="inline" data-confirm="<%= t('Delete this cost item?') %>">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete') %>">
+                          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!rows.length) { %>
+                <tr>
+                  <td colspan="9" class="px-6 py-16 text-center">
+                    <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                      <%- include('/partials/icon', { name: 'chart', className: 'h-6 w-6' }) %>
+                    </span>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('No cost items found') %></p>
+                    <p class="mt-1 text-sm text-gray-400"><%= t('Add your fixed and variable costs to start the analysis.') %></p>
+                    <a href="/finance/costs/items/new" class="btn btn-primary btn-sm mt-4"><%= t('New cost item') %></a>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

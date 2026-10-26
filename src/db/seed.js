@@ -1574,6 +1574,58 @@ async function main() {
       });
     }
 
+    // ------------------------------------------------ management finance demo
+    const financeStart = addDays(`${isoDate(new Date()).slice(0, 7)}-01`, -365);
+    const findOrCreate = async (table, name, data) => {
+      const [rows] = await conn.query(`SELECT id FROM \`${table}\` WHERE name = ? LIMIT 1`, [name]);
+      if (rows.length) return rows[0].id;
+      return insert(conn, table, { name, status: 'active', ...data });
+    };
+    const productionCenter = await findOrCreate('cost_centers', 'Production', {
+      code: 'PROD',
+      description: 'Manufacturing and factory costs',
+    });
+    const salesCenter = await findOrCreate('cost_centers', 'Sales', {
+      code: 'SALES',
+      description: 'Commercial and selling costs',
+    });
+    const rentCategory = await findOrCreate('cost_categories', 'Rent', {
+      description: 'Factory and office rent',
+    });
+    const commissionsCategory = await findOrCreate('cost_categories', 'Commissions', {
+      description: 'Sales commissions and payment fees',
+    });
+    await insert(conn, 'cost_items', {
+      name: 'Factory rent',
+      category_id: rentCategory,
+      cost_center_id: productionCenter,
+      behavior: 'fixed',
+      amount: 1000,
+      frequency: 'monthly',
+      amount_basis: 'net',
+      vat_rate: 21,
+      vat_recoverable: 1,
+      effective_from: financeStart,
+      status: 'active',
+      created_by: adminId,
+    });
+    await insert(conn, 'cost_items', {
+      name: 'Sales commission',
+      category_id: commissionsCategory,
+      cost_center_id: salesCenter,
+      behavior: 'variable',
+      amount: 0,
+      frequency: 'monthly',
+      driver_type: 'revenue_percent',
+      driver_rate: 3,
+      amount_basis: 'net',
+      vat_rate: 21,
+      vat_recoverable: 1,
+      effective_from: financeStart,
+      status: 'active',
+      created_by: adminId,
+    });
+
     // ------------------------------------------------ Unit #2 POS demo data
     const posResult = await seedPosDemo(conn, { adminId });
     if (!posResult.skipped) {

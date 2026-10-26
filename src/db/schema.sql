@@ -863,6 +863,105 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
   KEY idx_bank_accounts_bank (bank_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------------
+-- Management finance: cost structure and profitability analysis.
+-- These tables are a management-accounting layer, not a statutory ledger.
+-- All analytical amounts are stored net of recoverable VAT.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS cost_centers (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(120) NOT NULL,
+  code        VARCHAR(30) NULL,
+  description VARCHAR(255) NULL,
+  status      ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_cost_centers_name (name),
+  KEY idx_cost_centers_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cost_categories (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(120) NOT NULL,
+  description VARCHAR(255) NULL,
+  status      ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_cost_categories_name (name),
+  KEY idx_cost_categories_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cost_items (
+  id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name              VARCHAR(180) NOT NULL,
+  category_id       INT UNSIGNED NULL,
+  cost_center_id    INT UNSIGNED NULL,
+  behavior          ENUM('fixed','variable','semi_variable','stepped') NOT NULL DEFAULT 'fixed',
+  amount            DECIMAL(14,2) NOT NULL DEFAULT 0,
+  frequency         ENUM('monthly','quarterly','annual','one_off') NOT NULL DEFAULT 'monthly',
+  driver_type       ENUM('unit','revenue_percent','material_percent','invoice','pallet','labor_hour') NULL,
+  driver_rate       DECIMAL(14,4) NOT NULL DEFAULT 0,
+  scope_type        ENUM('company','product','category') NOT NULL DEFAULT 'company',
+  scope_product_id  INT UNSIGNED NULL,
+  scope_category_id INT UNSIGNED NULL,
+  amount_basis      ENUM('net','gross') NOT NULL DEFAULT 'net',
+  vat_rate          DECIMAL(5,2) NOT NULL DEFAULT 0,
+  vat_recoverable   TINYINT(1) NOT NULL DEFAULT 1,
+  is_non_cash       TINYINT(1) NOT NULL DEFAULT 0,
+  payment_days      INT NOT NULL DEFAULT 0,
+  payment_day       TINYINT UNSIGNED NULL,
+  effective_from    DATE NOT NULL,
+  effective_to      DATE NULL,
+  supplier_id       INT UNSIGNED NULL,
+  notes             TEXT NULL,
+  status            ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_by        INT UNSIGNED NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_cost_items_category (category_id),
+  KEY idx_cost_items_center (cost_center_id),
+  KEY idx_cost_items_behavior (behavior),
+  KEY idx_cost_items_status (status),
+  KEY idx_cost_items_effective (effective_from, effective_to),
+  KEY idx_cost_items_scope_product (scope_product_id),
+  KEY idx_cost_items_scope_category (scope_category_id),
+  CONSTRAINT fk_cost_items_category FOREIGN KEY (category_id)
+    REFERENCES cost_categories (id) ON DELETE SET NULL,
+  CONSTRAINT fk_cost_items_center FOREIGN KEY (cost_center_id)
+    REFERENCES cost_centers (id) ON DELETE SET NULL,
+  CONSTRAINT fk_cost_items_scope_product FOREIGN KEY (scope_product_id)
+    REFERENCES products (id) ON DELETE SET NULL,
+  CONSTRAINT fk_cost_items_scope_category FOREIGN KEY (scope_category_id)
+    REFERENCES product_categories (id) ON DELETE SET NULL,
+  CONSTRAINT fk_cost_items_supplier FOREIGN KEY (supplier_id)
+    REFERENCES suppliers (id) ON DELETE SET NULL,
+  CONSTRAINT fk_cost_items_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS cost_actuals (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  cost_item_id INT UNSIGNED NOT NULL,
+  period       CHAR(7) NOT NULL,
+  amount       DECIMAL(14,2) NOT NULL DEFAULT 0,
+  source       ENUM('manual','import','invoice') NOT NULL DEFAULT 'manual',
+  notes        VARCHAR(500) NULL,
+  created_by   INT UNSIGNED NULL,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_cost_actuals_item_period (cost_item_id, period),
+  KEY idx_cost_actuals_period (period),
+  CONSTRAINT fk_cost_actuals_item FOREIGN KEY (cost_item_id)
+    REFERENCES cost_items (id) ON DELETE CASCADE,
+  CONSTRAINT fk_cost_actuals_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS production_orders (
   id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_no  VARCHAR(30) NOT NULL,

@@ -1,0 +1,449 @@
+<%- include('/layouts/head', { includeApex: true }) %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Costs & profitability') %></h1>
+            <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Management analysis') %></span>
+          </div>
+          <p class="page-subtitle"><%= t('Understand fixed and variable costs, contribution margin and the revenue needed to break even.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/costs/items/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= t('New cost item') %>
+          </a>
+          <a href="/finance/costs/items" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'list', className: 'h-4 w-4' }) %>
+            <%= t('Cost items') %>
+          </a>
+          <a href="/finance/costs/actuals?period=<%= period %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'calendar', className: 'h-4 w-4' }) %>
+            <%= t('Monthly actuals') %>
+          </a>
+          <a href="/finance/costs/setup" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'cog', className: 'h-4 w-4' }) %>
+            <%= t('Cost setup') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card mb-5 p-4 md:p-5">
+        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><%= t('Analysis period') %></p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= periodLabel %></p>
+            <p class="mt-0.5 text-xs text-gray-400"><%= t('All analytical amounts are net of recoverable VAT.') %></p>
+          </div>
+          <form method="GET" action="/finance/costs" class="flex flex-wrap items-end gap-2">
+            <a href="/finance/costs?period=<%= previousPeriod %>" class="btn btn-secondary btn-sm" aria-label="<%= t('Previous month') %>">
+              <%- include('/partials/icon', { name: 'chevron-double-left', className: 'h-4 w-4' }) %>
+            </a>
+            <div>
+              <label for="period" class="sr-only"><%= t('Period') %></label>
+              <input id="period" name="period" type="month" value="<%= period %>" class="form-input">
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
+            <a href="/finance/costs?period=<%= nextPeriod %>" class="btn btn-secondary btn-sm" aria-label="<%= t('Next month') %>">
+              <%- include('/partials/icon', { name: 'chevron-right', className: 'h-4 w-4' }) %>
+            </a>
+          </form>
+        </div>
+      </div>
+
+      <% if (alerts && alerts.length) { %>
+        <div class="mb-5 space-y-3">
+          <% alerts.forEach((alert) => {
+            const tone = {
+              error: 'border-error-200 bg-error-50 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400',
+              warning: 'border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400',
+              info: 'border-blue-light-200 bg-blue-light-50 text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300',
+              success: 'border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400'
+            }[alert.tone] || 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300';
+          %>
+            <div class="flex flex-col gap-3 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between <%= tone %>">
+              <div class="flex items-start gap-3">
+                <%- include('/partials/icon', { name: alert.tone === 'error' || alert.tone === 'warning' ? 'exclamation-triangle' : 'info', className: 'mt-0.5 h-5 w-5 shrink-0' }) %>
+                <div>
+                  <p class="font-semibold"><%= alert.title %></p>
+                  <p class="mt-0.5 opacity-90"><%= alert.message %></p>
+                </div>
+              </div>
+              <% if (alert.href) { %>
+                <a href="<%= alert.href %>" class="btn btn-secondary btn-sm shrink-0"><%= alert.action || t('Open') %></a>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <% if (!costItems.length) { %>
+        <div class="card p-6 md:p-8">
+          <div class="mx-auto max-w-3xl text-center">
+            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+              <%- include('/partials/icon', { name: 'chart', className: 'h-7 w-7' }) %>
+            </span>
+            <h2 class="mt-4 text-xl font-bold text-gray-900 dark:text-white"><%= t('Build your cost model') %></h2>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400"><%= t('Costs are the foundation for contribution margin, break-even and the sales simulator. Start with your fixed and variable costs.') %></p>
+          </div>
+          <div class="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">1</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Set up cost centers') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Group costs by production, administration, sales and logistics.') %></p>
+              <a href="/finance/costs/setup" class="btn btn-secondary btn-sm mt-4"><%= t('Cost setup') %></a>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">2</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Add fixed and variable costs') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Rent, salaries, utilities, packaging, freight, commissions and more.') %></p>
+              <a href="/finance/costs/items/new" class="btn btn-primary btn-sm mt-4"><%= t('New cost item') %></a>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">3</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Enter monthly actuals') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Compare the recurring plan with what was really spent.') %></p>
+              <a href="/finance/costs/actuals" class="btn btn-secondary btn-sm mt-4"><%= t('Monthly actuals') %></a>
+            </div>
+          </div>
+          <% if (netRevenue > 0) { %>
+            <p class="mt-6 text-center text-xs text-gray-400"><%= t('Sales for this period are already available: {amount}.', { amount: money(netRevenue) }) %></p>
+          <% } %>
+        </div>
+      <% } else { %>
+
+        <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Net revenue') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(netRevenue) %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= h.pluralize(invoiceCount, 'invoice') %> · <%= h.formatQty(totalUnits) %> <%= t('units') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Contribution margin') %></p>
+            <p class="mt-2 text-2xl font-bold <%= contribution >= 0 ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400' %>"><%= money(contribution) %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= cmPct !== null ? `${h.formatNumber(cmPct, 1)}% ${t('of net revenue')}` : t('No sales in this period') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Fixed costs / month') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(fixedRunRate) %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('Recurring fixed and semi-variable costs') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Operating profit') %></p>
+            <p class="mt-2 text-2xl font-bold <%= operatingProfit >= 0 ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400' %>"><%= money(operatingProfit) %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= operatingProfit >= 0 ? t('Contribution covers fixed costs') : t('Contribution does not cover fixed costs') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Break-even revenue') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= breakEvenRevenue !== null ? money(breakEvenRevenue) : '—' %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('Per month at the current margin') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Margin of safety') %></p>
+            <p class="mt-2 text-2xl font-bold <%= marginOfSafety !== null && marginOfSafety < 0 ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white' %>"><%= marginOfSafety !== null ? `${h.formatNumber(marginOfSafety, 1)}%` : '—' %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('Revenue above or below break-even') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Variable cost ratio') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= variableCostPct !== null ? `${h.formatNumber(variableCostPct, 1)}%` : '—' %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('{amount} in variable costs', { amount: money(totalVariable) }) %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Cash break-even') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= cashBreakEven !== null ? money(cashBreakEven) : '—' %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('Excludes non-cash fixed costs') %></p>
+          </div>
+        </div>
+
+        <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-5">
+          <div class="card xl:col-span-2">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Cost structure') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Fixed, variable and one-off costs for the period') %></p>
+              </div>
+            </div>
+            <div class="flex flex-col items-center gap-4 p-5 sm:flex-row">
+              <div id="cost-structure-chart" class="w-full max-w-[240px]"></div>
+              <ul class="w-full space-y-3">
+                <li class="flex items-center justify-between text-sm">
+                  <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300"><span class="h-2.5 w-2.5 rounded-full bg-brand-500"></span><%= t('Fixed costs') %></span>
+                  <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(fixedRunRate) %></span>
+                </li>
+                <li class="flex items-center justify-between text-sm">
+                  <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300"><span class="h-2.5 w-2.5 rounded-full bg-success-500"></span><%= t('Variable costs') %></span>
+                  <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(totalVariable) %></span>
+                </li>
+                <% if (oneOffCost > 0) { %>
+                  <li class="flex items-center justify-between text-sm">
+                    <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300"><span class="h-2.5 w-2.5 rounded-full bg-warning-500"></span><%= t('One-off costs') %></span>
+                    <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(oneOffCost) %></span>
+                  </li>
+                <% } %>
+              </ul>
+            </div>
+          </div>
+
+          <div class="card xl:col-span-3">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Break-even position') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Revenue compared with the monthly break-even point') %></p>
+              </div>
+            </div>
+            <div class="p-5">
+              <% const breakEvenProgress = breakEvenRevenue && breakEvenRevenue > 0 ? Math.min(100, Math.max(0, (netRevenue / breakEvenRevenue) * 100)) : 0; %>
+              <% const breakEvenTone = breakEvenRevenue === null ? 'bg-gray-300 dark:bg-gray-600' : netRevenue >= breakEvenRevenue ? 'bg-success-500' : 'bg-brand-500'; %>
+              <div class="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Actual revenue') %></p>
+                  <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(netRevenue) %></p>
+                </div>
+                <div class="text-right">
+                  <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Break-even revenue') %></p>
+                  <p class="mt-1 text-2xl font-bold text-brand-600 dark:text-brand-400"><%= breakEvenRevenue !== null ? money(breakEvenRevenue) : '—' %></p>
+                </div>
+              </div>
+              <div class="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <div class="h-full rounded-full <%= breakEvenTone %>" style="width: <%= Number(breakEvenProgress).toFixed(1) %>%"></div>
+              </div>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <% if (breakEvenRevenue === null) { %>
+                  <%= t('Add recurring fixed costs and sales to calculate break-even.') %>
+                <% } else if (netRevenue >= breakEvenRevenue) { %>
+                  <%= t('Revenue is {amount} above break-even.', { amount: money(netRevenue - breakEvenRevenue) }) %>
+                <% } else { %>
+                  <%= t('Revenue is {amount} below break-even.', { amount: money(breakEvenRevenue - netRevenue) }) %>
+                <% } %>
+              </p>
+              <dl class="mt-5 grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 text-sm dark:border-gray-800 sm:grid-cols-4">
+                <div>
+                  <dt class="text-xs text-gray-400"><%= t('Contribution / unit') %></dt>
+                  <dd class="mt-1 font-semibold text-gray-800 dark:text-gray-200"><%= contributionPerUnit !== null ? money(contributionPerUnit) : '—' %></dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-400"><%= t('Break-even units') %></dt>
+                  <dd class="mt-1 font-semibold text-gray-800 dark:text-gray-200"><%= breakEvenUnits !== null ? h.formatQty(breakEvenUnits) : '—' %></dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-400"><%= t('Operating leverage') %></dt>
+                  <dd class="mt-1 font-semibold text-gray-800 dark:text-gray-200"><%= operatingLeverage !== null ? `${h.formatNumber(operatingLeverage, 2)}x` : '—' %></dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-400"><%= t('One-off costs') %></dt>
+                  <dd class="mt-1 font-semibold text-gray-800 dark:text-gray-200"><%= money(oneOffCost) %></dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Product profitability') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Net revenue, direct material cost and allocated variable costs by product.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(products.length, 'product') %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[1000px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Product') %></th>
+                  <th class="table-th text-right"><%= t('Units') %></th>
+                  <th class="table-th text-right"><%= t('Net revenue') %></th>
+                  <th class="table-th text-right"><%= t('Material cost') %></th>
+                  <th class="table-th text-right"><%= t('Allocated variable costs') %></th>
+                  <th class="table-th text-right"><%= t('Contribution') %></th>
+                  <th class="table-th text-right"><%= t('CM %') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% products.forEach((product) => { %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= product.name %></p>
+                      <p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                        <span class="font-mono"><%= product.sku %></span>
+                        <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide <%= product.cost_source === 'bom' ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400' : product.cost_source === 'service' ? 'bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300' : product.cost_source === 'product' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' %>">
+                          <%= product.cost_source === 'bom' ? t('BOM cost') : product.cost_source === 'service' ? t('Service') : product.cost_source === 'product' ? t('Product cost') : t('Missing cost') %>
+                        </span>
+                      </p>
+                    </td>
+                    <td class="table-td text-right"><%= h.formatQty(product.quantity) %></td>
+                    <td class="table-td text-right font-medium"><%= money(product.net_revenue) %></td>
+                    <td class="table-td text-right"><%= money(product.material_cost) %></td>
+                    <td class="table-td text-right"><%= money(product.allocated_variable) %></td>
+                    <td class="table-td text-right font-semibold <%= product.contribution >= 0 ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400' %>"><%= money(product.contribution) %></td>
+                    <td class="table-td text-right">
+                      <span class="font-semibold <%= product.cm_pct === null ? 'text-gray-400' : product.cm_pct < 0 ? 'text-error-600 dark:text-error-400' : product.cm_pct < 20 ? 'text-warning-600 dark:text-warning-400' : 'text-success-600 dark:text-success-400' %>">
+                        <%= product.cm_pct !== null ? `${h.formatNumber(product.cm_pct, 1)}%` : '—' %>
+                      </span>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (!products.length) { %>
+                  <tr><td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No product sales in this period.') %></td></tr>
+                <% } %>
+              </tbody>
+              <% if (products.length) { %>
+                <tfoot>
+                  <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                    <td class="px-5 py-3 text-sm"><%= t('Totals') %></td>
+                    <td class="px-3 py-3 text-right text-sm"><%= h.formatQty(products.reduce((sum, p) => sum + p.quantity, 0)) %></td>
+                    <td class="px-3 py-3 text-right text-sm"><%= money(products.reduce((sum, p) => sum + p.net_revenue, 0)) %></td>
+                    <td class="px-3 py-3 text-right text-sm"><%= money(products.reduce((sum, p) => sum + p.material_cost, 0)) %></td>
+                    <td class="px-3 py-3 text-right text-sm"><%= money(products.reduce((sum, p) => sum + p.allocated_variable, 0)) %></td>
+                    <td class="px-3 py-3 text-right text-sm"><%= money(products.reduce((sum, p) => sum + p.contribution, 0)) %></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              <% } %>
+            </table>
+          </div>
+          <% if (unallocatedVariable > 0) { %>
+            <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+              <%= t('{amount} of company-level variable costs (invoices, pallets or labour hours) are included in the totals but not allocated to individual products.', { amount: money(unallocatedVariable) }) %>
+            </p>
+          <% } %>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Cost items: calculated vs actual') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The calculated column uses the recurring plan and the variable drivers for the selected period.') %></p>
+            </div>
+            <a href="/finance/costs/actuals?period=<%= period %>" class="btn btn-secondary btn-sm"><%= t('Enter monthly actuals') %></a>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[1100px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Cost item') %></th>
+                  <th class="table-th"><%= t('Behavior') %></th>
+                  <th class="table-th"><%= t('Driver / scope') %></th>
+                  <th class="table-th text-right"><%= t('Fixed / month') %></th>
+                  <th class="table-th text-right"><%= t('Calculated') %></th>
+                  <th class="table-th text-right"><%= t('Actual') %></th>
+                  <th class="table-th text-right"><%= t('Variance') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% rows.forEach((row) => {
+                  const isFixed = ['fixed', 'semi_variable', 'stepped'].includes(row.behavior);
+                  const isVariable = ['variable', 'semi_variable'].includes(row.behavior);
+                  const behaviorLabel = { fixed: t('Fixed'), variable: t('Variable'), semi_variable: t('Semi-variable'), stepped: t('Stepped') }[row.behavior] || row.behavior;
+                  const behaviorTone = { fixed: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400', variable: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400', semi_variable: 'bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400', stepped: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' }[row.behavior];
+                  let driverText = isVariable ? t('Company-wide') : '—';
+                  if (isVariable && row.driver_type) {
+                    const rate = Number(row.driver_rate) || 0;
+                    if (row.driver_type === 'revenue_percent') driverText = `${h.formatNumber(rate, 2)}% ${t('of net revenue')}`;
+                    else if (row.driver_type === 'material_percent') driverText = `${h.formatNumber(rate, 2)}% ${t('of material cost')}`;
+                    else if (row.driver_type === 'unit') driverText = `${money(rate)} ${t('per unit')}`;
+                    else if (row.driver_type === 'invoice') driverText = `${money(rate)} ${t('per invoice')}`;
+                    else if (row.driver_type === 'pallet') driverText = `${money(rate)} ${t('per pallet')}`;
+                    else if (row.driver_type === 'labor_hour') driverText = `${money(rate)} ${t('per labour hour')}`;
+                    if (row.scope_label) driverText += ` · ${row.scope_label}`;
+                  }
+                %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <a href="/finance/costs/items/<%= row.id %>/edit" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.name %></a>
+                      <% if (row.status !== 'active') { %><span class="ml-2 badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('Inactive') %></span><% } %>
+                      <p class="mt-0.5 text-xs text-gray-400"><%= row.category_name || '—' %><% if (row.cost_center_name) { %> · <%= row.cost_center_name %><% } %></p>
+                    </td>
+                    <td class="table-td"><span class="badge <%= behaviorTone %>"><%= behaviorLabel %></span></td>
+                    <td class="table-td text-xs text-gray-500 dark:text-gray-400"><%= driverText %></td>
+                    <td class="table-td text-right"><%= isFixed ? money(row.monthly_fixed) : '—' %></td>
+                    <td class="table-td text-right font-medium"><%= money(row.calculated) %></td>
+                    <td class="table-td text-right"><%= row.actual ? money(row.actual) : '—' %></td>
+                    <td class="table-td text-right font-semibold <%= row.variance > 0 ? 'text-error-600 dark:text-error-400' : row.variance < 0 ? 'text-success-600 dark:text-success-400' : 'text-gray-400' %>">
+                      <%= row.actual ? `${row.variance > 0 ? '+' : ''}${money(row.variance)}` : '—' %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm" colspan="3"><%= t('Totals') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(fixedRunRate) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(rows.reduce((sum, row) => sum + row.calculated, 0)) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(rows.reduce((sum, row) => sum + row.actual, 0)) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(rows.reduce((sum, row) => sum + row.variance, 0)) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <div class="mt-5 rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+          <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How these numbers are calculated') %></p>
+          <p class="mt-2"><%= t('Contribution margin = net revenue − variable costs. Break-even revenue = monthly fixed costs ÷ contribution margin ratio. Break-even units = monthly fixed costs ÷ contribution per unit.') %></p>
+          <p class="mt-1"><%= t('Product material cost uses the active BOM when available; otherwise the product net cost. Recoverable VAT is excluded. Cash break-even excludes non-cash fixed costs such as depreciation.') %></p>
+          <p class="mt-1"><%= t('One-off costs are included in operating profit for the period but excluded from the recurring break-even point.') %></p>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+  (function () {
+    const currency = <%- JSON.stringify(currency || 'USD') %>;
+    const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
+    const fixed = <%- JSON.stringify(Number(fixedRunRate) || 0) %>;
+    const variable = <%- JSON.stringify(Number(totalVariable) || 0) %>;
+    const oneOff = <%- JSON.stringify(Number(oneOffCost) || 0) %>;
+    const labels = [
+      <%- JSON.stringify(t('Fixed costs')) %>,
+      <%- JSON.stringify(t('Variable costs')) %>,
+      <%- JSON.stringify(t('One-off costs')) %>
+    ];
+    const isDark = () => document.documentElement.classList.contains('dark');
+    const chartEl = document.querySelector('#cost-structure-chart');
+    if (!chartEl || typeof ApexCharts === 'undefined') return;
+
+    function money(value) {
+      try {
+        return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value || 0));
+      } catch (e) {
+        return currency + ' ' + Number(value || 0).toFixed(0);
+      }
+    }
+
+    const values = oneOff > 0 ? [fixed, variable, oneOff] : [fixed, variable];
+    const shownLabels = oneOff > 0 ? labels : labels.slice(0, 2);
+    const hasData = values.some((value) => value > 0);
+    const chart = new ApexCharts(chartEl, {
+      chart: { type: 'donut', height: 230, fontFamily: 'Outfit, sans-serif', foreColor: isDark() ? '#98A2B3' : '#667085' },
+      series: hasData ? values : [1],
+      labels: hasData ? shownLabels : [<%- JSON.stringify(t('No data')) %>],
+      colors: hasData ? ['#465FFF', '#12B76A', '#F79009'] : ['#E4E7EC'],
+      stroke: { width: 0 },
+      legend: { show: false },
+      dataLabels: { enabled: false },
+      plotOptions: { pie: { donut: { size: '72%', labels: {
+        show: true,
+        name: { show: false },
+        value: { show: true, fontSize: '18px', fontWeight: 600, color: isDark() ? '#F9FAFB' : '#1D2939', formatter: (value) => money(value) },
+        total: { show: true, showAlways: true, label: <%- JSON.stringify(t('Total costs')) %>, fontSize: '12px', color: '#98A2B3', formatter: () => money(values.reduce((sum, value) => sum + value, 0)) }
+      } } } },
+      tooltip: { theme: isDark() ? 'dark' : 'light', y: { formatter: money } }
+    });
+    chart.render();
+    document.addEventListener('werp:theme', () => {
+      chart.updateOptions({
+        chart: { foreColor: isDark() ? '#98A2B3' : '#667085' },
+        tooltip: { theme: isDark() ? 'dark' : 'light' }
+      });
+    });
+  })();
+  </script>
+</div>

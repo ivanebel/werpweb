@@ -278,6 +278,20 @@ async function upgradeSchema(conn, dbName) {
   // ------------------------------------------------------- pallet slips
   await addColumn(conn, dbName, 'delivery_items', 'lot_number', 'VARCHAR(60) NULL AFTER slip_weight_kg');
   await addColumn(conn, dbName, 'delivery_items', 'expiry_date', 'DATE NULL AFTER lot_number');
+
+  // ------------------------------------------------- management finance
+  const [driverColumns] = await conn.query(
+    `SELECT COLUMN_TYPE AS column_type
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'cost_items' AND COLUMN_NAME = 'driver_type'
+      LIMIT 1`,
+    [dbName],
+  );
+  if (driverColumns.length && !String(driverColumns[0].column_type || driverColumns[0].COLUMN_TYPE).includes("'invoice'")) {
+    await conn.query(
+      "ALTER TABLE cost_items MODIFY COLUMN driver_type ENUM('unit','revenue_percent','material_percent','invoice','pallet','labor_hour') NULL",
+    );
+  }
 }
 
 async function main() {
