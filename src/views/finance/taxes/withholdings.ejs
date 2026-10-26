@@ -1,0 +1,172 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const typeLabels = {
+    none: t('Unclassified'),
+    iibb: t('IIBB (Ingresos Brutos)'),
+    income: t('Income tax'),
+    other: t('Other'),
+  };
+  const typeTone = {
+    none: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400',
+    iibb: 'bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400',
+    income: 'bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300',
+    other: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  };
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1600px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Tax withholdings') %></h1>
+          <p class="page-subtitle"><%= t('Classify the withholdings recorded on customer payments so they reduce the correct tax.') %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('IIBB withholdings reduce the jurisdiction balance. Income tax and other withholdings are shown separately.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/taxes?from=<%= range.from %>&to=<%= range.to %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Taxes') %>
+          </a>
+          <a href="/finance/taxes/perceptions?from=<%= range.from %>&to=<%= range.to %>" class="btn btn-secondary btn-sm"><%= t('IIBB perceptions') %></a>
+        </div>
+      </div>
+
+      <div class="card mb-5 p-4 md:p-5">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><%= t('Tax period') %></p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatDate(range.from, locale) %> – <%= h.formatDate(range.to, locale) %></p>
+          </div>
+          <form method="GET" action="/finance/taxes/withholdings" class="flex flex-wrap items-end gap-2">
+            <div>
+              <label for="withholding-from" class="form-label"><%= t('From') %></label>
+              <input id="withholding-from" name="from" type="date" value="<%= range.from %>" class="form-input">
+            </div>
+            <div>
+              <label for="withholding-to" class="form-label"><%= t('To') %></label>
+              <input id="withholding-to" name="to" type="date" value="<%= range.to %>" class="form-input">
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
+          </form>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Total withholdings') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(report.withholdings.total) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= h.pluralize(report.withholdings.count, 'record', 'records', locale) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('IIBB withholdings') %></p>
+          <p class="mt-2 text-2xl font-bold text-brand-600 dark:text-brand-400"><%= money(report.withholdings.byType.iibb) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Netted against IIBB') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Income tax') %></p>
+          <p class="mt-2 text-2xl font-bold text-blue-light-600 dark:text-blue-light-400"><%= money(report.withholdings.byType.income) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Income tax withholdings') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Unclassified') %></p>
+          <p class="mt-2 text-2xl font-bold <%= report.withholdings.unclassified_count ? 'text-warning-600 dark:text-warning-400' : 'text-gray-900 dark:text-white' %>"><%= money(report.withholdings.byType.none) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('{count} records', { count: report.withholdings.unclassified_count }) %></p>
+        </div>
+      </div>
+
+      <% if (report.withholdings.unclassified_count || report.withholdings.unassigned_iibb_count) { %>
+        <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+          <p class="font-semibold"><%= t('Some withholdings still need a classification.') %></p>
+          <p class="mt-1 opacity-90"><%= t('{unclassified} are unclassified and {unassigned} IIBB withholdings have no jurisdiction. They do not reduce IIBB until they are classified.', { unclassified: report.withholdings.unclassified_count, unassigned: report.withholdings.unassigned_iibb_count }) %></p>
+        </div>
+      <% } %>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Withholdings on customer payments') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Adjustment lines with kind “Tax withholding” from customer payments in this period.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(report.withholdings.count, 'record', 'records', locale) %></span>
+        </div>
+        <div class="table-wrap max-h-[600px] overflow-y-auto">
+          <table class="table-base min-w-[1250px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Date') %></th>
+                <th class="table-th"><%= t('Payment') %></th>
+                <th class="table-th"><%= t('Customer') %></th>
+                <th class="table-th"><%= t('Reference') %></th>
+                <th class="table-th text-right"><%= t('Amount') %></th>
+                <th class="table-th"><%= t('Classification') %></th>
+                <th class="table-th"><%= t('Change classification') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% report.withholdings.rows.forEach((row) => { %>
+                <tr class="table-row">
+                  <td class="table-td whitespace-nowrap"><%= h.formatDate(row.date, locale) %></td>
+                  <td class="table-td whitespace-nowrap"><a href="/payments/<%= row.payment_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.number %></a></td>
+                  <td class="table-td"><%= row.party_name %></td>
+                  <td class="table-td text-gray-500 dark:text-gray-400">
+                    <%= row.reference || '—' %>
+                    <% if (row.notes) { %><span class="mt-0.5 block text-xs text-gray-400"><%= row.notes %></span><% } %>
+                  </td>
+                  <td class="table-td text-right font-semibold"><%= money(row.amount) %></td>
+                  <td class="table-td">
+                    <span class="badge <%= typeTone[row.tax_type] || typeTone.none %>"><%= typeLabels[row.tax_type] || t('Unclassified') %></span>
+                    <% if (row.tax_type === 'iibb') { %>
+                      <% if (row.jurisdiction_id) { %><span class="mt-1 block text-xs text-gray-500 dark:text-gray-400"><%= row.jurisdiction_name %><% if (row.jurisdiction_code) { %> (<%= row.jurisdiction_code %>)<% } %></span>
+                      <% } else { %><span class="mt-1 block text-xs text-warning-600 dark:text-warning-400"><%= t('No jurisdiction') %></span><% } %>
+                    <% } %>
+                  </td>
+                  <td class="table-td">
+                    <form method="POST" action="/finance/taxes/withholdings/<%= row.id %>" class="flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="from" value="<%= range.from %>">
+                      <input type="hidden" name="to" value="<%= range.to %>">
+                      <div>
+                        <label class="sr-only" for="tax-type-<%= row.id %>"><%= t('Tax type') %></label>
+                        <select id="tax-type-<%= row.id %>" name="tax_type" class="form-select w-44">
+                          <% withholdingTypeOptions.forEach((option) => { %>
+                            <option value="<%= option.value %>" <%= row.tax_type === option.value ? 'selected' : '' %>><%= t(option.label) %></option>
+                          <% }) %>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="sr-only" for="jurisdiction-<%= row.id %>"><%= t('Jurisdiction') %></label>
+                        <select id="jurisdiction-<%= row.id %>" name="jurisdiction_id" class="form-select w-44">
+                          <option value=""><%= t('No jurisdiction') %></option>
+                          <% jurisdictions.forEach((jurisdiction) => { %>
+                            <option value="<%= jurisdiction.id %>" <%= String(row.jurisdiction_id || '') === String(jurisdiction.id) ? 'selected' : '' %>><%= jurisdiction.name %><%= jurisdiction.code ? ` (${jurisdiction.code})` : '' %></option>
+                          <% }) %>
+                        </select>
+                      </div>
+                      <button type="submit" class="btn btn-secondary btn-sm"><%= t('Save') %></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!report.withholdings.rows.length) { %>
+                <tr><td colspan="7" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No withholding adjustments on customer payments in this period.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+          <%= t('The jurisdiction is required only for IIBB withholdings. Income tax and other withholdings are kept outside the IIBB balance.') %>
+        </p>
+      </div>
+
+      <div class="mt-5 rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('Where these withholdings come from') %></p>
+        <p class="mt-2"><%= t('Withholdings are read from the adjustment lines of customer payments. They reduce the amount collected from the customer and are classified here for tax reporting.') %></p>
+        <p class="mt-1"><%= t('Supplier payment adjustments are not included in this estimate because they are withholdings practiced on suppliers, not credits against our own IIBB.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

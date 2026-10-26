@@ -24,6 +24,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Finance: sales simulator** — build saved sales scenarios with a product/customer basket, monthly quantities, net prices, discounts and optional cost overrides. Each scenario projects revenue, contribution, fixed costs, operating profit, break-even, product and customer margins, a BOM-based purchase plan net of stock and open purchase orders, a production plan and a simplified cash/working-capital estimate. Scenarios can be duplicated, locked, archived and compared side by side.
 - **Finance: cash flow** — a 13-week weekly and 12-month monthly cash forecast built from cash account balances, open receivables and payables, collection and payment profiles, open checks, recurring fixed costs and planned cash events. It includes AR/AP aging, collection-rate assumptions, a minimum cash buffer with funding-gap alerts, planned-event and fixed-cost detail, cash snapshots for actual-vs-forecast tracking, CSV export and a settings page. Cash amounts are gross cash movements; non-cash costs and future uninvoiced sales are not forecast automatically.
 - **Finance: price analysis** — search competitor product prices from the bundled Python scraper. Results are grouped by retailer (DIA and Carrefour), sorted from the lowest price, summarised with price ranges and averages, and each product opens the original store page in a new tab. The page is restricted to administrators and managers; searches are not stored in the ERP.
+- **Finance: taxes** — an Argentine-oriented management tax estimate for a date range: VAT by rate (output minus input), Ingresos Brutos by jurisdiction with configurable sales allocation and rates, IIBB perceptions linked to purchase invoices, withholdings classified from customer payments, and municipal tax. Credit notes reduce the corresponding amounts; a negative net is shown as a credit balance. Administrators configure jurisdictions and rates; managers can view the report and enter perceptions/classify withholdings. The report is based on invoices and payments, excludes POS sales, and is not a statutory tax return.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
 - **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
@@ -179,6 +180,7 @@ npm run test:finance
 npm run test:simulator
 npm run test:cashflow
 npm run test:prices
+npm run test:taxes
 ```
 
 ---
@@ -261,6 +263,25 @@ npm run test:prices
 5. Each **Open** button opens the original product page in a new tab. Prices are shown in ARS unless the scraper returns a different `currency`.
 6. Searches require outbound internet access from the server. The timeout is 90 seconds by default and can be changed with `PRICE_SCRAPER_TIMEOUT_MS`. Use `PYTHON_BIN` if Python is not on the server's `PATH`.
 7. Search results are displayed only for the current request; they are not saved in the ERP. If a store is unavailable, its section is empty and the other retailer's results are still shown.
+
+### Taxes
+
+1. Open **Finance → Taxes**. Administrators and managers can view the report. **Tax settings** are restricted to administrators.
+2. In **Tax settings**, create the jurisdictions you need (for example CABA, Buenos Aires or Córdoba). For each one set:
+   - **Sales share %**: the portion of gross sales attributed to that jurisdiction. Active shares should total 100%.
+   - **IIBB rate %** and **municipal rate %**.
+   - The **default jurisdiction** supplies the municipal rate and is highlighted in the report.
+
+   `npm run db:migrate` creates the tax tables and a **Main jurisdiction** placeholder with 0% rates. Rename it and set the real rates before relying on the estimate.
+3. Choose a date range (defaults to the current month) and review:
+   - VAT by rate: output VAT minus input VAT.
+   - Ingresos Brutos by jurisdiction: gross sales × sales share × IIBB rate, less perceptions and IIBB withholdings.
+   - Municipal tax: gross sales × the default jurisdiction municipal rate.
+   - Other withholdings (income tax and other), shown separately from IIBB.
+4. Use **IIBB perceptions** to record perceptions printed on purchase invoices. Select a received, paid or overdue purchase invoice, a jurisdiction and the amount. Credit notes reduce the jurisdiction total.
+5. Use **Tax withholdings** to classify the withholding adjustment lines recorded on customer payments as IIBB (with a jurisdiction), income tax or other. Unclassified withholdings are shown as a warning and do not reduce IIBB.
+6. The report includes sales invoices with status sent/paid/overdue and purchase invoices with status received/paid/overdue. Draft, cancelled and POS sales are excluded. Credit notes reduce the corresponding amounts in their document period.
+7. This is a management estimate, not a statutory tax return. Confirm rates, sales allocation and treatment with your accountant.
 
 ### Purchase invoice and stock
 
@@ -381,6 +402,7 @@ src/
     simulator.js         Sales scenario, purchase plan and cash calculations
     cashflow.js          AR/AP, checks, fixed costs, events and cash forecast
     priceAnalysis.js     Safe Python runner and competitor-price normalizer
+    taxes.js             VAT, IIBB, perceptions, withholdings and municipal tax
     documentTypes.js     Shared order/invoice definitions
     email.js             SMTP transport, validation and email rendering
     emailDocuments.js    Document loaders and email content builders

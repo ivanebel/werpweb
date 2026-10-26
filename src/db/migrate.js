@@ -300,6 +300,40 @@ async function upgradeSchema(conn, dbName) {
 
   // --------------------------------------------------------------- cash flow
   await conn.query('INSERT IGNORE INTO cash_flow_settings (id) VALUES (1)');
+
+  // ------------------------------------------------------------------- taxes
+  const addedSalesShare = await addColumn(conn, dbName, 'tax_jurisdictions', 'sales_share', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER name');
+  await addColumn(conn, dbName, 'payment_adjustments', 'tax_type', "ENUM('none','iibb','income','other') NOT NULL DEFAULT 'none' AFTER kind");
+  await addColumn(conn, dbName, 'payment_adjustments', 'jurisdiction_id', 'INT UNSIGNED NULL AFTER tax_type');
+  await addIndex(conn, dbName, 'payment_adjustments', 'idx_payment_adjustments_jurisdiction', 'KEY `idx_payment_adjustments_jurisdiction` (`jurisdiction_id`)');
+  await addConstraint(
+    conn,
+    dbName,
+    'payment_adjustments',
+    'fk_payment_adjustments_jurisdiction',
+    'FOREIGN KEY (`jurisdiction_id`) REFERENCES `tax_jurisdictions` (`id`) ON DELETE SET NULL',
+  );
+  await conn.query('INSERT IGNORE INTO tax_settings (id) VALUES (1)');
+  const [taxJurisdictionCount] = await conn.query('SELECT COUNT(*) AS count FROM tax_jurisdictions');
+  if (Number(taxJurisdictionCount[0].count) === 0) {
+    await conn.query(
+      "INSERT INTO tax_jurisdictions (code, name, sales_share, iibb_rate, municipal_rate, status) VALUES ('MAIN', 'Main jurisdiction', 100, 0, 0, 'active')",
+    );
+  }
+  await conn.query(
+    `UPDATE tax_settings
+        SET default_jurisdiction_id = (
+          SELECT id FROM tax_jurisdictions WHERE status = 'active' ORDER BY id LIMIT 1
+        )
+      WHERE id = 1 AND default_jurisdiction_id IS NULL`,
+  );
+  if (addedSalesShare) {
+    await conn.query(
+      `UPDATE tax_jurisdictions
+          SET sales_share = 100
+        WHERE id = (SELECT default_jurisdiction_id FROM tax_settings WHERE id = 1 LIMIT 1)`,
+    );
+  }
 }
 
 async function main() {

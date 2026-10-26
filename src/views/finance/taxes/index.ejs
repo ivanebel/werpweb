@@ -1,0 +1,454 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const netTone = (value) => Number(value) < 0
+    ? 'text-success-600 dark:text-success-400'
+    : Number(value) > 0
+      ? 'text-gray-900 dark:text-white'
+      : 'text-gray-400';
+  const signedMoney = (value) => `${Number(value) > 0 ? '+' : ''}${money(value)}`;
+  const perceptionByInvoice = new Map();
+  report.perceptions.rows.forEach((row) => {
+    const id = Number(row.invoice_id);
+    perceptionByInvoice.set(id, (perceptionByInvoice.get(id) || 0) + Number(row.signed_amount || 0));
+  });
+  const iibbCredits = Number(report.iibb.perceptions) + Number(report.iibb.withholdings);
+  const vatCredits = Number(report.vat.input);
+  const totalCalculated = Number(report.vat.output) + Number(report.iibb.calculated) + Number(report.municipal.amount);
+  const totalCredits = vatCredits + iibbCredits;
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1800px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Taxes') %></h1>
+            <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Management estimate') %></span>
+          </div>
+          <p class="page-subtitle"><%= t('Calculate VAT, Ingresos Brutos, perceptions, withholdings and municipal tax for a date range.') %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Based on issued sales invoices, received purchase invoices and customer payment withholdings. Not a statutory tax return.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/taxes/perceptions?<%= `from=${range.from}&to=${range.to}` %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'receipt', className: 'h-4 w-4' }) %>
+            <%= t('IIBB perceptions') %>
+          </a>
+          <a href="/finance/taxes/withholdings?<%= `from=${range.from}&to=${range.to}` %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %>
+            <%= t('Tax withholdings') %>
+          </a>
+          <% if (canManageTaxes) { %>
+            <a href="/finance/taxes/settings" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'cog', className: 'h-4 w-4' }) %>
+              <%= t('Tax settings') %>
+            </a>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card mb-5 p-4 md:p-5">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><%= t('Tax period') %></p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatDate(range.from, locale) %> – <%= h.formatDate(range.to, locale) %></p>
+            <p class="mt-0.5 text-xs text-gray-400"><%= t('Documents and payments are included by their document date.') %></p>
+          </div>
+          <div class="flex flex-wrap items-end gap-2">
+            <form method="GET" action="/finance/taxes" class="flex flex-wrap items-end gap-2">
+              <div>
+                <label for="tax-from" class="form-label"><%= t('From') %></label>
+                <input id="tax-from" name="from" type="date" value="<%= range.from %>" class="form-input">
+              </div>
+              <div>
+                <label for="tax-to" class="form-label"><%= t('To') %></label>
+                <input id="tax-to" name="to" type="date" value="<%= range.to %>" class="form-input">
+              </div>
+              <button type="submit" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
+            </form>
+            <a href="/finance/taxes?from=<%= thisMonth.from %>&to=<%= thisMonth.to %>" class="btn btn-ghost btn-sm"><%= t('This month') %></a>
+            <a href="/finance/taxes?from=<%= previousMonth.from %>&to=<%= previousMonth.to %>" class="btn btn-ghost btn-sm"><%= t('Previous month') %></a>
+          </div>
+        </div>
+      </div>
+
+      <% if (alerts && alerts.length) { %>
+        <div class="mb-5 space-y-3">
+          <% alerts.forEach((alert) => {
+            const tone = {
+              error: 'border-error-200 bg-error-50 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400',
+              warning: 'border-warning-200 bg-warning-50 text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400',
+              info: 'border-blue-light-200 bg-blue-light-50 text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300'
+            }[alert.tone] || 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300';
+          %>
+            <div class="flex flex-col gap-3 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between <%= tone %>">
+              <div class="flex items-start gap-3">
+                <%- include('/partials/icon', { name: alert.tone === 'warning' ? 'exclamation-triangle' : 'info', className: 'mt-0.5 h-5 w-5 shrink-0' }) %>
+                <div>
+                  <p class="font-semibold"><%= alert.title %></p>
+                  <p class="mt-0.5 opacity-90"><%= alert.message %></p>
+                </div>
+              </div>
+              <% if (alert.href) { %><a href="<%= alert.href %>" class="btn btn-secondary btn-sm shrink-0"><%= alert.action || t('Open') %></a><% } %>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('VAT net') %></p>
+          <p class="mt-2 text-2xl font-bold <%= netTone(report.vat.net) %>"><%= signedMoney(report.vat.net) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Output {output} · Input {input}', { output: money(report.vat.output), input: money(report.vat.input) }) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('IIBB net') %></p>
+          <p class="mt-2 text-2xl font-bold <%= netTone(report.iibb.net) %>"><%= signedMoney(report.iibb.net) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Calculated {calculated} · Credits {credits}', { calculated: money(report.iibb.calculated), credits: money(iibbCredits) }) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Municipal tax') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(report.municipal.amount) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('{rate}% of gross sales', { rate: h.formatNumber(report.municipal.rate, 2) }) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Tax position') %></p>
+          <p class="mt-2 text-2xl font-bold <%= netTone(report.totalPosition) %>"><%= signedMoney(report.totalPosition) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= report.totalPosition < 0 ? t('Estimated credit balance') : t('Estimated amount due') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Gross sales') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(report.sales.gross) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('{count} invoices · Net {net}', { count: report.sales.count, net: money(report.sales.net) }) %></p>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Tax position summary') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Estimated tax calculated for the selected period. Credits are shown as negative amounts.') %></p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[700px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Tax') %></th>
+                  <th class="table-th text-right"><%= t('Base') %></th>
+                  <th class="table-th text-right"><%= t('Calculated') %></th>
+                  <th class="table-th text-right"><%= t('Credits') %></th>
+                  <th class="table-th text-right"><%= t('Net') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="table-row">
+                  <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= t('VAT') %></td>
+                  <td class="table-td text-right"><%= money(report.sales.net) %></td>
+                  <td class="table-td text-right"><%= money(report.vat.output) %></td>
+                  <td class="table-td text-right"><%= money(report.vat.input) %></td>
+                  <td class="table-td text-right font-semibold <%= netTone(report.vat.net) %>"><%= signedMoney(report.vat.net) %></td>
+                </tr>
+                <tr class="table-row">
+                  <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= t('IIBB') %></td>
+                  <td class="table-td text-right"><%= money(report.iibb.sales_base_total) %></td>
+                  <td class="table-td text-right"><%= money(report.iibb.calculated) %></td>
+                  <td class="table-td text-right"><%= money(iibbCredits) %></td>
+                  <td class="table-td text-right font-semibold <%= netTone(report.iibb.net) %>"><%= signedMoney(report.iibb.net) %></td>
+                </tr>
+                <tr class="table-row">
+                  <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= t('Municipal tax') %></td>
+                  <td class="table-td text-right"><%= money(report.municipal.base) %></td>
+                  <td class="table-td text-right"><%= money(report.municipal.amount) %></td>
+                  <td class="table-td text-right">—</td>
+                  <td class="table-td text-right font-semibold <%= netTone(report.municipal.amount) %>"><%= signedMoney(report.municipal.amount) %></td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                  <td class="px-3 py-3 text-right text-sm">—</td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(totalCalculated) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(totalCredits) %></td>
+                  <td class="px-3 py-3 text-right text-sm <%= netTone(report.totalPosition) %>"><%= signedMoney(report.totalPosition) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+            <%= t('VAT credits are input VAT. IIBB credits are perceptions plus IIBB withholdings.') %>
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('VAT by rate') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Output and input VAT extracted from tax-inclusive invoice lines.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} rates', { count: report.vat.byRate.length }) %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[700px]">
+              <thead>
+                <tr>
+                  <th class="table-th text-right"><%= t('Rate') %></th>
+                  <th class="table-th text-right"><%= t('Sales base') %></th>
+                  <th class="table-th text-right"><%= t('Output VAT') %></th>
+                  <th class="table-th text-right"><%= t('Purchase base') %></th>
+                  <th class="table-th text-right"><%= t('Input VAT') %></th>
+                  <th class="table-th text-right"><%= t('Net VAT') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% report.vat.byRate.forEach((row) => { %>
+                  <tr class="table-row">
+                    <td class="table-td text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatNumber(row.rate, 2) %>%</td>
+                    <td class="table-td text-right"><%= money(row.sales_base) %></td>
+                    <td class="table-td text-right"><%= money(row.sales_vat) %></td>
+                    <td class="table-td text-right"><%= money(row.purchase_base) %></td>
+                    <td class="table-td text-right"><%= money(row.purchase_vat) %></td>
+                    <td class="table-td text-right font-semibold <%= netTone(row.net_vat) %>"><%= signedMoney(row.net_vat) %></td>
+                  </tr>
+                <% }) %>
+                <% if (!report.vat.byRate.length) { %>
+                  <tr><td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No VAT movements in this period.') %></td></tr>
+                <% } %>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(report.sales.net) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(report.vat.output) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(report.purchases.net) %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(report.vat.input) %></td>
+                  <td class="px-3 py-3 text-right text-sm <%= netTone(report.vat.net) %>"><%= signedMoney(report.vat.net) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('IIBB by jurisdiction') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Gross sales are allocated by each active jurisdiction share and multiplied by its IIBB rate. Perceptions and withholdings are credited by jurisdiction.') %></p>
+          </div>
+          <span class="rounded-full px-3 py-1.5 text-xs font-medium <%= Math.abs(Number(report.iibb.sales_share_total) - 100) <= 0.01 ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' %>">
+            <%= t('Sales allocation: {total}%', { total: h.formatNumber(report.iibb.sales_share_total, 2) }) %>
+          </span>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[1050px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Jurisdiction') %></th>
+                <th class="table-th text-right"><%= t('Sales share') %></th>
+                <th class="table-th text-right"><%= t('IIBB rate') %></th>
+                <th class="table-th text-right"><%= t('Sales base') %></th>
+                <th class="table-th text-right"><%= t('Calculated') %></th>
+                <th class="table-th text-right"><%= t('Perceptions') %></th>
+                <th class="table-th text-right"><%= t('Withholdings') %></th>
+                <th class="table-th text-right"><%= t('Net') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% report.iibb.rows.forEach((row) => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <p class="font-medium text-gray-800 dark:text-gray-200">
+                      <%= row.unassigned ? t('Unassigned') : row.name %>
+                      <% if (row.is_default) { %><span class="ml-2 badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Default') %></span><% } %>
+                    </p>
+                    <% if (row.code && !row.unassigned) { %><p class="text-xs font-mono text-gray-400"><%= row.code %></p><% } %>
+                  </td>
+                  <td class="table-td text-right"><%= row.unassigned ? '—' : `${h.formatNumber(row.sales_share, 2)}%` %></td>
+                  <td class="table-td text-right"><%= row.unassigned ? '—' : `${h.formatNumber(row.rate, 2)}%` %></td>
+                  <td class="table-td text-right"><%= money(row.sales_base) %></td>
+                  <td class="table-td text-right"><%= money(row.calculated) %></td>
+                  <td class="table-td text-right"><%= row.perceptions ? money(row.perceptions) : '—' %></td>
+                  <td class="table-td text-right"><%= row.withholdings ? money(row.withholdings) : '—' %></td>
+                  <td class="table-td text-right font-semibold <%= netTone(row.net) %>">
+                    <%= signedMoney(row.net) %>
+                    <% if (row.net < 0) { %><span class="ml-1 text-[10px] uppercase tracking-wide"><%= t('Credit') %></span><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!report.iibb.rows.length) { %>
+                <tr><td colspan="8" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('Configure at least one jurisdiction to calculate IIBB.') %></td></tr>
+              <% } %>
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= h.formatNumber(report.iibb.sales_share_total, 2) %>%</td>
+                <td class="px-3 py-3 text-right text-sm">—</td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.sales_base_total) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.calculated) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.perceptions) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.withholdings) %></td>
+                <td class="px-3 py-3 text-right text-sm <%= netTone(report.iibb.net) %>"><%= signedMoney(report.iibb.net) %></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+          <%= t('A negative net amount is a credit balance (saldo a favor) for that jurisdiction. The total IIBB position can be a credit.') %>
+        </p>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Municipal tax') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Calculated on gross sales using the default jurisdiction municipal rate.') %></p>
+            </div>
+          </div>
+          <dl class="space-y-3 p-5 text-sm">
+            <div class="flex items-center justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Default jurisdiction') %></dt><dd class="font-medium text-gray-800 dark:text-gray-200"><%= report.defaultJurisdiction ? report.defaultJurisdiction.name : t('Not configured') %></dd></div>
+            <div class="flex items-center justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Gross sales') %></dt><dd class="font-medium text-gray-800 dark:text-gray-200"><%= money(report.municipal.base) %></dd></div>
+            <div class="flex items-center justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Municipal rate') %></dt><dd class="font-medium text-gray-800 dark:text-gray-200"><%= h.formatNumber(report.municipal.rate, 2) %>%</dd></div>
+            <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-3 dark:border-gray-800"><dt class="font-semibold text-gray-700 dark:text-gray-200"><%= t('Municipal tax') %></dt><dd class="text-lg font-bold text-gray-900 dark:text-white"><%= money(report.municipal.amount) %></dd></div>
+          </dl>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Other withholdings') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Income tax and other withholdings recorded on customer payments. These are not netted against IIBB.') %></p>
+            </div>
+            <a href="/finance/taxes/withholdings?from=<%= range.from %>&to=<%= range.to %>" class="btn btn-secondary btn-sm"><%= t('Classify') %></a>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Type') %></th>
+                  <th class="table-th text-right"><%= t('Amount') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="table-row"><td class="table-td"><%= t('Income tax') %></td><td class="table-td text-right"><%= money(report.otherWithholdings.income) %></td></tr>
+                <tr class="table-row"><td class="table-td"><%= t('Other') %></td><td class="table-td text-right"><%= money(report.otherWithholdings.other) %></td></tr>
+                <tr class="table-row"><td class="table-td"><%= t('Unclassified') %></td><td class="table-td text-right"><%= money(report.otherWithholdings.unclassified) %></td></tr>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(report.otherWithholdings.income + report.otherWithholdings.other + report.otherWithholdings.unclassified) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Sales invoices') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Net, VAT and gross amounts by issued invoice. Credit notes reduce the period totals.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} invoices', { count: report.sales.count }) %></span>
+        </div>
+        <div class="table-wrap max-h-[480px] overflow-y-auto">
+          <table class="table-base min-w-[1000px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Date') %></th>
+                <th class="table-th"><%= t('Invoice') %></th>
+                <th class="table-th"><%= t('Customer') %></th>
+                <th class="table-th"><%= t('Document type') %></th>
+                <th class="table-th text-right"><%= t('Net') %></th>
+                <th class="table-th text-right"><%= t('VAT') %></th>
+                <th class="table-th text-right"><%= t('Gross') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% report.sales.invoices.forEach((invoice) => { %>
+                <tr class="table-row">
+                  <td class="table-td whitespace-nowrap"><%= h.formatDate(invoice.date, locale) %></td>
+                  <td class="table-td whitespace-nowrap"><a href="/sales/<%= invoice.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= invoice.number %></a></td>
+                  <td class="table-td"><%= invoice.party_name %></td>
+                  <td class="table-td">
+                    <span class="text-gray-600 dark:text-gray-300"><%= invoice.document_type_name || '—' %></span>
+                    <% if (invoice.sign < 0) { %><span class="ml-2 badge bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300"><%= t('Credit note') %></span><% } %>
+                  </td>
+                  <td class="table-td text-right"><%= money(invoice.net) %></td>
+                  <td class="table-td text-right"><%= money(invoice.vat) %></td>
+                  <td class="table-td text-right font-semibold"><%= money(invoice.gross) %></td>
+                </tr>
+              <% }) %>
+              <% if (!report.sales.invoices.length) { %>
+                <tr><td colspan="7" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No sales invoices in this period.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Purchase invoices') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Net, VAT, gross and IIBB perceptions by received invoice.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} invoices', { count: report.purchases.count }) %></span>
+        </div>
+        <div class="table-wrap max-h-[480px] overflow-y-auto">
+          <table class="table-base min-w-[1100px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Date') %></th>
+                <th class="table-th"><%= t('Bill') %></th>
+                <th class="table-th"><%= t('Supplier') %></th>
+                <th class="table-th"><%= t('Document type') %></th>
+                <th class="table-th text-right"><%= t('Net') %></th>
+                <th class="table-th text-right"><%= t('VAT') %></th>
+                <th class="table-th text-right"><%= t('Gross') %></th>
+                <th class="table-th text-right"><%= t('Perceptions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% report.purchases.invoices.forEach((invoice) => { const perceptions = perceptionByInvoice.get(Number(invoice.id)) || 0; %>
+                <tr class="table-row">
+                  <td class="table-td whitespace-nowrap"><%= h.formatDate(invoice.date, locale) %></td>
+                  <td class="table-td whitespace-nowrap"><a href="/purchases/<%= invoice.id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= invoice.number %></a></td>
+                  <td class="table-td"><%= invoice.party_name %></td>
+                  <td class="table-td">
+                    <span class="text-gray-600 dark:text-gray-300"><%= invoice.document_type_name || '—' %></span>
+                    <% if (invoice.sign < 0) { %><span class="ml-2 badge bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300"><%= t('Credit note') %></span><% } %>
+                  </td>
+                  <td class="table-td text-right"><%= money(invoice.net) %></td>
+                  <td class="table-td text-right"><%= money(invoice.vat) %></td>
+                  <td class="table-td text-right font-semibold"><%= money(invoice.gross) %></td>
+                  <td class="table-td text-right"><%= perceptions ? money(perceptions) : '—' %></td>
+                </tr>
+              <% }) %>
+              <% if (!report.purchases.invoices.length) { %>
+                <tr><td colspan="8" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No purchase invoices in this period.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How these taxes are calculated') %></p>
+        <p class="mt-2"><%= t('VAT is extracted from tax-inclusive sales and purchase invoice lines, grouped by rate. Document discounts are allocated proportionally. Output VAT minus input VAT is the estimated VAT position.') %></p>
+        <p class="mt-1"><%= t('IIBB applies each active jurisdiction sales share to gross sales, then multiplies by its IIBB rate. Perceptions linked to purchase invoices and IIBB withholdings classified from customer payments reduce the jurisdiction balance.') %></p>
+        <p class="mt-1"><%= t('Municipal tax applies the default jurisdiction municipal rate to gross sales.') %></p>
+        <p class="mt-1"><%= t('Credit notes reduce the corresponding sales, purchase and tax amounts in their document period. Draft and cancelled documents are excluded. POS sales are not included in this estimate.') %></p>
+        <p class="mt-1"><%= t('This is a management estimate, not a statutory tax return. Confirm rates and treatment with your accountant before filing.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

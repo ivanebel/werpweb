@@ -1,0 +1,220 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const isCreditNote = (name) => String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .includes('NOTA DE CREDITO');
+  const perceptionTotal = Number(report.perceptions.total) || 0;
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('IIBB perceptions') %></h1>
+          <p class="page-subtitle"><%= t('Record Ingresos Brutos perceptions received on purchase invoices, by jurisdiction.') %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('The amount is entered as printed on the purchase document. Credit notes reduce the jurisdiction total.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/taxes?from=<%= range.from %>&to=<%= range.to %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Taxes') %>
+          </a>
+          <a href="/finance/taxes/withholdings?from=<%= range.from %>&to=<%= range.to %>" class="btn btn-secondary btn-sm"><%= t('Tax withholdings') %></a>
+        </div>
+      </div>
+
+      <div class="card mb-5 p-4 md:p-5">
+        <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><%= t('Tax period') %></p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatDate(range.from, locale) %> – <%= h.formatDate(range.to, locale) %></p>
+          </div>
+          <form method="GET" action="/finance/taxes/perceptions" class="flex flex-wrap items-end gap-2">
+            <div>
+              <label for="perception-from" class="form-label"><%= t('From') %></label>
+              <input id="perception-from" name="from" type="date" value="<%= range.from %>" class="form-input">
+            </div>
+            <div>
+              <label for="perception-to" class="form-label"><%= t('To') %></label>
+              <input id="perception-to" name="to" type="date" value="<%= range.to %>" class="form-input">
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
+          </form>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Total perceptions') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(perceptionTotal) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Signed amount, net of credit notes') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Perception records') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= report.perceptions.count %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Linked to purchase invoices') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Jurisdictions with perceptions') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= report.perceptions.byJurisdiction.filter((row) => Number(row.amount) !== 0).length %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Active period totals') %></p>
+        </div>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Add perception') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Select a received, paid or overdue purchase invoice and enter the perception for one jurisdiction.') %></p>
+          </div>
+        </div>
+        <form method="POST" action="/finance/taxes/perceptions" class="p-5">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="from" value="<%= range.from %>">
+          <input type="hidden" name="to" value="<%= range.to %>">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+            <div class="md:col-span-5">
+              <label for="perception-invoice" class="form-label"><%= t('Purchase invoice') %> <span class="text-error-500">*</span></label>
+              <select id="perception-invoice" name="invoice_id" class="form-select <%= errors.invoice_id ? 'form-input-error' : '' %>" required>
+                <option value=""><%= t('Select a purchase invoice') %></option>
+                <% purchaseInvoices.forEach((invoice) => { %>
+                  <option value="<%= invoice.id %>" <%= String(values.invoice_id) === String(invoice.id) ? 'selected' : '' %>>
+                    <%= invoice.number %> · <%= h.formatDate(invoice.date, locale) %> · <%= invoice.party_name %> · <%= money(invoice.total) %><%= isCreditNote(invoice.document_type_name) ? ` (${t('Credit note')})` : '' %>
+                  </option>
+                <% }) %>
+              </select>
+              <% if (errors.invoice_id) { %><p class="form-error"><%= errors.invoice_id %></p><% } %>
+              <% if (!purchaseInvoices.length) { %><p class="form-help text-warning-600 dark:text-warning-400"><%= t('No eligible purchase invoices in this period.') %></p><% } %>
+            </div>
+            <div class="md:col-span-3">
+              <label for="perception-jurisdiction" class="form-label"><%= t('Jurisdiction') %> <span class="text-error-500">*</span></label>
+              <select id="perception-jurisdiction" name="jurisdiction_id" class="form-select <%= errors.jurisdiction_id ? 'form-input-error' : '' %>" required>
+                <option value=""><%= t('Select a jurisdiction') %></option>
+                <% jurisdictions.forEach((jurisdiction) => { %>
+                  <option value="<%= jurisdiction.id %>" <%= String(values.jurisdiction_id) === String(jurisdiction.id) ? 'selected' : '' %>><%= jurisdiction.name %><%= jurisdiction.code ? ` (${jurisdiction.code})` : '' %></option>
+                <% }) %>
+              </select>
+              <% if (errors.jurisdiction_id) { %><p class="form-error"><%= errors.jurisdiction_id %></p><% } %>
+            </div>
+            <div class="md:col-span-2">
+              <label for="perception-amount" class="form-label"><%= t('Amount') %> <span class="text-error-500">*</span></label>
+              <input id="perception-amount" name="amount" type="number" min="0.01" step="0.01" value="<%= values.amount %>" class="form-input text-right <%= errors.amount ? 'form-input-error' : '' %>" required>
+              <% if (errors.amount) { %><p class="form-error"><%= errors.amount %></p><% } %>
+            </div>
+            <div class="md:col-span-2">
+              <label for="perception-reference" class="form-label"><%= t('Reference') %></label>
+              <input id="perception-reference" name="reference" type="text" maxlength="120" value="<%= values.reference %>" class="form-input <%= errors.reference ? 'form-input-error' : '' %>" placeholder="<%= t('Optional') %>">
+              <% if (errors.reference) { %><p class="form-error"><%= errors.reference %></p><% } %>
+            </div>
+            <div class="md:col-span-10">
+              <label for="perception-notes" class="form-label"><%= t('Notes') %></label>
+              <input id="perception-notes" name="notes" type="text" maxlength="255" value="<%= values.notes %>" class="form-input <%= errors.notes ? 'form-input-error' : '' %>" placeholder="<%= t('Optional details') %>">
+              <% if (errors.notes) { %><p class="form-error"><%= errors.notes %></p><% } %>
+            </div>
+            <div class="flex items-end md:col-span-2">
+              <button type="submit" class="btn btn-primary w-full">
+                <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+                <%= t('Add') %>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Perceptions by jurisdiction') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Period totals used to reduce the IIBB balance.') %></p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Jurisdiction') %></th>
+                <th class="table-th text-right"><%= t('Amount') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% report.perceptions.byJurisdiction.forEach((row) => { %>
+                <tr class="table-row">
+                  <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= row.name %><% if (row.code) { %> <span class="font-mono text-xs text-gray-400"><%= row.code %></span><% } %></td>
+                  <td class="table-td text-right font-semibold"><%= money(row.amount) %></td>
+                </tr>
+              <% }) %>
+              <% if (!report.perceptions.byJurisdiction.length) { %>
+                <tr><td colspan="2" class="px-6 py-8 text-center text-sm text-gray-400"><%= t('No perceptions recorded in this period.') %></td></tr>
+              <% } %>
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(report.perceptions.total) %></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Recorded perceptions') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Perception entries linked to purchase invoices in this period.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(report.perceptions.count, 'record', 'records', locale) %></span>
+        </div>
+        <div class="table-wrap max-h-[520px] overflow-y-auto">
+          <table class="table-base min-w-[1000px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Date') %></th>
+                <th class="table-th"><%= t('Invoice') %></th>
+                <th class="table-th"><%= t('Supplier') %></th>
+                <th class="table-th"><%= t('Jurisdiction') %></th>
+                <th class="table-th text-right"><%= t('Amount') %></th>
+                <th class="table-th"><%= t('Reference') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% report.perceptions.rows.forEach((row) => { %>
+                <tr class="table-row">
+                  <td class="table-td whitespace-nowrap"><%= h.formatDate(row.date, locale) %></td>
+                  <td class="table-td whitespace-nowrap">
+                    <a href="/purchases/<%= row.invoice_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.number %></a>
+                    <% if (row.is_credit_note) { %><span class="ml-2 badge bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300"><%= t('Credit note') %></span><% } %>
+                  </td>
+                  <td class="table-td"><%= row.party_name %></td>
+                  <td class="table-td"><%= row.jurisdiction_name %><% if (row.jurisdiction_code) { %> <span class="font-mono text-xs text-gray-400"><%= row.jurisdiction_code %></span><% } %></td>
+                  <td class="table-td text-right font-semibold"><%= money(row.signed_amount) %></td>
+                  <td class="table-td text-gray-500 dark:text-gray-400"><%= row.reference || '—' %><% if (row.notes) { %><span class="mt-0.5 block text-xs text-gray-400"><%= row.notes %></span><% } %></td>
+                  <td class="table-td text-right">
+                    <form action="/finance/taxes/perceptions/<%= row.id %>/delete" method="POST" class="inline" data-confirm="<%= t('Delete this perception?') %>">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="from" value="<%= range.from %>">
+                      <input type="hidden" name="to" value="<%= range.to %>">
+                      <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete') %>">
+                        <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!report.perceptions.rows.length) { %>
+                <tr><td colspan="7" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No perceptions recorded in this period.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -690,6 +690,61 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_items (
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------------
+-- Tax reporting configuration. The default jurisdiction supplies the IIBB and
+-- municipal rates applied to gross sales; all jurisdictions can receive
+-- perceptions and withholdings.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS tax_jurisdictions (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code           VARCHAR(20) NOT NULL,
+  name           VARCHAR(120) NOT NULL,
+  sales_share    DECIMAL(5,2) NOT NULL DEFAULT 0,
+  iibb_rate      DECIMAL(5,2) NOT NULL DEFAULT 0,
+  municipal_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+  status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tax_jurisdictions_code (code),
+  UNIQUE KEY uq_tax_jurisdictions_name (name),
+  KEY idx_tax_jurisdictions_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS tax_settings (
+  id                      TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  default_jurisdiction_id INT UNSIGNED NULL,
+  updated_by              INT UNSIGNED NULL,
+  updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_tax_settings_jurisdiction FOREIGN KEY (default_jurisdiction_id)
+    REFERENCES tax_jurisdictions (id) ON DELETE SET NULL,
+  CONSTRAINT fk_tax_settings_updated_by FOREIGN KEY (updated_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS purchase_invoice_perceptions (
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  invoice_id      INT UNSIGNED NOT NULL,
+  jurisdiction_id INT UNSIGNED NOT NULL,
+  amount          DECIMAL(14,2) NOT NULL DEFAULT 0,
+  reference       VARCHAR(120) NULL,
+  notes           VARCHAR(255) NULL,
+  created_by      INT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_purchase_invoice_perceptions_invoice (invoice_id),
+  KEY idx_purchase_invoice_perceptions_jurisdiction (jurisdiction_id),
+  CONSTRAINT fk_purchase_invoice_perceptions_invoice FOREIGN KEY (invoice_id)
+    REFERENCES purchase_invoices (id) ON DELETE CASCADE,
+  CONSTRAINT fk_purchase_invoice_perceptions_jurisdiction FOREIGN KEY (jurisdiction_id)
+    REFERENCES tax_jurisdictions (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_purchase_invoice_perceptions_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS payments (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   payment_no        VARCHAR(30) NOT NULL,
@@ -761,17 +816,22 @@ CREATE TABLE IF NOT EXISTS payment_methods (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS payment_adjustments (
-  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  payment_id INT UNSIGNED NOT NULL,
-  kind       ENUM('credit_note','debit_note','withholding') NOT NULL,
-  amount     DECIMAL(14,2) NOT NULL DEFAULT 0,
-  reference  VARCHAR(120) NULL,
-  notes      VARCHAR(255) NULL,
-  sort_order INT NOT NULL DEFAULT 0,
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  payment_id      INT UNSIGNED NOT NULL,
+  kind            ENUM('credit_note','debit_note','withholding') NOT NULL,
+  tax_type        ENUM('none','iibb','income','other') NOT NULL DEFAULT 'none',
+  jurisdiction_id INT UNSIGNED NULL,
+  amount          DECIMAL(14,2) NOT NULL DEFAULT 0,
+  reference       VARCHAR(120) NULL,
+  notes           VARCHAR(255) NULL,
+  sort_order      INT NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_payment_adjustments_payment (payment_id),
+  KEY idx_payment_adjustments_jurisdiction (jurisdiction_id),
   CONSTRAINT fk_payment_adjustments_payment FOREIGN KEY (payment_id)
-    REFERENCES payments (id) ON DELETE CASCADE
+    REFERENCES payments (id) ON DELETE CASCADE,
+  CONSTRAINT fk_payment_adjustments_jurisdiction FOREIGN KEY (jurisdiction_id)
+    REFERENCES tax_jurisdictions (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

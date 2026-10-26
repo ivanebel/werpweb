@@ -1,0 +1,203 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const activeJurisdictions = jurisdictions.filter((row) => row.status === 'active');
+  const salesShareTotal = activeJurisdictions.reduce((sum, row) => sum + (Number(row.sales_share) || 0), 0);
+  const isEditing = Boolean(editJurisdiction);
+  const formValues = values || {};
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Tax settings') %></h1>
+            <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Administrators only') %></span>
+          </div>
+          <p class="page-subtitle"><%= t('Configure the jurisdictions, sales allocation and rates used by the tax estimate.') %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Only administrators can change these settings.') %></p>
+        </div>
+        <a href="/finance/taxes" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Taxes') %>
+        </a>
+      </div>
+
+      <% if (errorForm === 'create' || errorForm === 'edit') { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <p class="font-semibold"><%= t('The jurisdiction could not be saved:') %></p>
+          <ul class="mt-1 list-inside list-disc space-y-1">
+            <% Object.values(errors).forEach((message) => { %><li><%= message %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-1">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Default jurisdiction') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The default jurisdiction supplies the municipal rate. Its sales share and IIBB rate also participate in the IIBB calculation.') %></p>
+              </div>
+            </div>
+            <form method="POST" action="/finance/taxes/settings" class="space-y-4 p-5">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <div>
+                <label for="default-jurisdiction" class="form-label"><%= t('Default jurisdiction') %></label>
+                <select id="default-jurisdiction" name="default_jurisdiction_id" class="form-select" required <%= activeJurisdictions.length ? '' : 'disabled' %>>
+                  <option value=""><%= t('Select a jurisdiction') %></option>
+                  <% activeJurisdictions.forEach((jurisdiction) => { %>
+                    <option value="<%= jurisdiction.id %>" <%= String(defaultId) === String(jurisdiction.id) ? 'selected' : '' %>><%= jurisdiction.name %><%= jurisdiction.code ? ` (${jurisdiction.code})` : '' %></option>
+                  <% }) %>
+                </select>
+                <% if (!activeJurisdictions.length) { %><p class="form-help text-warning-600 dark:text-warning-400"><%= t('Create an active jurisdiction first.') %></p><% } %>
+              </div>
+              <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs dark:border-gray-800 dark:bg-gray-800/60">
+                <span class="text-gray-500 dark:text-gray-400"><%= t('Active sales allocation') %></span>
+                <span class="font-semibold <%= Math.abs(salesShareTotal - 100) <= 0.01 ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400' %>"><%= h.formatNumber(salesShareTotal, 2) %>%</span>
+              </div>
+              <% if (Math.abs(salesShareTotal - 100) > 0.01) { %>
+                <p class="text-xs text-warning-600 dark:text-warning-400"><%= t('Active jurisdiction shares should total 100% so IIBB is calculated on all gross sales.') %></p>
+              <% } %>
+              <button type="submit" class="btn btn-primary w-full" <%= activeJurisdictions.length ? '' : 'disabled' %>>
+                <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                <%= t('Save default jurisdiction') %>
+              </button>
+            </form>
+          </div>
+
+          <div class="rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+            <p class="font-semibold"><%= t('How the rates are used') %></p>
+            <p class="mt-1"><%= t('Sales share assigns a portion of gross sales to each jurisdiction. IIBB = gross sales × sales share × IIBB rate.') %></p>
+            <p class="mt-1"><%= t('Municipal tax = gross sales × the default jurisdiction municipal rate.') %></p>
+            <p class="mt-1"><%= t('Perceptions and IIBB withholdings are credited to their own jurisdiction, so a jurisdiction can end with a credit balance.') %></p>
+          </div>
+        </div>
+
+        <div class="card xl:col-span-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Jurisdictions') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Provinces or tax jurisdictions used for IIBB, perceptions and withholdings.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(jurisdictions.length, 'jurisdiction', 'jurisdictions', locale) %></span>
+          </div>
+
+          <div class="border-b border-gray-100 p-5 dark:border-gray-800">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= isEditing ? t('Edit jurisdiction') : t('Add jurisdiction') %></h3>
+            <form method="POST" action="<%= isEditing ? `/finance/taxes/jurisdictions/${editJurisdiction.id}` : '/finance/taxes/jurisdictions' %>" class="mt-3 space-y-3">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                <div class="sm:col-span-3">
+                  <label for="jurisdiction-code" class="form-label"><%= t('Code') %> <span class="text-error-500">*</span></label>
+                  <input id="jurisdiction-code" name="code" type="text" maxlength="20" required value="<%= formValues.code || '' %>" class="form-input font-mono <%= errors.code && (errorForm === 'create' || errorForm === 'edit') ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. CABA') %>">
+                  <% if (errors.code && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.code %></p><% } %>
+                </div>
+                <div class="sm:col-span-5">
+                  <label for="jurisdiction-name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+                  <input id="jurisdiction-name" name="name" type="text" maxlength="120" required value="<%= formValues.name || '' %>" class="form-input <%= errors.name && (errorForm === 'create' || errorForm === 'edit') ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Ciudad Autónoma de Buenos Aires') %>">
+                  <% if (errors.name && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.name %></p><% } %>
+                </div>
+                <div class="sm:col-span-2">
+                  <label for="jurisdiction-share" class="form-label"><%= t('Sales share %') %></label>
+                  <input id="jurisdiction-share" name="sales_share" type="number" min="0" max="100" step="0.01" required value="<%= formValues.sales_share !== undefined ? formValues.sales_share : '0.00' %>" class="form-input text-right <%= errors.sales_share && (errorForm === 'create' || errorForm === 'edit') ? 'form-input-error' : '' %>">
+                  <% if (errors.sales_share && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.sales_share %></p><% } %>
+                </div>
+                <div class="sm:col-span-2">
+                  <label for="jurisdiction-status" class="form-label"><%= t('Status') %></label>
+                  <select id="jurisdiction-status" name="status" class="form-select">
+                    <option value="active" <%= formValues.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+                    <option value="inactive" <%= formValues.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+                  </select>
+                  <% if (errors.status && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.status %></p><% } %>
+                </div>
+                <div class="sm:col-span-3">
+                  <label for="jurisdiction-iibb" class="form-label"><%= t('IIBB rate (%)') %></label>
+                  <input id="jurisdiction-iibb" name="iibb_rate" type="number" min="0" max="100" step="0.01" required value="<%= formValues.iibb_rate !== undefined ? formValues.iibb_rate : '0.00' %>" class="form-input text-right <%= errors.iibb_rate && (errorForm === 'create' || errorForm === 'edit') ? 'form-input-error' : '' %>">
+                  <% if (errors.iibb_rate && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.iibb_rate %></p><% } %>
+                </div>
+                <div class="sm:col-span-3">
+                  <label for="jurisdiction-municipal" class="form-label"><%= t('Municipal rate (%)') %></label>
+                  <input id="jurisdiction-municipal" name="municipal_rate" type="number" min="0" max="100" step="0.01" required value="<%= formValues.municipal_rate !== undefined ? formValues.municipal_rate : '0.00' %>" class="form-input text-right <%= errors.municipal_rate && (errorForm === 'create' || errorForm === 'edit') ? 'form-input-error' : '' %>">
+                  <% if (errors.municipal_rate && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.municipal_rate %></p><% } %>
+                </div>
+                <div class="flex items-end gap-2 sm:col-span-6">
+                  <% if (isEditing) { %><a href="/finance/taxes/settings" class="btn btn-secondary btn-sm"><%= t('Cancel') %></a><% } %>
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                    <%= isEditing ? t('Save') : t('Add') %>
+                  </button>
+                </div>
+              </div>
+              <p class="form-help"><%= t('Sales share is the percentage of gross sales attributed to this jurisdiction. Active shares should total 100%. Rates are percentages, not amounts.') %></p>
+            </form>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table-base min-w-[900px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Jurisdiction') %></th>
+                  <th class="table-th text-right"><%= t('Sales share') %></th>
+                  <th class="table-th text-right"><%= t('IIBB rate') %></th>
+                  <th class="table-th text-right"><%= t('Municipal rate') %></th>
+                  <th class="table-th"><%= t('Status') %></th>
+                  <th class="table-th"><%= t('Used by') %></th>
+                  <th class="table-th text-right"><%= t('Actions') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% jurisdictions.forEach((jurisdiction) => { %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= jurisdiction.name %><% if (jurisdiction.is_default) { %><span class="ml-2 badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Default') %></span><% } %></p>
+                      <p class="font-mono text-xs text-gray-400"><%= jurisdiction.code %></p>
+                    </td>
+                    <td class="table-td text-right"><%= h.formatNumber(jurisdiction.sales_share, 2) %>%</td>
+                    <td class="table-td text-right"><%= h.formatNumber(jurisdiction.iibb_rate, 2) %>%</td>
+                    <td class="table-td text-right"><%= h.formatNumber(jurisdiction.municipal_rate, 2) %>%</td>
+                    <td class="table-td"><%- statusBadge(jurisdiction.status) %></td>
+                    <td class="table-td text-xs text-gray-500 dark:text-gray-400">
+                      <%= t('Perceptions: {count}', { count: jurisdiction.perception_count }) %><br>
+                      <%= t('Withholdings: {count}', { count: jurisdiction.withholding_count }) %>
+                    </td>
+                    <td class="table-td text-right">
+                      <div class="flex items-center justify-end gap-1">
+                        <a href="/finance/taxes/settings?edit=<%= jurisdiction.id %>" class="btn-icon" title="<%= t('Edit') %>">
+                          <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                        </a>
+                        <% if (!jurisdiction.is_default && Number(jurisdiction.perception_count) === 0 && Number(jurisdiction.withholding_count) === 0) { %>
+                          <form action="/finance/taxes/jurisdictions/<%= jurisdiction.id %>/delete" method="POST" class="inline" data-confirm="<%= t('Delete this jurisdiction?') %>">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete') %>">
+                              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                            </button>
+                          </form>
+                        <% } %>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (!jurisdictions.length) { %>
+                  <tr><td colspan="7" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No jurisdictions yet. Add the first one above.') %></td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('Configuration notes') %></p>
+        <p class="mt-2"><%= t('The default jurisdiction is used for the municipal rate. It does not need to receive all sales; the sales share controls the IIBB base for every jurisdiction.') %></p>
+        <p class="mt-1"><%= t('A jurisdiction used by perceptions or withholdings cannot be deleted. Mark it inactive to keep historical reports intact.') %></p>
+        <p class="mt-1"><%= t('Rates and sales shares are management assumptions. Confirm the correct rates for your activity and jurisdiction with your accountant.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>
