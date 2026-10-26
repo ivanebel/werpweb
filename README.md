@@ -23,6 +23,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Finance: costs and profitability** — a management-accounting workspace for fixed, variable, semi-variable and stepped costs. Cost centers and categories organise spending; cost items define recurring amounts or variable drivers such as units, net revenue, material cost, invoices, pallets or labour hours. The analysis dashboard combines BOM-based product costs with sales invoices to show contribution margin, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Monthly actual costs can be entered manually or imported from CSV and compared with the calculated plan. All analytical amounts are net of recoverable VAT.
 - **Finance: sales simulator** — build saved sales scenarios with a product/customer basket, monthly quantities, net prices, discounts and optional cost overrides. Each scenario projects revenue, contribution, fixed costs, operating profit, break-even, product and customer margins, a BOM-based purchase plan net of stock and open purchase orders, a production plan and a simplified cash/working-capital estimate. Scenarios can be duplicated, locked, archived and compared side by side.
 - **Finance: cash flow** — a 13-week weekly and 12-month monthly cash forecast built from cash account balances, open receivables and payables, collection and payment profiles, open checks, recurring fixed costs and planned cash events. It includes AR/AP aging, collection-rate assumptions, a minimum cash buffer with funding-gap alerts, planned-event and fixed-cost detail, cash snapshots for actual-vs-forecast tracking, CSV export and a settings page. Cash amounts are gross cash movements; non-cash costs and future uninvoiced sales are not forecast automatically.
+- **Finance: price analysis** — search competitor product prices from the bundled Python scraper. Results are grouped by retailer (DIA and Carrefour), sorted from the lowest price, summarised with price ranges and averages, and each product opens the original store page in a new tab. The page is restricted to administrators and managers; searches are not stored in the ERP.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
 - **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
@@ -36,6 +37,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 
 - Node.js **18 or newer**
 - MySQL **8.x** (local or remote)
+- Optional: Python **3.10 or newer** with the dependencies in `scraper/requirements.txt` for the price-analysis page
 - Optional: an SSH server that can reach MySQL, if you use the tunnel
 
 ---
@@ -45,6 +47,9 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 ```bash
 # 1. install dependencies
 npm install
+
+# Optional: install the price-analysis scraper dependencies
+python -m pip install -r scraper/requirements.txt
 
 # 2. create your environment file
 copy .env.example .env      # Windows
@@ -97,6 +102,9 @@ All settings live in `.env` (see `.env.example`).
 | `SSH_PRIVATE_KEY_PASSPHRASE` | empty | Passphrase for the private key. |
 | `DB_REMOTE_HOST` | `127.0.0.1` | MySQL host **as seen from the SSH server**. |
 | `DB_REMOTE_PORT` | `3306` | MySQL port **as seen from the SSH server**. |
+| `PYTHON_BIN` | `python` / `python3` | Python executable used by the price-analysis scraper. |
+| `PRICE_SCRAPER_TIMEOUT_MS` | `90000` | Maximum time for one price search. |
+| `PRICE_SCRAPER_SCRIPT` | `scraper/main.py` | Scraper entry point. Relative paths resolve from the project root. |
 
 Generate a session secret with:
 
@@ -170,6 +178,7 @@ Finance calculation helpers have standalone unit checks that do not touch the da
 npm run test:finance
 npm run test:simulator
 npm run test:cashflow
+npm run test:prices
 ```
 
 ---
@@ -242,6 +251,16 @@ npm run test:cashflow
 6. Use the aging, receivable, payable, check and event tables to see what drives each period. **Export CSV** downloads the selected view.
 7. Under **Actual cash**, enter a balance snapshot for each active cash account. A period shows actual cash and variance only when every active account has a snapshot inside that period and the snapshot is not future-dated.
 8. Future sales that are not invoiced yet are not forecast automatically. Add planned cash events for expected receipts, or use the sales simulator for what-if planning.
+
+### Price analysis
+
+1. Install Python 3 and the scraper dependencies once per server: `python -m pip install -r scraper/requirements.txt`.
+2. Open **Finance → Price analysis**. The workspace is restricted to administrators and managers.
+3. Enter a product name or brand, for example `tybo`, and choose **Search prices**. The server runs `scraper/main.py` with the search text as a single argument.
+4. Results are grouped by retailer (DIA and Carrefour), sorted by price from lowest to highest. The summary cards show the number of products, the lowest and highest prices and the overall average.
+5. Each **Open** button opens the original product page in a new tab. Prices are shown in ARS unless the scraper returns a different `currency`.
+6. Searches require outbound internet access from the server. The timeout is 90 seconds by default and can be changed with `PRICE_SCRAPER_TIMEOUT_MS`. Use `PYTHON_BIN` if Python is not on the server's `PATH`.
+7. Search results are displayed only for the current request; they are not saved in the ERP. If a store is unavailable, its section is empty and the other retailer's results are still shown.
 
 ### Purchase invoice and stock
 
@@ -361,6 +380,7 @@ src/
     finance.js           Cost items, periods and profitability calculations
     simulator.js         Sales scenario, purchase plan and cash calculations
     cashflow.js          AR/AP, checks, fixed costs, events and cash forecast
+    priceAnalysis.js     Safe Python runner and competitor-price normalizer
     documentTypes.js     Shared order/invoice definitions
     email.js             SMTP transport, validation and email rendering
     emailDocuments.js    Document loaders and email content builders
@@ -372,6 +392,12 @@ public/
   css/app.css            Built Tailwind stylesheet
   js/                    Sidebar, theme, confirmations, order and BOM editors
   favicon.svg
+scraper/
+  main.py                Price scraper entry point (JSON on stdout)
+  dia.py                 DIA / VTEX source
+  carrefour.py           Carrefour / VTEX source
+  vtex.py                Shared VTEX product-search parser
+  requirements.txt       Python dependencies
 ```
 
 ---

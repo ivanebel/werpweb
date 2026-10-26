@@ -1,0 +1,295 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Price analysis') %></h1>
+            <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Market research') %></span>
+          </div>
+          <p class="page-subtitle"><%= t('Compare product prices published by external retailers.') %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Results come from the configured scraper and are not saved in the ERP.') %></p>
+        </div>
+        <% if (result) { %>
+          <a href="/finance/prices" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %>
+            <%= t('Clear results') %>
+          </a>
+        <% } %>
+      </div>
+
+      <div class="card mb-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Search competitor prices') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Enter a product name or brand. The server will query the configured external stores.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('DIA · Carrefour') %></span>
+        </div>
+        <form method="POST" action="/finance/prices" class="p-5" data-price-search-form>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div class="min-w-0 flex-1">
+              <label for="price-query" class="form-label"><%= t('Product name or brand') %> <span class="text-error-500">*</span></label>
+              <div class="relative">
+                <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
+                </span>
+                <input id="price-query" name="query" type="search" required maxlength="80" value="<%= query %>" autocomplete="off" class="form-input pl-10" placeholder="<%= t('e.g. tybo, queso, leche') %>" autofocus>
+              </div>
+              <p class="form-help"><%= t('Use up to {max} characters. Searches can take a few seconds.', { max: 80 }) %></p>
+            </div>
+            <button type="submit" class="btn btn-primary" data-price-submit>
+              <span data-price-submit-idle class="inline-flex items-center gap-2">
+                <%- include('/partials/icon', { name: 'search', className: 'h-4 w-4' }) %>
+                <span><%= t('Search prices') %></span>
+              </span>
+              <span data-price-submit-busy class="hidden items-center gap-2">
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                <span><%= t('Searching stores...') %></span>
+              </span>
+            </button>
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <span class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Try') %></span>
+            <% exampleQueries.forEach((example) => { %>
+              <button type="button" data-price-example="<%= example %>" class="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition hover:border-brand-300 hover:text-brand-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-brand-500/50 dark:hover:text-brand-400"><%= example %></button>
+            <% }) %>
+          </div>
+          <div data-price-loading class="mt-4 hidden items-center gap-2 rounded-lg border border-blue-light-200 bg-blue-light-50 px-3 py-2 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+            <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span><%= t('Searching external stores. This can take a few seconds.') %></span>
+          </div>
+        </form>
+      </div>
+
+      <% if (error) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <div class="flex items-start gap-3">
+            <%- include('/partials/icon', { name: 'exclamation-triangle', className: 'mt-0.5 h-5 w-5 shrink-0' }) %>
+            <div class="min-w-0">
+              <p class="font-semibold"><%= error %></p>
+              <% if (errorHint) { %><p class="mt-1 opacity-90"><%= errorHint %></p><% } %>
+              <% if (errorDetail) { %>
+                <details class="mt-2">
+                  <summary class="cursor-pointer text-xs font-medium underline underline-offset-2 opacity-80"><%= t('Technical detail') %></summary>
+                  <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white/70 p-3 text-xs text-gray-700 dark:bg-gray-950/40 dark:text-gray-300"><%= errorDetail %></pre>
+                </details>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (result) { %>
+        <div class="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white"><%= t('Results for "{query}"', { query: result.query }) %></h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <%= h.pluralize(result.totals.products, 'product', 'products', locale) %>
+              · <%= h.pluralize(result.totals.companies, 'company', 'companies', locale) %>
+              <% if (durationMs !== null) { %>
+                · <%= t('Search completed in {seconds}s.', { seconds: h.formatNumber(durationMs / 1000, 1, locale) }) %>
+              <% } %>
+            </p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('Prices in {currency}', { currency: currency }) %></span>
+        </div>
+
+        <% if (warnings && warnings.length) { %>
+          <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+            <p class="font-semibold"><%= t('Some stores could not be queried. Results may be incomplete.') %></p>
+            <% if (warningDetail) { %>
+              <details class="mt-2">
+                <summary class="cursor-pointer text-xs font-medium underline underline-offset-2 opacity-80"><%= t('Technical detail') %></summary>
+                <pre class="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white/70 p-3 text-xs text-gray-700 dark:bg-gray-950/40 dark:text-gray-300"><%= warningDetail %></pre>
+              </details>
+            <% } %>
+          </div>
+        <% } %>
+
+        <% if (result.totals.products === 0) { %>
+          <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+            <p class="font-semibold"><%= t('No products were returned for "{query}".', { query: result.query }) %></p>
+            <p class="mt-1 opacity-90"><%= t('Try a different search or check the scraper connection.') %></p>
+          </div>
+        <% } %>
+
+        <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Stores') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= result.totals.companies %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('External sources') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Products found') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= result.totals.products %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('{count} with a price', { count: result.totals.priced_products }) %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Lowest price') %></p>
+            <p class="mt-2 text-2xl font-bold text-success-600 dark:text-success-400"><%= result.totals.min === null ? '—' : price(result.totals.min) %></p>
+            <% if (result.totals.lowest) { %>
+              <p class="mt-1 truncate text-xs text-gray-400" title="<%= result.totals.lowest.company %> · <%= result.totals.lowest.title || t('Unnamed product') %>"><%= result.totals.lowest.company %> · <%= result.totals.lowest.title || t('Unnamed product') %></p>
+            <% } else { %>
+              <p class="mt-1 text-xs text-gray-400"><%= t('No prices available') %></p>
+            <% } %>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Average price') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= result.totals.average === null ? '—' : price(result.totals.average) %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('Across all listed products') %></p>
+          </div>
+          <div class="card p-5">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Highest price') %></p>
+            <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= result.totals.max === null ? '—' : price(result.totals.max) %></p>
+            <p class="mt-1 text-xs text-gray-400"><%= t('Highest listed price') %></p>
+          </div>
+        </div>
+
+        <% result.companies.forEach((company) => { %>
+          <div class="card mb-5">
+            <div class="card-header">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="card-title"><%= company.label %></h2>
+                  <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(company.products.length, 'product', 'products', locale) %></span>
+                </div>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                  <% if (company.stats.priced_count) { %>
+                    <%= t('Price range: {min} – {max}', { min: price(company.stats.min), max: price(company.stats.max) }) %>
+                    · <%= t('Average: {amount}', { amount: price(company.stats.average) }) %>
+                  <% } else { %>
+                    <%= t('No prices available for this store.') %>
+                  <% } %>
+                </p>
+              </div>
+              <span class="rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Lowest first') %></span>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[760px]">
+                <thead>
+                  <tr>
+                    <th class="table-th w-12">#</th>
+                    <th class="table-th"><%= t('Product') %></th>
+                    <th class="table-th text-right"><%= t('Price') %> (<%= currency %>)</th>
+                    <th class="table-th text-right"><%= t('Link') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% company.products.forEach((product, index) => { %>
+                    <tr class="table-row">
+                      <td class="table-td text-gray-400"><%= index + 1 %></td>
+                      <td class="table-td">
+                        <p class="font-medium text-gray-800 dark:text-gray-200"><%= product.title || t('Unnamed product') %></p>
+                      </td>
+                      <td class="table-td text-right font-semibold text-gray-800 dark:text-gray-200"><%= product.price === null ? '—' : price(product.price) %></td>
+                      <td class="table-td text-right">
+                        <% if (product.link) { %>
+                          <a href="<%= product.link %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+                            <%= t('Open') %>
+                            <%- include('/partials/icon', { name: 'arrow-right', className: 'h-3.5 w-3.5' }) %>
+                          </a>
+                        <% } else { %>
+                          <span class="text-gray-400">—</span>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                  <% if (!company.products.length) { %>
+                    <tr><td colspan="4" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No products found at this store.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        <% }) %>
+
+        <div class="rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+          <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('About these prices') %></p>
+          <p class="mt-2"><%= t('Prices are published by external stores and may vary by branch, date or availability. Package sizes differ, so compare unit prices with care.') %></p>
+          <p class="mt-1"><%= t('Results are sorted by price, lowest first. Product links open the original store page in a new tab.') %></p>
+        </div>
+      <% } else if (!error) { %>
+        <div class="card p-6 md:p-8">
+          <div class="mx-auto max-w-3xl text-center">
+            <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+              <%- include('/partials/icon', { name: 'tag', className: 'h-7 w-7' }) %>
+            </span>
+            <h2 class="mt-4 text-xl font-bold text-gray-900 dark:text-white"><%= t('Analyze competitor prices') %></h2>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400"><%= t('Search for a product or brand to collect current prices from DIA and Carrefour, compare offers and open the original product pages.') %></p>
+          </div>
+          <div class="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">1</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Enter a search') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Use a product name or brand such as “tybo” or “queso”.') %></p>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">2</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('The scraper queries the stores') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('The server runs the configured scraper and groups matches by retailer.') %></p>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-5 dark:border-gray-700">
+              <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-sm font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">3</span>
+              <h3 class="mt-3 text-sm font-semibold text-gray-900 dark:text-white"><%= t('Compare and open links') %></h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Review the prices and open the original product page in a new tab.') %></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+          <p class="font-semibold"><%= t('How it works') %></p>
+          <p class="mt-1"><%= t('The page calls a local Python scraper on the server. Python 3 and the scraper dependencies must be installed. Searches are not stored in the ERP.') %></p>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+
+  <script>
+  (function () {
+    const form = document.querySelector('[data-price-search-form]');
+    if (!form) return;
+    const input = form.querySelector('#price-query');
+
+    form.querySelectorAll('[data-price-example]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (!input) return;
+        input.value = button.dataset.priceExample || '';
+        input.focus();
+      });
+    });
+
+    form.addEventListener('submit', () => {
+      const submit = form.querySelector('[data-price-submit]');
+      const idle = form.querySelector('[data-price-submit-idle]');
+      const busy = form.querySelector('[data-price-submit-busy]');
+      const loading = form.querySelector('[data-price-loading]');
+      if (submit) {
+        submit.disabled = true;
+        submit.setAttribute('aria-busy', 'true');
+      }
+      if (idle) idle.classList.add('hidden');
+      if (busy) {
+        busy.classList.remove('hidden');
+        busy.classList.add('inline-flex');
+      }
+      if (loading) {
+        loading.classList.remove('hidden');
+        loading.classList.add('flex');
+      }
+    });
+  })();
+  </script>
+</div>

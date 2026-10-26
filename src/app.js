@@ -37,6 +37,7 @@ const posRoutes = require('./routes/pos');
 const financeRoutes = require('./routes/finance');
 const simulatorRoutes = require('./routes/simulator');
 const cashflowRoutes = require('./routes/cashflow');
+const priceRoutes = require('./routes/prices');
 const emailRoutes = require('./routes/emails');
 const settingsRoutes = require('./routes/settings');
 
@@ -153,6 +154,7 @@ async function createApp() {
   app.use('/pos', posRoutes);
   app.use('/finance/simulator', requireRole('admin', 'manager'), simulatorRoutes);
   app.use('/finance/cash', requireRole('admin', 'manager'), cashflowRoutes);
+  app.use('/finance/prices', requireRole('admin', 'manager'), priceRoutes);
   app.use('/finance', requireRole('admin', 'manager'), financeRoutes);
   app.use('/emails', emailRoutes);
   app.use('/', settingsRoutes);

@@ -3,6 +3,8 @@ node_modules/
 .env.local
 public/css/app.css
 *.log
+__pycache__/
+*.pyc
 npm-debug.log*
 .DS_Store
 Thumbs.db
