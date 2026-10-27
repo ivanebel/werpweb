@@ -154,7 +154,7 @@
                 </tr>
                 <tr class="table-row">
                   <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= t('IIBB') %></td>
-                  <td class="table-td text-right"><%= money(report.iibb.sales_base_total) %></td>
+                  <td class="table-td text-right"><%= money(report.iibb.tax_base) %></td>
                   <td class="table-td text-right"><%= money(report.iibb.calculated) %></td>
                   <td class="table-td text-right"><%= money(iibbCredits) %></td>
                   <td class="table-td text-right font-semibold <%= netTone(report.iibb.net) %>"><%= signedMoney(report.iibb.net) %></td>
@@ -237,22 +237,22 @@
         <div class="card-header">
           <div>
             <h2 class="card-title"><%= t('IIBB by jurisdiction') %></h2>
-            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Gross sales are allocated by each active jurisdiction share and multiplied by its IIBB rate. Perceptions and withholdings are credited by jurisdiction.') %></p>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The IIBB tax base is net sales without VAT. Each jurisdiction applies its Convenio Multilateral coefficient and IIBB rate. Perceptions and withholdings are credited by jurisdiction.') %></p>
           </div>
-          <span class="rounded-full px-3 py-1.5 text-xs font-medium <%= Math.abs(Number(report.iibb.sales_share_total) - 100) <= 0.01 ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' %>">
-            <%= t('Sales allocation: {total}%', { total: h.formatNumber(report.iibb.sales_share_total, 2) }) %>
+          <span class="rounded-full px-3 py-1.5 text-xs font-medium <%= Math.abs(Number(report.iibb.coefficient_total) - 100) <= 0.01 ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300' : 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400' %>">
+            <%= t('{year} coefficients: {total}%', { year: report.iibb.coefficient_year, total: h.formatNumber(report.iibb.coefficient_total, 2) }) %>
           </span>
         </div>
         <div class="table-wrap">
-          <table class="table-base min-w-[1050px]">
+          <table class="table-base min-w-[1150px]">
             <thead>
               <tr>
                 <th class="table-th"><%= t('Jurisdiction') %></th>
-                <th class="table-th text-right"><%= t('Sales share') %></th>
+                <th class="table-th text-right"><%= t('Coefficient') %></th>
+                <th class="table-th text-right"><%= t('Tax base') %></th>
                 <th class="table-th text-right"><%= t('IIBB rate') %></th>
-                <th class="table-th text-right"><%= t('Sales base') %></th>
                 <th class="table-th text-right"><%= t('Calculated') %></th>
-                <th class="table-th text-right"><%= t('Perceptions') %></th>
+                <th class="table-th text-right"><%= t('Perceptions / levies') %></th>
                 <th class="table-th text-right"><%= t('Withholdings') %></th>
                 <th class="table-th text-right"><%= t('Net') %></th>
               </tr>
@@ -266,13 +266,14 @@
                       <% if (row.is_default) { %><span class="ml-2 badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Default') %></span><% } %>
                     </p>
                     <% if (row.code && !row.unassigned) { %><p class="text-xs font-mono text-gray-400"><%= row.code %></p><% } %>
+                    <% if (row.coefficient_source === 'default') { %><p class="mt-0.5 text-[10px] text-warning-600 dark:text-warning-400"><%= t('Using default coefficient') %></p><% } %>
                   </td>
-                  <td class="table-td text-right"><%= row.unassigned ? '—' : `${h.formatNumber(row.sales_share, 2)}%` %></td>
-                  <td class="table-td text-right"><%= row.unassigned ? '—' : `${h.formatNumber(row.rate, 2)}%` %></td>
-                  <td class="table-td text-right"><%= money(row.sales_base) %></td>
+                  <td class="table-td text-right"><%= row.unassigned ? '-' : `${h.formatNumber(row.coefficient, 2)}%` %></td>
+                  <td class="table-td text-right"><%= money(row.tax_base) %></td>
+                  <td class="table-td text-right"><%= row.unassigned ? '-' : `${h.formatNumber(row.rate, 2)}%` %></td>
                   <td class="table-td text-right"><%= money(row.calculated) %></td>
-                  <td class="table-td text-right"><%= row.perceptions ? money(row.perceptions) : '—' %></td>
-                  <td class="table-td text-right"><%= row.withholdings ? money(row.withholdings) : '—' %></td>
+                  <td class="table-td text-right"><%= row.perceptions ? money(row.perceptions) : '-' %></td>
+                  <td class="table-td text-right"><%= row.withholdings ? money(row.withholdings) : '-' %></td>
                   <td class="table-td text-right font-semibold <%= netTone(row.net) %>">
                     <%= signedMoney(row.net) %>
                     <% if (row.net < 0) { %><span class="ml-1 text-[10px] uppercase tracking-wide"><%= t('Credit') %></span><% } %>
@@ -286,9 +287,9 @@
             <tfoot>
               <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
                 <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
-                <td class="px-3 py-3 text-right text-sm"><%= h.formatNumber(report.iibb.sales_share_total, 2) %>%</td>
-                <td class="px-3 py-3 text-right text-sm">—</td>
-                <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.sales_base_total) %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= h.formatNumber(report.iibb.coefficient_total, 2) %>%</td>
+                <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.allocated_base) %></td>
+                <td class="px-3 py-3 text-right text-sm">-</td>
                 <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.calculated) %></td>
                 <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.perceptions) %></td>
                 <td class="px-3 py-3 text-right text-sm"><%= money(report.iibb.withholdings) %></td>
@@ -298,7 +299,7 @@
           </table>
         </div>
         <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
-          <%= t('A negative net amount is a credit balance (saldo a favor) for that jurisdiction. The total IIBB position can be a credit.') %>
+          <%= t('Tax base: net sales without VAT. A negative net amount is a credit balance (saldo a favor) for that jurisdiction.') %>
         </p>
       </div>
 
@@ -443,7 +444,7 @@
       <div class="rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
         <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How these taxes are calculated') %></p>
         <p class="mt-2"><%= t('VAT is extracted from tax-inclusive sales and purchase invoice lines, grouped by rate. Document discounts are allocated proportionally. Output VAT minus input VAT is the estimated VAT position.') %></p>
-        <p class="mt-1"><%= t('IIBB applies each active jurisdiction sales share to gross sales, then multiplies by its IIBB rate. Perceptions linked to purchase invoices and IIBB withholdings classified from customer payments reduce the jurisdiction balance.') %></p>
+        <p class="mt-1"><%= t('IIBB uses the Convenio Multilateral coefficients agreed for the fiscal year. The total IIBB tax base is net sales without VAT; each jurisdiction base is the total base times its coefficient, then multiplied by the jurisdiction IIBB rate. Perceptions linked to purchase invoices and IIBB withholdings classified from customer payments reduce the jurisdiction balance.') %></p>
         <p class="mt-1"><%= t('Municipal tax applies the default jurisdiction municipal rate to gross sales.') %></p>
         <p class="mt-1"><%= t('Credit notes reduce the corresponding sales, purchase and tax amounts in their document period. Draft and cancelled documents are excluded. POS sales are not included in this estimate.') %></p>
         <p class="mt-1"><%= t('This is a management estimate, not a statutory tax return. Confirm rates and treatment with your accountant before filing.') %></p>

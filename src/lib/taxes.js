@@ -135,7 +135,14 @@ function buildVatByRate(salesInvoices, purchaseInvoices) {
     .sort((a, b) => a.rate - b.rate);
 }
 
-function buildIibbRows({ grossSales, defaultJurisdiction, jurisdictions, perceptions, withholdings }) {
+function buildIibbRows({
+  taxBase,
+  defaultJurisdiction,
+  jurisdictions,
+  coefficients = new Map(),
+  perceptions,
+  withholdings,
+}) {
   const rows = new Map();
   const defaultId = defaultJurisdiction ? Number(defaultJurisdiction.id) : null;
   const ensure = (jurisdiction) => {
@@ -147,8 +154,9 @@ function buildIibbRows({ grossSales, defaultJurisdiction, jurisdictions, percept
         code: jurisdiction ? jurisdiction.code : '',
         name: jurisdiction ? jurisdiction.name : '',
         unassigned: id === null,
-        sales_share: 0,
-        sales_base: 0,
+        coefficient: 0,
+        coefficient_source: 'none',
+        tax_base: 0,
         rate: 0,
         calculated: 0,
         perceptions: 0,
@@ -162,13 +170,20 @@ function buildIibbRows({ grossSales, defaultJurisdiction, jurisdictions, percept
 
   for (const jurisdiction of jurisdictions || []) {
     const id = Number(jurisdiction.id);
-    const share = jurisdiction.status === 'active' ? Math.max(0, Number(jurisdiction.sales_share) || 0) : 0;
-    if (share <= 0 && id !== defaultId && !perceptions.has(id) && !withholdings.has(id)) continue;
+    const isActive = jurisdiction.status === 'active';
+    const hasActivity = perceptions.has(id) || withholdings.has(id);
+    if (!isActive && !hasActivity) continue;
+    const hasAnnual = isActive && coefficients.has(id);
+    const coefficient = isActive
+      ? Math.max(0, Number(hasAnnual ? coefficients.get(id) : jurisdiction.sales_share) || 0)
+      : 0;
+    if (coefficient <= 0 && id !== defaultId && !hasActivity) continue;
     const row = ensure(jurisdiction);
-    row.sales_share = round2(share);
-    row.sales_base = round2(grossSales * share / 100);
+    row.coefficient = round2(coefficient);
+    row.coefficient_source = hasAnnual ? 'annual' : (isActive ? 'default' : 'inactive');
+    row.tax_base = round2(taxBase * coefficient / 100);
     row.rate = Number(jurisdiction.iibb_rate) || 0;
-    row.calculated = round2(row.sales_base * row.rate / 100);
+    row.calculated = round2(row.tax_base * row.rate / 100);
   }
 
   for (const [key, amount] of perceptions.entries()) {
@@ -211,6 +226,24 @@ async function loadJurisdictions({ activeOnly = false } = {}) {
       ${activeOnly ? "WHERE status = 'active'" : ''}
       ORDER BY name`,
   );
+}
+
+function normalizeFiscalYear(value, fallback = new Date().getUTCFullYear()) {
+  const year = Number.parseInt(value, 10);
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) return fallback;
+  return year;
+}
+
+async function loadJurisdictionCoefficients(fiscalYear) {
+  const year = normalizeFiscalYear(fiscalYear);
+  const rows = await query(
+    `SELECT jurisdiction_id, coefficient, notes
+       FROM tax_jurisdiction_coefficients
+      WHERE fiscal_year = ?
+      ORDER BY jurisdiction_id`,
+    [year],
+  );
+  return new Map(rows.map((row) => [Number(row.jurisdiction_id), Number(row.coefficient) || 0]));
 }
 
 async function loadInvoiceItems(table, foreignKey, ids) {
@@ -299,13 +332,15 @@ async function loadWithholdings(from, to) {
 
 async function buildTaxReport(from, to) {
   const range = normalizeRange(from, to);
-  const [settings, jurisdictions, salesInvoices, purchaseInvoices, perceptions, withholdings] = await Promise.all([
+  const fiscalYear = normalizeFiscalYear(String(range.from).slice(0, 4));
+  const [settings, jurisdictions, salesInvoices, purchaseInvoices, perceptions, withholdings, annualCoefficients] = await Promise.all([
     loadTaxSettings(),
     loadJurisdictions(),
     loadSalesInvoices(range.from, range.to),
     loadPurchaseInvoices(range.from, range.to),
     loadPerceptions(range.from, range.to),
     loadWithholdings(range.from, range.to),
+    loadJurisdictionCoefficients(fiscalYear),
   ]);
 
   const [salesItems, purchaseItems] = await Promise.all([
@@ -382,15 +417,33 @@ async function buildTaxReport(from, to) {
     : null;
 
   const iibbRows = buildIibbRows({
-    grossSales,
+    taxBase: netSales,
     defaultJurisdiction,
     jurisdictions,
+    coefficients: annualCoefficients,
     perceptions: perceptionByJurisdiction,
     withholdings: withholdingByJurisdiction,
   });
   const activeJurisdictions = jurisdictions.filter((row) => row.status === 'active');
-  const salesShareTotal = round2(activeJurisdictions.reduce((sum, row) => sum + (Number(row.sales_share) || 0), 0));
-  const iibbSalesBase = round2(iibbRows.reduce((sum, row) => sum + row.sales_base, 0));
+  const effectiveCoefficient = (jurisdiction) => (
+    annualCoefficients.has(Number(jurisdiction.id))
+      ? Number(annualCoefficients.get(Number(jurisdiction.id))) || 0
+      : Math.max(0, Number(jurisdiction.sales_share) || 0)
+  );
+  const coefficientTotal = round2(
+    activeJurisdictions.reduce((sum, row) => sum + effectiveCoefficient(row), 0),
+  );
+  const annualCoefficientCount = activeJurisdictions
+    .filter((row) => annualCoefficients.has(Number(row.id)))
+    .length;
+  const missingCoefficientCount = activeJurisdictions.length - annualCoefficientCount;
+  const coefficientSource = activeJurisdictions.length === 0
+    ? 'none'
+    : missingCoefficientCount === 0
+      ? 'annual'
+      : annualCoefficientCount > 0 ? 'mixed' : 'default';
+  const iibbTaxBase = netSales;
+  const iibbAllocatedBase = round2(iibbRows.reduce((sum, row) => sum + row.tax_base, 0));
   const iibbCalculated = round2(iibbRows.reduce((sum, row) => sum + row.calculated, 0));
   const iibbPerceptions = round2(iibbRows.reduce((sum, row) => sum + row.perceptions, 0));
   const iibbWithholdings = round2(iibbRows.reduce((sum, row) => sum + row.withholdings, 0));
@@ -404,15 +457,34 @@ async function buildTaxReport(from, to) {
   if (!defaultJurisdiction) {
     alerts.push({ code: 'no_default_jurisdiction', tone: 'warning' });
   } else {
-    if (Number(defaultJurisdiction.iibb_rate) <= 0) {
-      alerts.push({ code: 'zero_iibb_rate', tone: 'warning', jurisdiction: defaultJurisdiction.name });
-    }
     if (Number(defaultJurisdiction.municipal_rate) <= 0) {
       alerts.push({ code: 'zero_municipal_rate', tone: 'info', jurisdiction: defaultJurisdiction.name });
     }
   }
-  if (activeJurisdictions.length && Math.abs(salesShareTotal - 100) > 0.01) {
-    alerts.push({ code: 'sales_share_total', tone: 'warning', total: salesShareTotal });
+  const zeroRateJurisdictions = activeJurisdictions.filter(
+    (row) => effectiveCoefficient(row) > 0 && Number(row.iibb_rate) <= 0,
+  );
+  if (zeroRateJurisdictions.length) {
+    alerts.push({
+      code: 'zero_iibb_rate',
+      tone: 'warning',
+      jurisdiction: zeroRateJurisdictions.map((row) => row.name).join(', '),
+    });
+  }
+  if (activeJurisdictions.length && Math.abs(coefficientTotal - 100) > 0.01) {
+    alerts.push({ code: 'coefficient_total', tone: 'warning', total: coefficientTotal, year: fiscalYear });
+  }
+  if (activeJurisdictions.length && missingCoefficientCount > 0) {
+    alerts.push({
+      code: 'missing_coefficients',
+      tone: 'warning',
+      count: missingCoefficientCount,
+      year: fiscalYear,
+      using_defaults: annualCoefficientCount === 0,
+    });
+  }
+  if (String(range.from).slice(0, 4) !== String(range.to).slice(0, 4)) {
+    alerts.push({ code: 'multi_year_range', tone: 'warning', year: fiscalYear });
   }
   if (!sales.length) alerts.push({ code: 'no_sales', tone: 'info' });
   if (!purchases.length) alerts.push({ code: 'no_purchases', tone: 'info' });
@@ -481,8 +553,13 @@ async function buildTaxReport(from, to) {
     },
     iibb: {
       rate: defaultJurisdiction ? Number(defaultJurisdiction.iibb_rate) || 0 : 0,
-      sales_share_total: salesShareTotal,
-      sales_base_total: iibbSalesBase,
+      tax_base: iibbTaxBase,
+      allocated_base: iibbAllocatedBase,
+      coefficient_year: fiscalYear,
+      coefficient_total: coefficientTotal,
+      coefficient_source: coefficientSource,
+      annual_coefficient_count: annualCoefficientCount,
+      active_jurisdiction_count: activeJurisdictions.length,
       calculated: iibbCalculated,
       perceptions: iibbPerceptions,
       withholdings: iibbWithholdings,
@@ -523,6 +600,8 @@ module.exports = {
   buildIibbRows,
   loadTaxSettings,
   loadJurisdictions,
+  normalizeFiscalYear,
+  loadJurisdictionCoefficients,
   loadSalesInvoices,
   loadPurchaseInvoices,
   loadPerceptions,

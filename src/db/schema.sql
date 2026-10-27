@@ -763,6 +763,28 @@ CREATE TABLE IF NOT EXISTS tax_jurisdictions (
   KEY idx_tax_jurisdictions_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Convenio Multilateral coefficients are agreed once per fiscal year. The
+-- coefficient assigns a share of the total IIBB tax base (net sales without
+-- VAT) to each jurisdiction. tax_jurisdictions.sales_share is the fallback
+-- used when no coefficient has been stored for the report year.
+CREATE TABLE IF NOT EXISTS tax_jurisdiction_coefficients (
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  jurisdiction_id INT UNSIGNED NOT NULL,
+  fiscal_year     SMALLINT UNSIGNED NOT NULL,
+  coefficient     DECIMAL(5,2) NOT NULL DEFAULT 0,
+  notes           VARCHAR(255) NULL,
+  created_by      INT UNSIGNED NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tax_coefficient_jurisdiction_year (jurisdiction_id, fiscal_year),
+  KEY idx_tax_coefficients_year (fiscal_year),
+  CONSTRAINT fk_tax_coefficients_jurisdiction FOREIGN KEY (jurisdiction_id)
+    REFERENCES tax_jurisdictions (id) ON DELETE CASCADE,
+  CONSTRAINT fk_tax_coefficients_created_by FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS tax_settings (
   id                      TINYINT UNSIGNED NOT NULL DEFAULT 1,
   default_jurisdiction_id INT UNSIGNED NULL,

@@ -2,7 +2,14 @@
 <%- include('/layouts/sidebar') %>
 <%
   const activeJurisdictions = jurisdictions.filter((row) => row.status === 'active');
-  const salesShareTotal = activeJurisdictions.reduce((sum, row) => sum + (Number(row.sales_share) || 0), 0);
+  const coefficientValue = (row) => {
+    if (coefficientValues && coefficientValues[row.id] !== undefined) return coefficientValues[row.id];
+    return row.annual_coefficient !== null ? row.annual_coefficient : row.sales_share;
+  };
+  const displayCoefficientTotal = activeJurisdictions.reduce(
+    (sum, row) => sum + (Number(coefficientValue(row)) || 0),
+    0,
+  );
   const isEditing = Boolean(editJurisdiction);
   const formValues = values || {};
 %>
@@ -17,7 +24,7 @@
             <h1 class="page-title"><%= t('Tax settings') %></h1>
             <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Administrators only') %></span>
           </div>
-          <p class="page-subtitle"><%= t('Configure the jurisdictions, sales allocation and rates used by the tax estimate.') %></p>
+          <p class="page-subtitle"><%= t('Configure the jurisdictions, Convenio Multilateral coefficients and rates used by the tax estimate.') %></p>
           <p class="mt-1 text-xs text-gray-400"><%= t('Only administrators can change these settings.') %></p>
         </div>
         <a href="/finance/taxes" class="btn btn-secondary btn-sm">
@@ -41,7 +48,7 @@
             <div class="card-header">
               <div>
                 <h2 class="card-title"><%= t('Default jurisdiction') %></h2>
-                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The default jurisdiction supplies the municipal rate. Its sales share and IIBB rate also participate in the IIBB calculation.') %></p>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The default jurisdiction supplies the municipal rate. Its coefficient and IIBB rate also participate in the IIBB calculation.') %></p>
               </div>
             </div>
             <form method="POST" action="/finance/taxes/settings" class="space-y-4 p-5">
@@ -57,11 +64,11 @@
                 <% if (!activeJurisdictions.length) { %><p class="form-help text-warning-600 dark:text-warning-400"><%= t('Create an active jurisdiction first.') %></p><% } %>
               </div>
               <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs dark:border-gray-800 dark:bg-gray-800/60">
-                <span class="text-gray-500 dark:text-gray-400"><%= t('Active sales allocation') %></span>
-                <span class="font-semibold <%= Math.abs(salesShareTotal - 100) <= 0.01 ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400' %>"><%= h.formatNumber(salesShareTotal, 2) %>%</span>
+                <span class="text-gray-500 dark:text-gray-400"><%= t('Active coefficient total') %></span>
+                <span class="font-semibold <%= Math.abs(displayCoefficientTotal - 100) <= 0.01 ? 'text-success-600 dark:text-success-400' : 'text-warning-600 dark:text-warning-400' %>"><%= h.formatNumber(displayCoefficientTotal, 2) %>%</span>
               </div>
-              <% if (Math.abs(salesShareTotal - 100) > 0.01) { %>
-                <p class="text-xs text-warning-600 dark:text-warning-400"><%= t('Active jurisdiction shares should total 100% so IIBB is calculated on all gross sales.') %></p>
+              <% if (Math.abs(displayCoefficientTotal - 100) > 0.01) { %>
+                <p class="text-xs text-warning-600 dark:text-warning-400"><%= t('Active jurisdiction coefficients should total 100% so IIBB is calculated on the whole tax base.') %></p>
               <% } %>
               <button type="submit" class="btn btn-primary w-full" <%= activeJurisdictions.length ? '' : 'disabled' %>>
                 <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
@@ -72,7 +79,7 @@
 
           <div class="rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
             <p class="font-semibold"><%= t('How the rates are used') %></p>
-            <p class="mt-1"><%= t('Sales share assigns a portion of gross sales to each jurisdiction. IIBB = gross sales × sales share × IIBB rate.') %></p>
+            <p class="mt-1"><%= t('The IIBB tax base is net sales without VAT. Each jurisdiction receives its coefficient share of the base, then its IIBB rate is applied.') %></p>
             <p class="mt-1"><%= t('Municipal tax = gross sales × the default jurisdiction municipal rate.') %></p>
             <p class="mt-1"><%= t('Perceptions and IIBB withholdings are credited to their own jurisdiction, so a jurisdiction can end with a credit balance.') %></p>
           </div>
@@ -103,7 +110,7 @@
                   <% if (errors.name && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.name %></p><% } %>
                 </div>
                 <div class="sm:col-span-2">
-                  <label for="jurisdiction-share" class="form-label"><%= t('Sales share %') %></label>
+                  <label for="jurisdiction-share" class="form-label"><%= t('Default coefficient (%)') %></label>
                   <input id="jurisdiction-share" name="sales_share" type="number" min="0" max="100" step="0.01" required value="<%= formValues.sales_share !== undefined ? formValues.sales_share : '0.00' %>" class="form-input text-right <%= errors.sales_share && (errorForm === 'create' || errorForm === 'edit') ? 'form-input-error' : '' %>">
                   <% if (errors.sales_share && (errorForm === 'create' || errorForm === 'edit')) { %><p class="form-error"><%= errors.sales_share %></p><% } %>
                 </div>
@@ -133,7 +140,7 @@
                   </button>
                 </div>
               </div>
-              <p class="form-help"><%= t('Sales share is the percentage of gross sales attributed to this jurisdiction. Active shares should total 100%. Rates are percentages, not amounts.') %></p>
+              <p class="form-help"><%= t('The default coefficient is used only when no annual Convenio Multilateral coefficient is configured for the report year. Rates are percentages, not amounts.') %></p>
             </form>
           </div>
 
@@ -142,7 +149,7 @@
               <thead>
                 <tr>
                   <th class="table-th"><%= t('Jurisdiction') %></th>
-                  <th class="table-th text-right"><%= t('Sales share') %></th>
+                  <th class="table-th text-right"><%= t('Default coefficient') %></th>
                   <th class="table-th text-right"><%= t('IIBB rate') %></th>
                   <th class="table-th text-right"><%= t('Municipal rate') %></th>
                   <th class="table-th"><%= t('Status') %></th>
@@ -191,11 +198,112 @@
         </div>
       </div>
 
+      <div class="card mt-5">
+        <div class="card-header flex-col gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h2 class="card-title"><%= t('Convenio Multilateral coefficients') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Annual coefficient per active jurisdiction for the IIBB tax base (net sales without VAT). Coefficients must total 100%.') %></p>
+          </div>
+          <form method="GET" action="/finance/taxes/settings" class="flex items-end gap-2">
+            <div>
+              <label for="coefficient-year" class="form-label"><%= t('Fiscal year') %></label>
+              <input id="coefficient-year" name="coefficient_year" type="number" min="2000" max="2100" step="1" value="<%= coefficientYear %>" class="form-input w-32 text-right">
+            </div>
+            <button type="submit" class="btn btn-secondary btn-sm"><%= t('Load') %></button>
+          </form>
+        </div>
+
+        <% if (coefficientFormError) { %>
+          <div class="border-b border-error-200 bg-error-50 px-5 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+            <%= coefficientFormError %>
+          </div>
+        <% } %>
+
+        <form method="POST" action="/finance/taxes/settings/coefficients">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="coefficient_year" value="<%= coefficientYear %>">
+          <div class="table-wrap">
+            <table class="table-base min-w-[900px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Jurisdiction') %></th>
+                  <th class="table-th text-right"><%= t('IIBB rate') %></th>
+                  <th class="table-th text-right"><%= t('Default coefficient') %></th>
+                  <th class="table-th text-right"><%= t('{year} coefficient (%)', { year: coefficientYear }) %></th>
+                  <th class="table-th"><%= t('Source') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% activeJurisdictions.forEach((jurisdiction) => { %>
+                  <tr class="table-row">
+                    <td class="table-td">
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= jurisdiction.name %><% if (jurisdiction.is_default) { %><span class="ml-2 badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Default') %></span><% } %></p>
+                      <p class="font-mono text-xs text-gray-400"><%= jurisdiction.code %></p>
+                    </td>
+                    <td class="table-td text-right"><%= h.formatNumber(jurisdiction.iibb_rate, 2) %>%</td>
+                    <td class="table-td text-right"><%= h.formatNumber(jurisdiction.sales_share, 2) %>%</td>
+                    <td class="table-td text-right">
+                      <input name="coefficient_<%= jurisdiction.id %>" data-coefficient-input type="number" min="0" max="100" step="0.01" required value="<%= coefficientValue(jurisdiction) %>" class="form-input w-28 text-right <%= coefficientErrors[jurisdiction.id] ? 'form-input-error' : '' %>">
+                      <% if (coefficientErrors[jurisdiction.id]) { %><p class="form-error"><%= coefficientErrors[jurisdiction.id] %></p><% } %>
+                    </td>
+                    <td class="table-td">
+                      <% if (jurisdiction.annual_coefficient === null) { %>
+                        <span class="badge bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Using default') %></span>
+                      <% } else { %>
+                        <span class="badge bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"><%= t('Annual') %></span>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+                <% if (!activeJurisdictions.length) { %>
+                  <tr><td colspan="5" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('Create an active jurisdiction first.') %></td></tr>
+                <% } %>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td class="px-5 py-3 text-sm"><%= t('Total') %></td>
+                  <td class="px-3 py-3 text-right text-sm">-</td>
+                  <td class="px-3 py-3 text-right text-sm"><%= h.formatNumber(activeJurisdictions.reduce((sum, row) => sum + (Number(row.sales_share) || 0), 0), 2) %>%</td>
+                  <td class="px-3 py-3 text-right text-sm"><strong data-coefficient-total><%= h.formatNumber(displayCoefficientTotal, 2) %>%</strong></td>
+                  <td colspan="1"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+            <p class="text-xs text-gray-400"><%= t('Annual values override the default coefficient for the selected fiscal year.') %></p>
+            <button type="submit" class="btn btn-primary btn-sm" <%= activeJurisdictions.length ? '' : 'disabled' %>>
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              <%= t('Save {year} coefficients', { year: coefficientYear }) %>
+            </button>
+          </div>
+        </form>
+      </div>
+      <script>
+      (function () {
+        const inputs = [...document.querySelectorAll('[data-coefficient-input]')];
+        const totalEl = document.querySelector('[data-coefficient-total]');
+        const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
+        const fmt = (value) => Number(value || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        function update() {
+          let total = 0;
+          inputs.forEach((input) => {
+            const coefficient = Number(input.value || 0);
+            total += coefficient;
+          });
+          if (totalEl) totalEl.textContent = `${fmt(total)}%`;
+        }
+        inputs.forEach((input) => input.addEventListener('input', update));
+        update();
+      })();
+      </script>
+
       <div class="mt-5 rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
         <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('Configuration notes') %></p>
-        <p class="mt-2"><%= t('The default jurisdiction is used for the municipal rate. It does not need to receive all sales; the sales share controls the IIBB base for every jurisdiction.') %></p>
+        <p class="mt-2"><%= t('The default jurisdiction is used for the municipal rate. Its coefficient participates in the IIBB calculation like any other active jurisdiction.') %></p>
+        <p class="mt-1"><%= t('The Convenio Multilateral coefficients are agreed once per fiscal year. Reports use the coefficient stored for the year of the selected period, or the default coefficient when no annual value exists.') %></p>
         <p class="mt-1"><%= t('A jurisdiction used by perceptions or withholdings cannot be deleted. Mark it inactive to keep historical reports intact.') %></p>
-        <p class="mt-1"><%= t('Rates and sales shares are management assumptions. Confirm the correct rates for your activity and jurisdiction with your accountant.') %></p>
+        <p class="mt-1"><%= t('Rates and coefficients are management assumptions. Confirm the correct rates for your activity and jurisdiction with your accountant.') %></p>
       </div>
     </div>
   </main>

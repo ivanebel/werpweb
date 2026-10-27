@@ -90,36 +90,64 @@ assert.deepEqual(vatByRate, [{
 }]);
 
 const iibbRows = taxes.buildIibbRows({
-  grossSales: 10000,
-  defaultJurisdiction: { id: 1, code: 'CABA', name: 'CABA', iibb_rate: 3.5 },
+  taxBase: 1000000,
+  defaultJurisdiction: { id: 1, code: 'CABA', name: 'CABA', iibb_rate: 5 },
   jurisdictions: [
-    { id: 1, code: 'CABA', name: 'CABA', sales_share: 60, iibb_rate: 3.5, status: 'active' },
-    { id: 2, code: 'BA', name: 'Buenos Aires', sales_share: 40, iibb_rate: 2, status: 'active' },
+    { id: 1, code: 'CABA', name: 'CABA', sales_share: 55, iibb_rate: 5, status: 'active' },
+    { id: 2, code: 'BA', name: 'Buenos Aires', sales_share: 30, iibb_rate: 3, status: 'active' },
+    { id: 3, code: 'SF', name: 'Santa Fe', sales_share: 15, iibb_rate: 4, status: 'active' },
   ],
-  perceptions: new Map([[1, 100], [2, 50]]),
-  withholdings: new Map([[1, 200], [null, 30]]),
+  coefficients: new Map([[1, 55], [2, 30], [3, 15]]),
+  perceptions: new Map([[1, 1000], [2, 500]]),
+  withholdings: new Map([[1, 2000], [null, 300]]),
 });
-assert.equal(iibbRows.length, 3);
+assert.equal(iibbRows.length, 4);
 assert.equal(iibbRows[0].is_default, true);
-assert.equal(iibbRows[0].sales_base, 6000);
-assert.equal(iibbRows[0].calculated, 210);
-assert.equal(iibbRows[0].perceptions, 100);
-assert.equal(iibbRows[0].withholdings, 200);
-assert.equal(iibbRows[0].net, -90);
+assert.equal(iibbRows[0].coefficient, 55);
+assert.equal(iibbRows[0].coefficient_source, 'annual');
+assert.equal(iibbRows[0].tax_base, 550000);
+assert.equal(iibbRows[0].calculated, 27500);
+assert.equal(iibbRows[0].perceptions, 1000);
+assert.equal(iibbRows[0].withholdings, 2000);
+assert.equal(iibbRows[0].net, 24500);
 assert.equal(iibbRows[1].name, 'Buenos Aires');
-assert.equal(iibbRows[1].sales_base, 4000);
-assert.equal(iibbRows[1].calculated, 80);
-assert.equal(iibbRows[1].net, 30);
-assert.equal(iibbRows[2].unassigned, true);
-assert.equal(iibbRows[2].net, -30);
+assert.equal(iibbRows[1].tax_base, 300000);
+assert.equal(iibbRows[1].calculated, 9000);
+assert.equal(iibbRows[1].net, 8500);
+assert.equal(iibbRows[2].name, 'Santa Fe');
+assert.equal(iibbRows[2].tax_base, 150000);
+assert.equal(iibbRows[2].calculated, 6000);
+assert.equal(iibbRows[3].unassigned, true);
+assert.equal(iibbRows[3].net, -300);
+
+// Without annual coefficients, the jurisdiction default coefficient is used.
+const fallbackRows = taxes.buildIibbRows({
+  taxBase: 1000,
+  defaultJurisdiction: null,
+  jurisdictions: [{ id: 1, code: 'CABA', name: 'CABA', sales_share: 100, iibb_rate: 3, status: 'active' }],
+  perceptions: new Map(),
+  withholdings: new Map(),
+});
+assert.equal(fallbackRows[0].coefficient, 100);
+assert.equal(fallbackRows[0].coefficient_source, 'default');
+assert.equal(fallbackRows[0].tax_base, 1000);
+assert.equal(fallbackRows[0].calculated, 30);
 
 const creditRows = taxes.buildIibbRows({
-  grossSales: 1000,
+  taxBase: -1000,
   defaultJurisdiction: { id: 1, code: 'CABA', name: 'CABA', iibb_rate: 3 },
   jurisdictions: [{ id: 1, code: 'CABA', name: 'CABA', sales_share: 100, iibb_rate: 3, status: 'active' }],
+  coefficients: new Map([[1, 100]]),
   perceptions: new Map([[1, 100]]),
   withholdings: new Map([[1, 50]]),
 });
-assert.equal(creditRows[0].net, -120);
+assert.equal(creditRows[0].tax_base, -1000);
+assert.equal(creditRows[0].calculated, -30);
+assert.equal(creditRows[0].net, -180);
+
+assert.equal(taxes.normalizeFiscalYear('2026'), 2026);
+assert.equal(taxes.normalizeFiscalYear('bad', 2025), 2025);
+assert.equal(taxes.normalizeFiscalYear(1999, 2025), 2025);
+assert.equal(taxes.normalizeFiscalYear(2101, 2025), 2025);
 
 console.log('All tax checks passed.');

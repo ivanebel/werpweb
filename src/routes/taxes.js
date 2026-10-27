@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { query, one } = require('../db');
+const { query, one, withTransaction } = require('../db');
 const { todayISO, formatMoney } = require('../lib/helpers');
 const { requireRole } = require('../middleware/web');
 const taxes = require('../lib/taxes');
@@ -82,15 +82,31 @@ function dashboardAlerts(report, req, range, canManageTaxes) {
         href: canManageTaxes ? settingsHref : null,
         action: canManageTaxes ? t('Tax settings') : null,
       });
-    } else if (alert.code === 'sales_share_total') {
+    } else if (alert.code === 'coefficient_total') {
       alerts.push({
         tone: 'warning',
-        title: t('Sales allocation does not total 100%'),
+        title: t('Convenio Multilateral coefficients do not total 100%'),
         message: canManageTaxes
-          ? t('The active jurisdictions total {total}%. Adjust the sales allocation so IIBB is calculated on all gross sales.', { total: alert.total })
-          : t('The active jurisdictions total {total}%. Ask an administrator to adjust the sales allocation.', { total: alert.total }),
-        href: canManageTaxes ? settingsHref : null,
+          ? t('The active jurisdictions for {year} total {total}%. Adjust the coefficients so the whole IIBB tax base is allocated.', { year: alert.year, total: alert.total })
+          : t('The active jurisdictions for {year} total {total}%. Ask an administrator to adjust the coefficients.', { year: alert.year, total: alert.total }),
+        href: canManageTaxes ? `${settingsHref}?coefficient_year=${alert.year}` : null,
         action: canManageTaxes ? t('Tax settings') : null,
+      });
+    } else if (alert.code === 'missing_coefficients') {
+      alerts.push({
+        tone: 'warning',
+        title: t('Convenio Multilateral coefficients are incomplete'),
+        message: canManageTaxes
+          ? t('{count} active jurisdictions have no coefficient for {year}. The default coefficient is being used for them.', { count: alert.count, year: alert.year })
+          : t('{count} active jurisdictions have no coefficient for {year}. Ask an administrator to configure them.', { count: alert.count, year: alert.year }),
+        href: canManageTaxes ? `${settingsHref}?coefficient_year=${alert.year}` : null,
+        action: canManageTaxes ? t('Tax settings') : null,
+      });
+    } else if (alert.code === 'multi_year_range') {
+      alerts.push({
+        tone: 'warning',
+        title: t('The selected range spans more than one year'),
+        message: t('Convenio Multilateral coefficients for {year} are applied to the whole range. Run a separate report per year to use each year coefficients.', { year: alert.year }),
       });
     } else if (alert.code === 'no_sales') {
       alerts.push({
@@ -162,7 +178,7 @@ function parseJurisdiction(body, req) {
   else if (values.name.length > 120) errors.name = req.t('Name must be 120 characters or fewer.');
   const salesShare = Number(values.sales_share);
   if (values.sales_share === '' || !Number.isFinite(salesShare) || salesShare < 0 || salesShare > 100) {
-    errors.sales_share = req.t('The sales share must be between 0 and 100.');
+    errors.sales_share = req.t('The default coefficient must be between 0 and 100.');
   }
   const iibbRate = Number(values.iibb_rate);
   if (values.iibb_rate === '' || !Number.isFinite(iibbRate) || iibbRate < 0 || iibbRate > 100) {
@@ -185,8 +201,9 @@ async function jurisdictionReferenceCounts(id) {
   return rows[0] || { perceptions: 0, withholdings: 0 };
 }
 
-async function loadSettingsData(defaultId = null) {
-  const [settings, rows] = await Promise.all([
+async function loadSettingsData({ defaultId = null, coefficientYear = null } = {}) {
+  const year = taxes.normalizeFiscalYear(coefficientYear);
+  const [settings, rows, coefficientRows] = await Promise.all([
     taxes.loadTaxSettings(),
     query(
       `SELECT j.*,
@@ -195,15 +212,44 @@ async function loadSettingsData(defaultId = null) {
          FROM tax_jurisdictions j
         ORDER BY j.name`,
     ),
+    query(
+      `SELECT jurisdiction_id, coefficient
+         FROM tax_jurisdiction_coefficients
+        WHERE fiscal_year = ?`,
+      [year],
+    ),
   ]);
+  const coefficientById = new Map(
+    coefficientRows.map((row) => [Number(row.jurisdiction_id), Number(row.coefficient) || 0]),
+  );
   const selectedDefault = defaultId || (settings ? Number(settings.default_jurisdiction_id) : null);
+  const jurisdictions = rows.map((row) => ({
+    ...row,
+    is_default: selectedDefault !== null && Number(row.id) === Number(selectedDefault),
+    annual_coefficient: coefficientById.has(Number(row.id))
+      ? coefficientById.get(Number(row.id))
+      : null,
+  }));
+  const activeJurisdictions = jurisdictions.filter((row) => row.status === 'active');
+  const effectiveCoefficient = (row) => (
+    row.annual_coefficient !== null
+      ? row.annual_coefficient
+      : Math.max(0, Number(row.sales_share) || 0)
+  );
+  const activeCoefficientTotal = taxes.round2(
+    activeJurisdictions.reduce((sum, row) => sum + effectiveCoefficient(row), 0),
+  );
+  const annualCoefficientCount = activeJurisdictions
+    .filter((row) => row.annual_coefficient !== null)
+    .length;
   return {
     taxSettings: settings,
     defaultId: settings ? Number(settings.default_jurisdiction_id) : null,
-    jurisdictions: rows.map((row) => ({
-      ...row,
-      is_default: selectedDefault !== null && Number(row.id) === Number(selectedDefault),
-    })),
+    coefficientYear: year,
+    jurisdictions,
+    activeCoefficientTotal,
+    annualCoefficientCount,
+    activeJurisdictionCount: activeJurisdictions.length,
   };
 }
 
@@ -214,8 +260,12 @@ async function renderSettings(req, res, options = {}) {
     errors = {},
     errorForm = null,
     editId = null,
+    coefficientYear = null,
+    coefficientValues = null,
+    coefficientErrors = {},
+    coefficientFormError = null,
   } = options;
-  const data = await loadSettingsData();
+  const data = await loadSettingsData({ coefficientYear });
   const editRow = editId
     ? data.jurisdictions.find((row) => Number(row.id) === Number(editId)) || null
     : null;
@@ -239,6 +289,9 @@ async function renderSettings(req, res, options = {}) {
       status: 'active',
     }),
     errors,
+    coefficientValues,
+    coefficientErrors,
+    coefficientFormError,
     money: (value) => formatMoney(value, currency, req.locale),
   });
 }
@@ -441,7 +494,71 @@ router.post('/withholdings/:id(\\d+)', async (req, res, next) => {
 router.get('/settings', adminOnly, async (req, res, next) => {
   try {
     const editId = req.query.edit ? Number(req.query.edit) : null;
-    return renderSettings(req, res, { editId });
+    const coefficientYear = taxes.normalizeFiscalYear(req.query.coefficient_year);
+    return renderSettings(req, res, { editId, coefficientYear });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/settings/coefficients', adminOnly, async (req, res, next) => {
+  try {
+    const coefficientYear = taxes.normalizeFiscalYear(req.body.coefficient_year);
+    const activeJurisdictions = await query(
+      "SELECT id, name, code FROM tax_jurisdictions WHERE status = 'active' ORDER BY name",
+    );
+    if (!activeJurisdictions.length) {
+      req.flash('error', 'Create an active jurisdiction before setting coefficients.');
+      return res.redirect(`${basePath}/settings`);
+    }
+
+    const coefficientValues = {};
+    const coefficientErrors = {};
+    let total = 0;
+    for (const jurisdiction of activeJurisdictions) {
+      const field = `coefficient_${jurisdiction.id}`;
+      const raw = req.body[field] === undefined ? '' : String(req.body[field]).trim();
+      coefficientValues[jurisdiction.id] = raw;
+      const coefficient = Number(raw);
+      if (raw === '' || !Number.isFinite(coefficient) || coefficient < 0 || coefficient > 100) {
+        coefficientErrors[jurisdiction.id] = req.t('Enter a coefficient between 0 and 100.');
+        continue;
+      }
+      total += coefficient;
+    }
+    total = taxes.round2(total);
+    let coefficientFormError = null;
+    if (!Object.keys(coefficientErrors).length && Math.abs(total - 100) > 0.01) {
+      coefficientFormError = req.t('The coefficients must total 100%. Current total: {total}%.', { total });
+    }
+
+    if (Object.keys(coefficientErrors).length || coefficientFormError) {
+      return renderSettings(req, res, {
+        status: 422,
+        coefficientYear,
+        coefficientValues,
+        coefficientErrors,
+        coefficientFormError,
+      });
+    }
+
+    await withTransaction(async (conn) => {
+      for (const jurisdiction of activeJurisdictions) {
+        const coefficient = taxes.round2(Number(coefficientValues[jurisdiction.id]));
+        await conn.query(
+          `INSERT INTO tax_jurisdiction_coefficients
+             (jurisdiction_id, fiscal_year, coefficient, created_by)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             coefficient = VALUES(coefficient),
+             created_by = VALUES(created_by)`,
+          [jurisdiction.id, coefficientYear, coefficient, req.session.user.id],
+        );
+      }
+    });
+
+    req.flash('success', 'Convenio Multilateral coefficients saved for {year}.', { year: coefficientYear });
+    return res.redirect(`${basePath}/settings?coefficient_year=${coefficientYear}`);
   } catch (error) {
     next(error);
   }
