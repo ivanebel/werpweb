@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS products (
   order_multiple   DECIMAL(14,3) NOT NULL DEFAULT 0,
   sold_by_weight   TINYINT(1) NOT NULL DEFAULT 0,
   weight_kg        DECIMAL(14,3) NOT NULL DEFAULT 0,
-  type          ENUM('finished_good','raw_material','consumable','service') NOT NULL DEFAULT 'finished_good',
+  type          ENUM('finished_good','for_sale','raw_material','consumable','service') NOT NULL DEFAULT 'finished_good',
   unit          VARCHAR(20) NOT NULL DEFAULT 'pcs',
   cost_gross_price DECIMAL(14,2) NOT NULL DEFAULT 0,
   cost_vat_rate    DECIMAL(5,2) NOT NULL DEFAULT 0,

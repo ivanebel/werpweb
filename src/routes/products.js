@@ -7,6 +7,7 @@ const { analyzeBarcode, barcodeFilename, renderBarcodeSvg } = require('../lib/ba
 
 const typeOptions = [
   { value: 'finished_good', label: 'Finished good' },
+  { value: 'for_sale', label: 'For Sale' },
   { value: 'raw_material', label: 'Raw material' },
   { value: 'consumable', label: 'Consumable' },
   { value: 'service', label: 'Service' },
@@ -152,6 +153,12 @@ async function applyPricingAndRules(data, existing = null) {
     data.is_purchasable = 1;
     data.is_manufactured = 0;
   }
+  if (data.type === 'for_sale') {
+    data.is_sellable = 1;
+    data.is_purchasable = 1;
+    data.is_manufactured = 0;
+    data.track_stock = 1;
+  }
   if (data.type === 'service') {
     data.track_stock = 0;
     data.is_manufactured = 0;
@@ -169,7 +176,7 @@ const fields = [
     return rows.map((r) => ({ value: String(r.id), label: r.name }));
   } },
   { name: 'brand_id', label: 'Brand', type: 'select', section: 'Product', optionsFrom: brandOptions },
-  { name: 'type', label: 'Product type', type: 'select', options: typeOptions, default: 'finished_good', section: 'Product', help: 'Raw materials are purchased but not sold. Finished goods can be produced from a BOM.' },
+  { name: 'type', label: 'Product type', type: 'select', options: typeOptions, default: 'finished_good', section: 'Product', help: 'Raw materials are purchased but not sold. Finished goods are produced from a BOM. For Sale products are purchased and resold.' },
   { name: 'unit', label: 'Unit of measure', type: 'text', default: 'pcs', section: 'Product', help: 'Used as the quantity label, e.g. pcs, pack, kg or m.' },
   { name: 'ean13', label: 'EAN-13', type: 'text', section: 'Identifiers', maxLength: 13, placeholder: '13 digits, optional', help: 'Retail barcode. Leave blank when the product has none.' },
   { name: 'dun14', label: 'DUN-14', type: 'text', section: 'Identifiers', maxLength: 14, placeholder: '14 digits, optional', help: 'Case / pallet barcode. Leave blank when the product has none.' },

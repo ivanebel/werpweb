@@ -53,7 +53,7 @@
                   <% const value = row[f.name] === null || row[f.name] === undefined ? '' : row[f.name]; %>
                   <% if (f.type === 'checkbox') { %>
                     <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition hover:border-brand-300 dark:border-gray-700 dark:hover:border-brand-500/50">
-                      <input type="checkbox" name="<%= f.name %>" value="1" class="form-checkbox mt-0.5" <%= Number(value) === 1 ? 'checked' : '' %>>
+                      <input id="field-<%= f.name %>" type="checkbox" name="<%= f.name %>" value="1" class="form-checkbox mt-0.5" <%= Number(value) === 1 ? 'checked' : '' %>>
                       <span>
                         <span class="block text-sm font-medium text-gray-800 dark:text-gray-200"><%= f.label %></span>
                         <% if (f.help) { %><span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400"><%= f.help %></span><% } %>
@@ -159,6 +159,12 @@
     type.addEventListener('change', function () {
       if (type.value === 'raw_material') {
         if (sellable) sellable.checked = false;
+        if (purchasable) purchasable.checked = true;
+        if (manufactured) manufactured.checked = false;
+        if (track) track.checked = true;
+      }
+      if (type.value === 'for_sale') {
+        if (sellable) sellable.checked = true;
         if (purchasable) purchasable.checked = true;
         if (manufactured) manufactured.checked = false;
         if (track) track.checked = true;

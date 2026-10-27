@@ -142,6 +142,7 @@ const ES = {
   'Contract': 'Contrato',
   'Intern': 'Pasante',
   'Finished good': 'Producto terminado',
+  'For Sale': 'Para la venta',
   'Raw material': 'Materia prima',
   'Consumable': 'Consumible',
   'Service': 'Servicio',
@@ -463,6 +464,8 @@ const ES = {
   'Leave blank to generate automatically.': 'Dejá en blanco para generar automáticamente.',
   'Raw materials are purchased but not sold. Finished goods can be produced from a BOM.':
     'Las materias primas se compran pero no se venden. Los productos terminados se pueden producir a partir de una BOM.',
+  'Raw materials are purchased but not sold. Finished goods are produced from a BOM. For Sale products are purchased and resold.':
+    'Las materias primas se compran pero no se venden. Los productos terminados se producen a partir de una BOM. Los productos Para la venta se compran y se revenden.',
   'Used as the quantity label, e.g. pcs, pack, kg or m.': 'Se usa como etiqueta de cantidad, p. ej. pcs, paquete, kg o m.',
   '13 digits, optional': '13 dígitos, opcional',
   '14 digits, optional': '14 dígitos, opcional',

@@ -58,6 +58,7 @@ const STATUS = {
   intern: { label: 'Intern', tone: 'gray' },
   // products
   finished_good: { label: 'Finished good', tone: 'info' },
+  for_sale: { label: 'For Sale', tone: 'success' },
   raw_material: { label: 'Raw material', tone: 'warning' },
   consumable: { label: 'Consumable', tone: 'purple' },
   service: { label: 'Service', tone: 'gray' },

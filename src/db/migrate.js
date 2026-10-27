@@ -101,6 +101,23 @@ async function upgradeSchema(conn, dbName) {
   const addedSaleGross = await addColumn(conn, dbName, 'products', 'sale_gross_price', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER cost_price');
   await addColumn(conn, dbName, 'products', 'sale_vat_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER sale_gross_price');
 
+  const [productTypeColumns] = await conn.query(
+    `SELECT COLUMN_TYPE AS column_type
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'products' AND COLUMN_NAME = 'type'
+      LIMIT 1`,
+    [dbName],
+  );
+  if (
+    productTypeColumns.length
+    && !String(productTypeColumns[0].column_type || productTypeColumns[0].COLUMN_TYPE).includes("'for_sale'")
+  ) {
+    await conn.query(
+      "ALTER TABLE products MODIFY COLUMN type ENUM('finished_good','for_sale','raw_material','consumable','service') NOT NULL DEFAULT 'finished_good'",
+    );
+    console.log('[migrate] added product type for_sale');
+  }
+
   // Existing products stored their final price in cost_price/sale_price. Make
   // those the gross amount once, so the first edit does not reset the price.
   if (addedCostGross) {
