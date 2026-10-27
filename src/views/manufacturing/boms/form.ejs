@@ -9,7 +9,9 @@
         const errorList = Object.values(errors || {}).concat(itemErrors || []);
         const productById = {};
         products.forEach(p => { productById[String(p.value)] = p; });
-        const lines = items && items.length ? items : [{ component_id: '', quantity: 1, scrap_percent: 0 }];
+        const classById = {};
+        (classes || []).forEach(c => { classById[String(c.id)] = c; });
+        const lines = items && items.length ? items : [{ item_type: 'component', component_id: '', material_class_id: '', quantity: 1, scrap_percent: 0 }];
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -104,27 +106,56 @@
                 <thead>
                   <tr>
                     <th class="table-th w-8">#</th>
-                    <th class="table-th min-w-[260px]">Component</th>
+                    <th class="table-th min-w-[280px]">Material / class</th>
                     <th class="table-th w-28 text-right">Qty</th>
                     <th class="table-th w-28 text-right">Scrap %</th>
-                    <th class="table-th w-32 text-right">Cost</th>
+                    <th class="table-th w-36 text-right">Cost</th>
                     <th class="table-th w-12"></th>
                   </tr>
                 </thead>
                 <tbody id="bom-lines">
-                  <% lines.forEach((item, i) => { const component = productById[String(item.component_id || '')]; %>
+                  <% lines.forEach((item, i) => {
+                    const itemType = item.item_type || (item.material_class_id ? 'class' : 'component');
+                    const component = productById[String(item.component_id || '')];
+                    const materialClass = classById[String(item.material_class_id || '')];
+                  %>
                     <tr data-bom-line class="align-top">
                       <td class="table-td pt-5 text-xs text-gray-400"><span data-bom-number><%= i + 1 %></span></td>
                       <td class="table-td">
-                        <select name="component_id[<%= i %>]" data-component-select class="form-select w-full">
-                          <option value="">Select component…</option>
-                          <% products.forEach(opt => { %>
-                            <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>" <%= String(item.component_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
-                          <% }) %>
+                        <select name="item_type[<%= i %>]" data-bom-type class="form-select w-full">
+                          <option value="component" <%= itemType !== 'class' ? 'selected' : '' %>><%= t('Fixed component') %></option>
+                          <option value="class" <%= itemType === 'class' ? 'selected' : '' %>><%= t('Material class') %></option>
                         </select>
-                        <span class="mt-1 block text-[11px] text-gray-400">
-                          <%= component ? t('{unit} · stock {qty}', { unit: component.unit, qty: h.formatQty(component.stock_qty) }) : t('Quantity per output unit') %>
-                        </span>
+                        <div class="mt-2 <%= itemType === 'class' ? 'hidden' : '' %>" data-bom-component-wrap>
+                          <select name="component_id[<%= i %>]" data-component-select class="form-select w-full">
+                            <option value=""><%= t('Select component') %></option>
+                            <% products.forEach(opt => { %>
+                              <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>" data-stock="<%= opt.stock %>" <%= String(item.component_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                            <% }) %>
+                          </select>
+                          <span class="mt-1 block text-[11px] text-gray-400" data-bom-unit-hint>
+                            <%= component ? t('{unit} · stock {qty}', { unit: component.unit, qty: h.formatQty(component.stock) }) : t('Quantity per output unit') %>
+                          </span>
+                        </div>
+                        <div class="mt-2 <%= itemType === 'class' ? '' : 'hidden' %>" data-bom-class-wrap>
+                          <select name="material_class_id[<%= i %>]" data-class-select class="form-select w-full">
+                            <option value=""><%= t('Select material class') %></option>
+                            <% (classes || []).forEach((option) => { %>
+                              <option value="<%= option.id %>"
+                                      data-cost="<%= option.unit_cost %>"
+                                      data-min="<%= option.cost_min %>"
+                                      data-max="<%= option.cost_max %>"
+                                      data-unit="<%= option.unit %>"
+                                      data-stock="<%= option.stock_qty %>"
+                                      data-missing="<%= option.active_member_count ? 0 : 1 %>"
+                                      <%= String(item.material_class_id || '') === String(option.id) ? 'selected' : '' %>><%= option.code %> - <%= option.name %> (<%= option.unit %>)<%= option.status === 'inactive' ? ` - ${t('inactive')}` : '' %></option>
+                            <% }) %>
+                          </select>
+                          <span class="mt-1 block text-[11px] text-gray-400" data-bom-unit-hint>
+                            <%= materialClass ? t('{unit} · class stock {qty}', { unit: materialClass.unit, qty: h.formatQty(materialClass.stock_qty) }) : t('Class quantity per output unit') %>
+                          </span>
+                          <span class="mt-0.5 block text-[11px] text-gray-400" data-bom-cost-range></span>
+                        </div>
                       </td>
                       <td class="table-td">
                         <input name="quantity[<%= i %>]" data-bom-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
@@ -136,7 +167,7 @@
                         <span class="font-medium text-gray-800 dark:text-gray-200" data-bom-cost><%= money(item.line_cost || 0) %></span>
                       </td>
                       <td class="table-td pt-4 text-right">
-                        <button type="button" data-remove-component class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove component">
+                        <button type="button" data-remove-component class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove') %>">
                           <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
                         </button>
                       </td>
@@ -149,19 +180,41 @@
               <tr data-bom-line class="align-top">
                 <td class="table-td pt-5 text-xs text-gray-400"><span data-bom-number></span></td>
                 <td class="table-td">
-                  <select name="component_id[__INDEX__]" data-component-select class="form-select w-full">
-                    <option value="">Select component…</option>
-                    <% products.forEach(opt => { %>
-                      <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>"><%= opt.label %></option>
-                    <% }) %>
+                  <select name="item_type[__INDEX__]" data-bom-type class="form-select w-full">
+                    <option value="component"><%= t('Fixed component') %></option>
+                    <option value="class"><%= t('Material class') %></option>
                   </select>
-                  <span class="mt-1 block text-[11px] text-gray-400">Quantity per output unit</span>
+                  <div class="mt-2" data-bom-component-wrap>
+                    <select name="component_id[__INDEX__]" data-component-select class="form-select w-full">
+                      <option value=""><%= t('Select component') %></option>
+                      <% products.forEach(opt => { %>
+                        <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>" data-stock="<%= opt.stock %>"><%= opt.label %></option>
+                      <% }) %>
+                    </select>
+                    <span class="mt-1 block text-[11px] text-gray-400" data-bom-unit-hint><%= t('Quantity per output unit') %></span>
+                  </div>
+                  <div class="mt-2 hidden" data-bom-class-wrap>
+                    <select name="material_class_id[__INDEX__]" data-class-select class="form-select w-full">
+                      <option value=""><%= t('Select material class') %></option>
+                      <% (classes || []).forEach((option) => { %>
+                        <option value="<%= option.id %>"
+                                data-cost="<%= option.unit_cost %>"
+                                data-min="<%= option.cost_min %>"
+                                data-max="<%= option.cost_max %>"
+                                data-unit="<%= option.unit %>"
+                                data-stock="<%= option.stock_qty %>"
+                                data-missing="<%= option.active_member_count ? 0 : 1 %>"><%= option.code %> - <%= option.name %> (<%= option.unit %>)<%= option.status === 'inactive' ? ` - ${t('inactive')}` : '' %></option>
+                      <% }) %>
+                    </select>
+                    <span class="mt-1 block text-[11px] text-gray-400" data-bom-unit-hint><%= t('Class quantity per output unit') %></span>
+                    <span class="mt-0.5 block text-[11px] text-gray-400" data-bom-cost-range></span>
+                  </div>
                 </td>
                 <td class="table-td"><input name="quantity[__INDEX__]" data-bom-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
                 <td class="table-td"><input name="scrap_percent[__INDEX__]" data-bom-scrap type="number" min="0" step="0.01" value="0" class="form-input text-right"></td>
                 <td class="table-td pt-7 text-right"><span class="font-medium" data-bom-cost>0.00</span></td>
                 <td class="table-td pt-4 text-right">
-                  <button type="button" data-remove-component class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove component">
+                  <button type="button" data-remove-component class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove') %>">
                     <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
                   </button>
                 </td>
@@ -182,7 +235,7 @@
                   <dd class="text-lg font-bold text-gray-900 dark:text-white"><span id="unit-cost">0.00</span> <span class="text-xs font-normal text-gray-400"><%= currency %></span></dd>
                 </div>
               </dl>
-              <p class="form-help">Based on current component cost prices, including scrap allowance.</p>
+              <p class="form-help"><%= t('Based on preferred component and material class costs, including scrap allowance.') %></p>
             </div>
 
             <div class="card p-5 md:p-6">

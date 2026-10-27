@@ -5,7 +5,11 @@
   <main class="flex-1 p-4 md:p-6">
     <div class="mx-auto max-w-[1400px]">
       <%
-        const totalWithScrap = items.reduce((sum, item) => sum + Number(item.qty_with_scrap || 0), 0);
+        const classItems = items.filter((item) => item.is_class);
+        const minMaterial = items.reduce((sum, item) => sum + Number(item.quantity || 0) * (1 + Number(item.scrap_percent || 0) / 100) * Number(item.cost_min || 0), 0);
+        const maxMaterial = items.reduce((sum, item) => sum + Number(item.quantity || 0) * (1 + Number(item.scrap_percent || 0) / 100) * Number(item.cost_max || 0), 0);
+        const hasCostRange = Math.abs(maxMaterial - minMaterial) > 0.0001;
+        const canManageClasses = currentUser && ['admin', 'manager'].includes(currentUser.role);
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -24,6 +28,12 @@
           <a href="/manufacturing/boms" class="btn btn-secondary btn-sm">
             <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
           </a>
+          <% if (classItems.length && canManageClasses) { %>
+            <a href="/manufacturing/material-classes" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'cube', className: 'h-4 w-4' }) %>
+              <%= t('Material classes') %>
+            </a>
+          <% } %>
           <a href="/manufacturing/production-orders/new?bom_id=<%= bom.id %>" class="btn btn-primary btn-sm">
             <%- include('/partials/icon', { name: 'factory', className: 'h-4 w-4' }) %> New production order
           </a>
@@ -46,6 +56,12 @@
           <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Material cost</p>
           <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(materialCost) %></p>
           <p class="mt-1 text-xs text-gray-400"><%= t('For {qty} {unit}', { qty: h.formatQty(bom.output_qty), unit: bom.product_unit }) %></p>
+          <% if (hasCostRange) { %>
+            <p class="mt-1 text-xs text-gray-400"><%= t('Preferred {preferred} · range {min} – {max}', { preferred: money(materialCost), min: money(minMaterial), max: money(maxMaterial) }) %></p>
+          <% } %>
+          <% if (classItems.some((item) => item.class_missing)) { %>
+            <p class="mt-1 text-xs text-warning-600 dark:text-warning-400"><%= t('One or more material classes have no active members.') %></p>
+          <% } %>
         </div>
         <div class="card p-5">
           <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Cost per unit</p>
@@ -77,7 +93,7 @@
             <table class="table-base min-w-[760px]">
               <thead>
                 <tr>
-                  <th class="table-th">Component</th>
+                  <th class="table-th"><%= t('Material / class') %></th>
                   <th class="table-th text-right">Qty</th>
                   <th class="table-th text-right">Scrap</th>
                   <th class="table-th text-right">Effective qty</th>
@@ -90,24 +106,41 @@
                 <% items.forEach(item => { %>
                   <tr class="table-row">
                     <td class="table-td">
-                      <a href="/products/<%= item.component_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= item.name %></a>
-                      <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= item.sku %> · <%= h.statusInfo(item.type).label %></span>
+                      <% if (item.is_class) { %>
+                        <p class="font-medium text-gray-900 dark:text-white/90"><%= item.name %></p>
+                        <p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                          <span class="font-mono"><%= item.sku %></span>
+                          <span class="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"><%= t('Material class') %></span>
+                        </p>
+                        <% if (item.preferred_member) { %>
+                          <p class="mt-1 text-xs text-gray-400"><%= t('Preferred: {name} (priority {priority})', { name: item.preferred_member.name, priority: item.preferred_member.priority }) %></p>
+                        <% } %>
+                      <% } else { %>
+                        <a href="/products/<%= item.component_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= item.name %></a>
+                        <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= item.sku %> · <%= h.statusInfo(item.type).label %></span>
+                      <% } %>
                     </td>
                     <td class="table-td text-right"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
                     <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatNumber(item.scrap_percent, 2) %>%</td>
                     <td class="table-td text-right"><%= h.formatQty(item.qty_with_scrap) %></td>
-                    <td class="table-td text-right"><%= money(item.cost_price) %></td>
+                    <td class="table-td text-right">
+                      <%= money(item.unit_cost) %>
+                      <% if (item.is_class && Math.abs(Number(item.cost_max) - Number(item.cost_min)) > 0.0001) { %>
+                        <span class="mt-0.5 block text-[10px] text-gray-400"><%= money(item.cost_min) %> – <%= money(item.cost_max) %></span>
+                      <% } %>
+                    </td>
                     <td class="table-td text-right font-medium"><%= money(item.line_cost) %></td>
                     <td class="table-td text-right">
                       <span class="<%= Number(item.stock_qty) < Number(item.qty_with_scrap) ? 'font-medium text-warning-600 dark:text-warning-400' : 'text-gray-600 dark:text-gray-300' %>">
                         <%= h.formatQty(item.stock_qty) %>
                       </span>
+                      <% if (item.is_class) { %><span class="mt-0.5 block text-[10px] text-gray-400"><%= item.unit %></span><% } %>
                     </td>
                   </tr>
                 <% }) %>
                 <% if (!items.length) { %>
                   <tr>
-                    <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400">No components in this BOM yet.</td>
+                    <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No components or material classes in this BOM yet.') %></td>
                   </tr>
                 <% } %>
               </tbody>
@@ -121,7 +154,7 @@
             </table>
           </div>
           <div class="border-t border-gray-100 px-5 py-4 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400 md:px-6">
-            <%= t('Effective quantity includes scrap. Total effective component quantity: {qty}.', { qty: h.formatQty(totalWithScrap) }) %>
+            <%= t('Effective quantity includes scrap. Material class lines use the preferred member cost; the substitution range is shown under the unit cost.') %>
           </div>
         </div>
 
@@ -171,6 +204,74 @@
           </div>
         </div>
       </div>
+
+      <% if (classItems.length) { %>
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Material class substitution options') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Members are eligible for this requirement in priority order. Production orders allocate actual stock using these rules.') %></p>
+            </div>
+            <% if (canManageClasses) { %>
+              <a href="/manufacturing/material-classes" class="btn btn-secondary btn-sm"><%= t('Manage material classes') %></a>
+            <% } %>
+          </div>
+          <div class="divide-y divide-gray-100 dark:divide-gray-800">
+            <% classItems.forEach((item) => { %>
+              <div class="p-5 md:p-6">
+                <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="text-sm font-semibold text-gray-900 dark:text-white"><%= item.name %></h3>
+                      <span class="badge bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"><%= item.sku %></span>
+                      <% if (item.class_missing) { %><span class="badge bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('No active members') %></span><% } %>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      <%= t('Requirement: {qty} {unit} per BOM output. Effective: {effective} {unit}.', { qty: h.formatQty(item.quantity), unit: item.unit, effective: h.formatQty(item.qty_with_scrap) }) %>
+                    </p>
+                    <p class="mt-0.5 text-xs text-gray-400">
+                      <%= item.preferred_member ? t('Preferred: {name} (priority {priority})', { name: item.preferred_member.name, priority: item.preferred_member.priority }) : t('No preferred member') %>
+                      · <%= t('Cost range {min} – {max}', { min: money(item.cost_min), max: money(item.cost_max) }) %>
+                    </p>
+                  </div>
+                  <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(item.members.length, 'member') %></span>
+                </div>
+                <div class="table-wrap mt-4">
+                  <table class="table-base min-w-[900px]">
+                    <thead>
+                      <tr>
+                        <th class="table-th"><%= t('Product') %></th>
+                        <th class="table-th text-right"><%= t('Priority') %></th>
+                        <th class="table-th text-right"><%= t('Conversion factor') %></th>
+                        <th class="table-th text-right"><%= t('Member stock') %></th>
+                        <th class="table-th text-right"><%= t('Class stock') %></th>
+                        <th class="table-th text-right"><%= t('Unit cost') %></th>
+                        <th class="table-th"><%= t('Status') %></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% item.members.forEach((member) => { const classStock = Number(member.stock_qty) * Number(member.conversion_factor); %>
+                        <tr class="table-row">
+                          <td class="table-td">
+                            <a href="/products/<%= member.product_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= member.name %></a>
+                            <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= member.product_sku %></span>
+                          </td>
+                          <td class="table-td text-right"><%= member.priority %></td>
+                          <td class="table-td text-right"><%= h.formatNumber(member.conversion_factor, 6) %></td>
+                          <td class="table-td text-right"><%= h.formatQty(member.stock_qty) %> <span class="text-xs text-gray-400"><%= member.product_unit %></span></td>
+                          <td class="table-td text-right font-medium"><%= h.formatQty(classStock) %> <span class="text-xs font-normal text-gray-400"><%= item.unit %></span></td>
+                          <td class="table-td text-right"><%= money(member.unit_cost) %></td>
+                          <td class="table-td"><%- statusBadge(member.status) %></td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        </div>
+      <% } %>
     </div>
   </main>
   <%- include('/layouts/footer') %>

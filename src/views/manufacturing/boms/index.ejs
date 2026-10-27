@@ -8,7 +8,7 @@
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 class="page-title">Bills of materials</h1>
-          <p class="page-subtitle">Define the components, quantities and scrap for every manufactured product.</p>
+          <p class="page-subtitle">Define fixed components or material classes, quantities and scrap for every manufactured product.</p>
         </div>
         <a href="/manufacturing/boms/new" class="btn btn-primary btn-sm">
           <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
@@ -52,7 +52,7 @@
                 <th class="table-th">Product</th>
                 <th class="table-th">BOM</th>
                 <th class="table-th text-right">Output</th>
-                <th class="table-th text-right">Components</th>
+                <th class="table-th text-right">Material lines</th>
                 <th class="table-th text-right">Unit cost</th>
                 <th class="table-th text-right">Sale price</th>
                 <th class="table-th">Status</th>
@@ -71,7 +71,12 @@
                     <span class="mt-0.5 block text-xs text-gray-400"><%= row.version %></span>
                   </td>
                   <td class="table-td text-right"><%= h.formatQty(row.output_qty) %></td>
-                  <td class="table-td text-right"><%= h.formatNumber(row.component_count, 0) %></td>
+                  <td class="table-td text-right">
+                    <%= h.formatNumber(row.component_count, 0) %>
+                    <% if (Number(row.class_count) > 0) { %>
+                      <span class="mt-0.5 block text-[10px] text-purple-600 dark:text-purple-400"><%= t('{count} class lines', { count: row.class_count }) %></span>
+                    <% } %>
+                  </td>
                   <td class="table-td text-right font-medium"><%= money(row.unit_cost) %></td>
                   <td class="table-td text-right"><%= money(row.sale_price) %></td>
                   <td class="table-td"><%- statusBadge(row.status) %></td>

@@ -19,7 +19,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Sales** — sales orders, sales invoices and deliveries. Orders can be confirmed, invoiced and delivered partially or completely. Each customer can have several receiving warehouses (separate from the billing address). Sales orders store the customer's own order number, a destination warehouse, the docking station and the expected reception date/time; deliveries and their printed documents show these details. Each delivery receives a sequential packing-slip number from an administrator-managed CAI authorization, and packing slips can carry an optional COT code. Packing-slip lines show pallets, boxes, units and weight, calculated from the product packaging data and editable for manual adjustments, with lot and expiry stored for the printable pallet slips (two copies per pallet, with EAN-13/DUN-14 barcodes and a summary QR code). Carrier and transport records store the company, driver, DNI/ID and truck license plate, and those details are printed on the packing slip. Customers can also store their own product codes, which are printed on sales documents and packing slips. Sales and purchase invoices use the ARCA number format `#####-########`, select an active fiscal document type, and support linked packing slips and credit/debit note relations; sales invoices also store CAE data and the optional MiPyME credit-invoice fields.
 - **Purchasing** — purchase orders and purchase invoices (bills). Receiving a bill posts stock into inventory.
 - **Point of Sale (Unit #2)** — manage several shops as distinct points of sale, record completed POS sales with ticket type, ticket number and shop, and analyse revenue, average ticket, units, product rankings and category performance. POS sales are reporting records only: they do not create stock movements or change Unit #1 inventory.
-- **Manufacturing** — bills of materials with component quantities and scrap, multi-BOM production orders where each line has its own quantity, lot, expiry and notes, aggregated material requirements across all BOM lines, material availability checks, component consumption and finished-goods posting, plus scale records from the Bizerba GLM-e labeler with lot/date filters, weight statistics, and box/pallet totals.
+- **Manufacturing** - bills of materials with fixed components or flexible **material classes**, component quantities and scrap, multi-BOM production orders where each line has its own quantity, lot, expiry and notes, aggregated material requirements across all BOM lines, material availability checks, component consumption and finished-goods posting, plus scale records from the Bizerba GLM-e labeler with lot/date filters, weight statistics, and box/pallet totals. Material classes group interchangeable products (for example cheese brands, film reels or label rolls) with a global priority and a conversion factor to the class unit. Production orders split each class requirement across the available members by priority and stock, allow mixing members, reserve stock for other active orders, and keep the actual member allocation as a snapshot for costing and completion.
 - **Finance: costs and profitability** — a management-accounting workspace for fixed, variable, semi-variable and stepped costs. Cost centers and categories organise spending; cost items define recurring amounts or variable drivers such as units, net revenue, material cost, invoices, pallets or labour hours. The analysis dashboard combines BOM-based product costs with sales invoices to show contribution margin, operating profit, break-even revenue and units, margin of safety, cash break-even and product profitability. Monthly actual costs can be entered manually or imported from CSV and compared with the calculated plan. All analytical amounts are net of recoverable VAT.
 - **Finance: sales simulator** — build saved sales scenarios with a product/customer basket, monthly quantities, net prices, discounts and optional cost overrides. Each scenario projects revenue, contribution, fixed costs, operating profit, break-even, product and customer margins, a BOM-based purchase plan net of stock and open purchase orders, a production plan and a simplified cash/working-capital estimate. Scenarios can be duplicated, locked, archived and compared side by side.
 - **Finance: cash flow** — a 13-week weekly and 12-month monthly cash forecast built from cash account balances, open receivables and payables, collection and payment profiles, open checks, recurring fixed costs and planned cash events. It includes AR/AP aging, collection-rate assumptions, a minimum cash buffer with funding-gap alerts, planned-event and fixed-cost detail, cash snapshots for actual-vs-forecast tracking, CSV export and a settings page. Cash amounts are gross cash movements; non-cash costs and future uninvoiced sales are not forecast automatically.
@@ -178,10 +178,13 @@ Finance calculation helpers have standalone unit checks that do not touch the da
 ```bash
 npm run test:finance
 npm run test:simulator
+npm run test:materials
 npm run test:cashflow
 npm run test:prices
 npm run test:taxes
 ```
+
+`npm run test:materials` checks the material-class allocation and costing helpers without a database. `npm run test:manufacturing` uses the configured development database: it creates its own products, class, BOM and production orders, verifies reservation and completion behaviour, and removes everything it created.
 
 ---
 
@@ -237,7 +240,7 @@ npm run test:taxes
    - monthly revenue, material cost, other variable costs, contribution, fixed costs and operating profit;
    - break-even revenue, break-even units and margin of safety;
    - product and customer margins;
-   - a purchase plan net of stock and open purchase orders, with order-by dates based on lead times and quantities rounded to product minimums and order multiples;
+   - a purchase plan net of stock and open purchase orders, with order-by dates based on lead times and quantities rounded to product minimums and order multiples; material classes are planned as one class requirement and any purchase is assigned to the preferred member;
    - a production plan for manufactured products;
    - a simplified cash and working-capital projection using collection, payment and inventory days.
 6. Product purchasing fields are maintained in the product form under **Purchasing**: lead time, minimum order quantity and order multiple.
@@ -349,11 +352,13 @@ npm run test:taxes
 
 ### Manufacturing
 
-1. Create an **active BOM** for a finished product and add its components with quantities and scrap percentages.
-2. Create a **production order** and add one or more **BOM lines**, each with its own quantity, lot number, expiry date and notes. The order can optionally be linked to a sales order.
-3. Review the **aggregated material requirements**; components shared by several BOMs appear once with their combined quantity. Release the order, then start production.
-4. **Complete** the order: the system checks material availability, consumes the combined components, records stock movements and adds every finished product to stock. If stock is short, completion is blocked with a clear error.
-5. Sales orders can also generate a production order with lines for their manufactured products from the order detail page.
+1. Create an **active BOM** for a finished product and add its material lines. A line is either a **fixed component** or a **material class** with a class quantity and scrap percentage.
+2. Material classes are managed by administrators and managers under **Manufacturing → Material classes**. Each class has a unit (for example `kg` or `unit`) and a list of interchangeable product members. Lower priority numbers are preferred. The **conversion factor** is the number of class units supplied by one member unit: a 20 kg film reel is `20`, a 2,500-label roll is `2,500`, and a 10 kg cheese box is `10`.
+3. The BOM cost for a class line uses the preferred member cost and shows the substitution range from the cheapest to the most expensive active member. Existing fixed-component BOMs keep working unchanged.
+4. Create a **production order** and add one or more **BOM lines**, each with its own quantity, lot number, expiry date and notes. The order can optionally be linked to a sales order.
+5. Review the **material requirements**. Class requirements are converted into member quantities by priority and available stock, excluding stock reserved by other planned, released or in-progress orders. Use **Edit allocation** to change the split manually or **Recalculate** to reset it to the priority allocation.
+6. **Complete** the order: the system checks shortages and stock, consumes the allocated member products, records stock movements with the snapshotted unit costs, and adds every finished product to stock. Completion is blocked while a requirement still has a shortage.
+7. Sales orders can also generate a production order with lines for their manufactured products from the order detail page.
 
 ### Point-of-sale reporting
 
@@ -396,7 +401,8 @@ src/
     helpers.js           Formatting, badges, pagination, status metadata
     settings.js          Cached company settings
     sequences.js         Per-year document numbering
-    production.js        BOM snapshots and production completion
+    production.js        BOM snapshots, material allocation and production completion
+    materials.js         Material classes, member costs, stock and BOM costing
     checks.js            Check statuses, history, payment links and reversal
     finance.js           Cost items, periods and profitability calculations
     simulator.js         Sales scenario, purchase plan and cash calculations

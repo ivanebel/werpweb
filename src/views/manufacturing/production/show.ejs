@@ -145,66 +145,136 @@
             </div>
           </div>
 
-          <div class="card overflow-hidden">
+                    <div class="card overflow-hidden">
             <div class="card-header">
               <div>
                 <h2 class="card-title"><%= t('Material requirements') %></h2>
-                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Aggregated from {count} BOM lines. Shared components are combined.', { count: lines.length }) %></p>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Aggregated from {count} BOM lines. Material classes are allocated across their members.', { count: lines.length }) %></p>
               </div>
-              <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(materials.length, 'component') %></span>
+              <div class="flex items-center gap-2">
+                <% if (activeOrder) { %>
+                  <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/reallocate" class="inline" data-confirm="<%= t('Replace the current allocation with the priority and current stock allocation?') %>">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-secondary btn-sm"><%= t('Recalculate') %></button>
+                  </form>
+                  <a href="/manufacturing/production-orders/<%= order.id %>/materials" class="btn btn-secondary btn-sm"><%= t('Edit allocation') %></a>
+                <% } %>
+                <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(requirements.length, 'requirement') %></span>
+              </div>
             </div>
             <div class="table-wrap">
-              <table class="table-base min-w-[820px]">
+              <table class="table-base min-w-[950px]">
                 <thead>
                   <tr>
-                    <th class="table-th">Component</th>
-                    <th class="table-th text-right">Required</th>
-                    <th class="table-th text-right">Consumed</th>
-                    <th class="table-th text-right">On hand</th>
-                    <th class="table-th text-right">Unit cost</th>
-                    <th class="table-th text-right">Line cost</th>
-                    <th class="table-th">Availability</th>
+                    <th class="table-th"><%= t('Material / class') %></th>
+                    <th class="table-th text-right"><%= t('Required') %></th>
+                    <th class="table-th text-right"><%= t('Allocated') %></th>
+                    <th class="table-th text-right"><%= t('Shortage') %></th>
+                    <th class="table-th"><%= t('Unit') %></th>
+                    <th class="table-th text-right"><%= t('BOM lines') %></th>
+                    <th class="table-th"><%= t('Availability') %></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <% materials.forEach(m => {
+                  <% requirements.forEach((requirement) => { const short = Number(requirement.shortage_qty) > 0.0005; %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <% if (requirement.material_class_id) { %>
+                          <p class="font-medium text-gray-900 dark:text-white/90"><%= requirement.class_name %></p>
+                          <p class="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-gray-400"><span class="font-mono"><%= requirement.class_code %></span><span class="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"><%= t('Material class') %></span></p>
+                        <% } else { %>
+                          <a href="/products/<%= requirement.component_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= requirement.component_name %></a>
+                          <p class="mt-0.5 font-mono text-xs text-gray-400"><%= requirement.component_sku %></p>
+                        <% } %>
+                      </td>
+                      <td class="table-td text-right font-medium"><%= h.formatQty(requirement.quantity_required) %></td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.quantity_allocated) %></td>
+                      <td class="table-td text-right font-semibold <%= short ? 'text-warning-600 dark:text-warning-400' : 'text-gray-400' %>"><%= h.formatQty(requirement.shortage_qty) %></td>
+                      <td class="table-td"><%= requirement.unit %></td>
+                      <td class="table-td text-right"><%= requirement.source_count %></td>
+                      <td class="table-td">
+                        <% if (short) { %>
+                          <span class="badge bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Short') %></span>
+                        <% } else { %>
+                          <span class="badge bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"><%= t('Covered') %></span>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                  <% if (!requirements.length) { %>
+                    <tr><td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No material requirements snapped for this order.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card overflow-hidden">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Material allocations') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Actual member products selected for each requirement.') %></p>
+              </div>
+              <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(materials.length, 'allocation') %></span>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[1050px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Member') %></th>
+                    <th class="table-th"><%= t('Class') %></th>
+                    <th class="table-th text-right"><%= t('Priority') %></th>
+                    <th class="table-th text-right"><%= t('Allocated') %></th>
+                    <th class="table-th text-right"><%= t('Consumed') %></th>
+                    <th class="table-th text-right"><%= t('On hand') %></th>
+                    <th class="table-th text-right"><%= t('Reserved elsewhere') %></th>
+                    <th class="table-th text-right"><%= t('Unit cost') %></th>
+                    <th class="table-th text-right"><%= t('Line cost') %></th>
+                    <th class="table-th"><%= t('Status') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% materials.forEach((m) => {
                     const short = Number(m.track_stock) === 1 && Number(m.stock_qty) < Number(m.quantity_required);
                   %>
                     <tr class="table-row">
                       <td class="table-td">
                         <a href="/products/<%= m.component_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= m.name %></a>
                         <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= m.sku %> · <%= m.unit %></span>
-                        <% if (Number(m.source_count) > 1) { %>
-                          <span class="mt-1 inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:bg-purple-500/15 dark:text-purple-400">
-                            <%= t('Shared by {count} BOM lines', { count: m.source_count }) %>
-                          </span>
+                      </td>
+                      <td class="table-td">
+                        <% if (m.material_class_id) { %>
+                          <span class="text-gray-700 dark:text-gray-300"><%= m.class_name %></span>
+                          <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= m.class_code %></span>
+                        <% } else { %>
+                          <span class="text-gray-400">—</span>
                         <% } %>
                       </td>
+                      <td class="table-td text-right"><%= Number(m.priority) || '—' %></td>
                       <td class="table-td text-right font-medium"><%= h.formatQty(m.quantity_required) %></td>
                       <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(m.quantity_consumed) %></td>
                       <td class="table-td text-right"><%= h.formatQty(m.stock_qty) %></td>
-                      <td class="table-td text-right"><%= money(m.cost_price) %></td>
+                      <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(m.reserved_other || 0) %></td>
+                      <td class="table-td text-right"><%= money(m.unit_cost || m.cost_price) %></td>
                       <td class="table-td text-right font-medium"><%= money(m.line_cost) %></td>
                       <td class="table-td">
                         <% if (Number(m.track_stock) !== 1) { %>
-                          <span class="text-xs text-gray-400">Not tracked</span>
+                          <span class="text-xs text-gray-400"><%= t('Not tracked') %></span>
                         <% } else if (short) { %>
-                          <span class="badge bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-500/15 dark:text-warning-400">Short</span>
+                          <span class="badge bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Short') %></span>
                         <% } else { %>
-                          <span class="badge bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/15 dark:text-success-400">Available</span>
+                          <span class="badge bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/15 dark:text-success-400"><%= t('Available') %></span>
                         <% } %>
                       </td>
                     </tr>
                   <% }) %>
                   <% if (!materials.length) { %>
-                    <tr>
-                      <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No materials snapped for this order.') %></td>
-                    </tr>
+                    <tr><td colspan="10" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No material allocations for this order.') %></td></tr>
                   <% } %>
                 </tbody>
                 <tfoot>
                   <tr class="bg-gray-50 dark:bg-white/[0.02]">
-                    <td class="table-td font-semibold text-gray-800 dark:text-gray-200" colspan="5"><%= t('Estimated material cost') %></td>
+                    <td class="table-td font-semibold text-gray-800 dark:text-gray-200" colspan="8"><%= t('Estimated material cost') %></td>
                     <td class="table-td text-right font-semibold text-gray-900 dark:text-white"><%= money(totalCost) %></td>
                     <td class="table-td"></td>
                   </tr>

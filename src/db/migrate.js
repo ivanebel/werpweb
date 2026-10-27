@@ -334,6 +334,99 @@ async function upgradeSchema(conn, dbName) {
         WHERE id = (SELECT default_jurisdiction_id FROM tax_settings WHERE id = 1 LIMIT 1)`,
     );
   }
+
+  // ------------------------------------------------------- material classes
+  await addColumn(conn, dbName, 'bom_items', 'material_class_id', 'INT UNSIGNED NULL AFTER component_id');
+  await makeNullable(conn, dbName, 'bom_items', 'component_id', 'INT UNSIGNED NULL');
+  await addIndex(conn, dbName, 'bom_items', 'uq_bom_material_class', 'UNIQUE KEY `uq_bom_material_class` (`bom_id`, `material_class_id`)');
+  await addIndex(conn, dbName, 'bom_items', 'idx_bom_items_class', 'KEY `idx_bom_items_class` (`material_class_id`)');
+  await addConstraint(
+    conn,
+    dbName,
+    'bom_items',
+    'fk_bom_items_class',
+    'FOREIGN KEY (`material_class_id`) REFERENCES `material_classes` (`id`) ON DELETE RESTRICT',
+  );
+  await addConstraint(
+    conn,
+    dbName,
+    'bom_items',
+    'chk_bom_items_source',
+    'CHECK ((`component_id` IS NULL) <> (`material_class_id` IS NULL))',
+  );
+
+  await addColumn(conn, dbName, 'production_order_materials', 'requirement_id', 'INT UNSIGNED NULL AFTER production_order_id');
+  await addColumn(conn, dbName, 'production_order_materials', 'material_class_id', 'INT UNSIGNED NULL AFTER requirement_id');
+  await addColumn(conn, dbName, 'production_order_materials', 'priority', 'INT NOT NULL DEFAULT 0 AFTER source_count');
+  await addColumn(conn, dbName, 'production_order_materials', 'conversion_factor', 'DECIMAL(18,6) NOT NULL DEFAULT 1 AFTER priority');
+  await addColumn(conn, dbName, 'production_order_materials', 'unit_cost', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER conversion_factor');
+  await addColumn(conn, dbName, 'production_order_materials', 'is_substitute', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER unit_cost');
+  await addIndex(conn, dbName, 'production_order_materials', 'idx_pom_requirement', 'KEY `idx_pom_requirement` (`requirement_id`)');
+  await addIndex(conn, dbName, 'production_order_materials', 'idx_pom_class', 'KEY `idx_pom_class` (`material_class_id`)');
+  await addConstraint(
+    conn,
+    dbName,
+    'production_order_materials',
+    'fk_pom_requirement',
+    'FOREIGN KEY (`requirement_id`) REFERENCES `production_order_requirements` (`id`) ON DELETE CASCADE',
+  );
+  await addConstraint(
+    conn,
+    dbName,
+    'production_order_materials',
+    'fk_pom_class',
+    'FOREIGN KEY (`material_class_id`) REFERENCES `material_classes` (`id`) ON DELETE SET NULL',
+  );
+
+  // Backfill requirements for production orders created before the allocation
+  // model. Existing fixed-component material rows become one requirement and
+  // allocation each.
+  const [legacyMaterials] = await conn.query(
+    `SELECT m.id, m.production_order_id, m.component_id, m.quantity_required,
+            m.quantity_consumed, m.source_count, p.unit,
+            COALESCE(
+              NULLIF(p.cost_gross_price, 0) + (p.cost_gross_price * p.cost_levy_rate / 100),
+              p.cost_price,
+              0
+            ) AS unit_cost
+       FROM production_order_materials m
+       JOIN products p ON p.id = m.component_id
+      WHERE m.requirement_id IS NULL
+      ORDER BY m.production_order_id, m.id`,
+  );
+  for (const material of legacyMaterials) {
+    const [existing] = await conn.query(
+      `SELECT id FROM production_order_requirements
+        WHERE production_order_id = ? AND component_id = ?
+        LIMIT 1`,
+      [material.production_order_id, material.component_id],
+    );
+    let requirementId = existing.length ? existing[0].id : null;
+    if (!requirementId) {
+      const [inserted] = await conn.query(
+        `INSERT INTO production_order_requirements
+           (production_order_id, component_id, unit, quantity_required,
+            quantity_allocated, quantity_consumed, shortage_qty, source_count, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0)`,
+        [
+          material.production_order_id,
+          material.component_id,
+          material.unit || 'unit',
+          material.quantity_required,
+          material.quantity_required,
+          material.quantity_consumed,
+          material.source_count || 1,
+        ],
+      );
+      requirementId = inserted.insertId;
+    }
+    await conn.query(
+      `UPDATE production_order_materials
+          SET requirement_id = ?, unit_cost = ?, priority = 0, is_substitute = 0
+        WHERE id = ?`,
+      [requirementId, material.unit_cost, material.id],
+    );
+  }
 }
 
 async function main() {

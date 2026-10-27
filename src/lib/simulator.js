@@ -2,6 +2,7 @@
 
 const { query, one } = require('../db');
 const finance = require('./finance');
+const materials = require('./materials');
 
 const round2 = finance.round2;
 const round3 = finance.round3;
@@ -139,61 +140,92 @@ async function loadBomData(productIds) {
   const ids = [...new Set(productIds.map(Number).filter((id) => id > 0))];
   if (!ids.length) return new Map();
   const placeholders = ids.map(() => '?').join(', ');
-  const rows = await query(
-    `SELECT b.id AS bom_id, b.product_id, b.output_qty,
-            bi.component_id, bi.quantity, bi.scrap_percent, bi.sort_order,
-            cp.sku AS component_sku, cp.name AS component_name, cp.unit,
-            cp.type AS component_type, cp.cost_gross_price, cp.cost_levy_rate, cp.cost_price,
-            cp.stock_qty, cp.supplier_id, cp.lead_time_days, cp.min_order_qty, cp.order_multiple,
-            s.company_name AS supplier_name
-       FROM boms b
-       JOIN bom_items bi ON bi.bom_id = b.id
-       JOIN products cp ON cp.id = bi.component_id
-       LEFT JOIN suppliers s ON s.id = cp.supplier_id
-      WHERE b.status = 'active'
-        AND b.product_id IN (${placeholders})
-      ORDER BY b.id DESC, bi.sort_order, bi.id`,
+  const bomRows = await query(
+    `SELECT id, product_id, output_qty
+       FROM boms
+      WHERE status = 'active'
+        AND product_id IN (${placeholders})
+      ORDER BY id DESC`,
     ids,
   );
+  const selected = new Map();
+  for (const row of bomRows) {
+    const productId = Number(row.product_id);
+    if (!selected.has(productId)) selected.set(productId, row);
+  }
+  if (!selected.size) return new Map();
+  const lineMap = await materials.loadBomLineCosts([...selected.values()].map((row) => row.id));
 
   const boms = new Map();
-  for (const row of rows) {
-    const productId = Number(row.product_id);
-    const bomId = Number(row.bom_id);
-    let bom = boms.get(productId);
-    if (!bom) {
-      bom = {
-        bom_id: bomId,
-        output_qty: Math.max(0.0001, Number(row.output_qty) || 1),
-        components: [],
-        unit_cost: 0,
-      };
-      boms.set(productId, bom);
+  for (const [productId, header] of selected) {
+    const bomId = Number(header.id);
+    const output = Math.max(0.0001, Number(header.output_qty) || 1);
+    const bom = {
+      bom_id: bomId,
+      output_qty: output,
+      components: [],
+      unit_cost: 0,
+    };
+    for (const line of lineMap.get(bomId) || []) {
+      const quantity = Math.max(0, Number(line.quantity) || 0);
+      const scrap = Math.max(0, Number(line.scrap_percent) || 0);
+      const unitCost = Math.max(0, Number(line.unit_cost) || 0);
+      const requiredPerOutput = (quantity * (1 + scrap / 100)) / output;
+      bom.unit_cost = round4(bom.unit_cost + requiredPerOutput * unitCost);
+      if (line.is_class) {
+        const active = materials.activeMembers(line.members).sort(materials.sortMembers);
+        const preferred = active[0] || null;
+        bom.components.push({
+          is_class: true,
+          material_class_id: line.material_class_id,
+          class_name: line.name,
+          class_code: line.sku,
+          class_unit: line.unit,
+          class_quantity: quantity,
+          quantity,
+          scrap_percent: scrap,
+          required_per_output: round4(requiredPerOutput),
+          unit_cost: unitCost,
+          cost_min: line.cost_min,
+          cost_max: line.cost_max,
+          members: active,
+          preferred_member: preferred,
+          component_id: preferred ? preferred.product_id : null,
+          sku: preferred ? preferred.product_sku : line.sku,
+          name: preferred ? preferred.name : line.name,
+          unit: preferred ? preferred.product_unit : line.unit,
+          type: 'material_class',
+          stock_qty: line.stock_qty,
+          supplier_id: preferred ? preferred.supplier_id : null,
+          supplier_name: preferred ? preferred.supplier_name : null,
+          lead_time_days: preferred ? preferred.lead_time_days : 0,
+          min_order_qty: preferred ? preferred.min_order_qty : 0,
+          order_multiple: preferred ? preferred.order_multiple : 0,
+          sort_order: Number(line.sort_order) || 0,
+        });
+      } else {
+        bom.components.push({
+          is_class: false,
+          component_id: Number(line.component_id),
+          sku: line.sku,
+          name: line.name,
+          unit: line.unit,
+          type: line.type,
+          quantity,
+          scrap_percent: scrap,
+          required_per_output: round4(requiredPerOutput),
+          unit_cost: unitCost,
+          stock_qty: Number(line.stock_qty) || 0,
+          supplier_id: line.supplier_id ? Number(line.supplier_id) : null,
+          supplier_name: line.supplier_name,
+          lead_time_days: Number(line.lead_time_days) || 0,
+          min_order_qty: Number(line.min_order_qty) || 0,
+          order_multiple: Number(line.order_multiple) || 0,
+          sort_order: Number(line.sort_order) || 0,
+        });
+      }
     }
-    if (bom.bom_id !== bomId) continue;
-    const quantity = Math.max(0, Number(row.quantity) || 0);
-    const scrap = Math.max(0, Number(row.scrap_percent) || 0);
-    const unitCost = netProductCost(row);
-    const requiredPerOutput = (quantity * (1 + scrap / 100)) / bom.output_qty;
-    bom.unit_cost = round4(bom.unit_cost + requiredPerOutput * unitCost);
-    bom.components.push({
-      component_id: Number(row.component_id),
-      sku: row.component_sku,
-      name: row.component_name,
-      unit: row.unit,
-      type: row.component_type,
-      quantity,
-      scrap_percent: scrap,
-      required_per_output: round4(requiredPerOutput),
-      unit_cost: unitCost,
-      stock_qty: Number(row.stock_qty) || 0,
-      supplier_id: row.supplier_id ? Number(row.supplier_id) : null,
-      supplier_name: row.supplier_name,
-      lead_time_days: Number(row.lead_time_days) || 0,
-      min_order_qty: Number(row.min_order_qty) || 0,
-      order_multiple: Number(row.order_multiple) || 0,
-      sort_order: Number(row.sort_order) || 0,
-    });
+    boms.set(productId, bom);
   }
   return boms;
 }
@@ -342,7 +374,13 @@ async function buildScenarioResults(scenarioOrId) {
   ]);
   const requirementIds = new Set(productIds);
   for (const bom of bomByProduct.values()) {
-    for (const component of bom.components) requirementIds.add(component.component_id);
+    for (const component of bom.components) {
+      if (component.is_class) {
+        for (const member of component.members || []) requirementIds.add(Number(member.product_id));
+      } else if (component.component_id) {
+        requirementIds.add(Number(component.component_id));
+      }
+    }
   }
   const openPurchaseQuantities = await loadOpenPurchaseQuantities([...requirementIds]);
 
@@ -419,6 +457,7 @@ async function buildScenarioResults(scenarioOrId) {
   }));
 
   const purchaseRequirements = new Map();
+  const classRequirements = new Map();
   const productionPlan = new Map();
 
   const addRequirement = (product, period, quantity) => {
@@ -443,6 +482,56 @@ async function buildScenarioResults(scenarioOrId) {
         order_multiple: Number(product.order_multiple) || 0,
       };
       purchaseRequirements.set(key, row);
+    }
+    row.monthly.set(period, round3((row.monthly.get(period) || 0) + quantity));
+    row.total = round3(row.total + quantity);
+  };
+
+  const addClassRequirement = (component, period, quantity) => {
+    if (!component || !quantity) return;
+    const key = Number(component.material_class_id);
+    let row = classRequirements.get(key);
+    if (!row) {
+      const members = [...(component.members || [])].sort(materials.sortMembers);
+      const preferred = members[0] || null;
+      const stock = members.reduce(
+        (sum, member) => sum + Math.max(0, Number(member.stock_qty) || 0)
+          * Math.max(0, Number(member.conversion_factor) || 0),
+        0,
+      );
+      const openPo = members.reduce(
+        (sum, member) => sum + (Number(openPurchaseQuantities.get(Number(member.product_id))) || 0)
+          * Math.max(0, Number(member.conversion_factor) || 0),
+        0,
+      );
+      row = {
+        is_class: true,
+        material_class_id: key,
+        class_code: component.class_code,
+        class_name: component.class_name,
+        class_unit: component.class_unit,
+        members,
+        member_count: members.length,
+        preferred_member: preferred,
+        member_name: preferred ? preferred.name : null,
+        member_sku: preferred ? preferred.product_sku : null,
+        member_unit: preferred ? preferred.product_unit : null,
+        name: component.class_name,
+        sku: component.class_code,
+        unit: component.class_unit,
+        conversion_factor: preferred ? Math.max(0.000001, Number(preferred.conversion_factor) || 1) : 1,
+        stock: round3(stock),
+        open_po: round3(openPo),
+        unit_cost: preferred ? materials.memberUnitCost(preferred) : Number(component.unit_cost) || 0,
+        supplier_id: preferred ? preferred.supplier_id : null,
+        supplier_name: preferred ? preferred.supplier_name : null,
+        lead_time_days: preferred ? Number(preferred.lead_time_days) || 0 : 0,
+        min_order_qty: preferred ? Number(preferred.min_order_qty) || 0 : 0,
+        order_multiple: preferred ? Number(preferred.order_multiple) || 0 : 0,
+        monthly: new Map(),
+        total: 0,
+      };
+      classRequirements.set(key, row);
     }
     row.monthly.set(period, round3((row.monthly.get(period) || 0) + quantity));
     row.total = round3(row.total + quantity);
@@ -562,23 +651,27 @@ async function buildScenarioResults(scenarioOrId) {
         production.monthly.set(period, round3((production.monthly.get(period) || 0) + quantity));
         production.total = round3(production.total + quantity);
         for (const component of product.bom.components) {
-          addRequirement(
-            {
-              id: component.component_id,
-              sku: component.sku,
-              name: component.name,
-              unit: component.unit,
-              stock_qty: component.stock_qty,
-              supplier_id: component.supplier_id,
-              supplier_name: component.supplier_name,
-              lead_time_days: component.lead_time_days,
-              min_order_qty: component.min_order_qty,
-              order_multiple: component.order_multiple,
-              unit_cost: component.unit_cost,
-            },
-            period,
-            quantity * component.required_per_output,
-          );
+          if (component.is_class) {
+            addClassRequirement(component, period, quantity * component.required_per_output);
+          } else {
+            addRequirement(
+              {
+                id: component.component_id,
+                sku: component.sku,
+                name: component.name,
+                unit: component.unit,
+                stock_qty: component.stock_qty,
+                supplier_id: component.supplier_id,
+                supplier_name: component.supplier_name,
+                lead_time_days: component.lead_time_days,
+                min_order_qty: component.min_order_qty,
+                order_multiple: component.order_multiple,
+                unit_cost: component.unit_cost,
+              },
+              period,
+              quantity * component.required_per_output,
+            );
+          }
         }
       } else {
         addRequirement(product, period, quantity);
@@ -654,6 +747,8 @@ async function buildScenarioResults(scenarioOrId) {
       : null;
     purchasePlan.push({
       ...row,
+      is_class: false,
+      purchase_unit: row.unit,
       available,
       net_required: netRequired,
       order_quantity: orderQuantity,
@@ -661,6 +756,44 @@ async function buildScenarioResults(scenarioOrId) {
       first_need_period: firstNeedPeriod,
       order_by: orderBy,
       monthly: Object.fromEntries(periods.map((period) => [period, Number(row.monthly.get(period)) || 0])),
+    });
+  }
+
+  // Material classes are planned as one class-level requirement. Stock and open
+  // purchase orders are converted from every member into class units; the
+  // resulting purchase quantity is assigned to the preferred member.
+  for (const row of classRequirements.values()) {
+    const factor = Math.max(0.000001, Number(row.conversion_factor) || 1);
+    const available = round3(row.stock + row.open_po);
+    const netRequiredClass = round3(Math.max(0, row.total - available));
+    const netRequiredMember = round3(netRequiredClass / factor);
+    const orderQuantity = roundOrderQuantity(netRequiredMember, row.min_order_qty, row.order_multiple);
+    let cumulative = 0;
+    let firstNeedPeriod = null;
+    for (const period of periods) {
+      const quantity = Number(row.monthly.get(period)) || 0;
+      if (quantity <= 0) continue;
+      cumulative = round3(cumulative + quantity);
+      if (!firstNeedPeriod && cumulative > available) firstNeedPeriod = period;
+    }
+    const orderBy = firstNeedPeriod
+      ? subtractDays(`${firstNeedPeriod}-01`, row.lead_time_days)
+      : null;
+    const monthly = {};
+    for (const period of periods) {
+      monthly[period] = round3((Number(row.monthly.get(period)) || 0) / factor);
+    }
+    purchasePlan.push({
+      ...row,
+      purchase_unit: row.member_unit || row.class_unit,
+      available,
+      net_required: netRequiredClass,
+      net_required_member: netRequiredMember,
+      order_quantity: orderQuantity,
+      total_cost: round2(orderQuantity * row.unit_cost),
+      first_need_period: firstNeedPeriod,
+      order_by: orderBy,
+      monthly,
     });
   }
   purchasePlan.sort((a, b) => {
@@ -682,6 +815,13 @@ async function buildScenarioResults(scenarioOrId) {
   for (const row of purchaseRequirements.values()) {
     for (let index = 0; index < periods.length; index += 1) {
       const quantity = Number(row.monthly.get(periods[index])) || 0;
+      monthlyPurchaseValue[index] = round2(monthlyPurchaseValue[index] + quantity * row.unit_cost);
+    }
+  }
+  for (const row of classRequirements.values()) {
+    const factor = Math.max(0.000001, Number(row.conversion_factor) || 1);
+    for (let index = 0; index < periods.length; index += 1) {
+      const quantity = (Number(row.monthly.get(periods[index])) || 0) / factor;
       monthlyPurchaseValue[index] = round2(monthlyPurchaseValue[index] + quantity * row.unit_cost);
     }
   }

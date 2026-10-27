@@ -897,7 +897,7 @@ router.get('/:id(\\d+)/purchase-plan.csv', async (req, res, next) => {
     const scenario = await loadScenarioOr404(req.params.id, req);
     const result = await simulator.buildScenarioResults(scenario);
     const header = [
-      'Supplier', 'SKU', 'Product', 'Unit', 'Required', 'Stock', 'Open POs', 'Net required',
+      'Supplier', 'SKU', 'Product', 'Unit', 'Purchase unit', 'Required', 'Stock', 'Open POs', 'Net required',
       'Order quantity', 'Unit cost', 'Total cost', 'First need month', 'Order by',
     ];
     const rows = result.purchasePlan.map((row) => [
@@ -905,6 +905,7 @@ router.get('/:id(\\d+)/purchase-plan.csv', async (req, res, next) => {
       row.sku,
       row.name,
       row.unit,
+      row.purchase_unit || row.unit,
       row.total,
       row.stock,
       row.open_po,

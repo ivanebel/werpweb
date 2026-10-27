@@ -1,0 +1,111 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Material classes') %></h1>
+          <p class="page-subtitle"><%= t('Define interchangeable materials, their priority and the conversion to the BOM unit.') %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('A BOM can require a material class instead of a single product. Production orders then allocate available members by priority.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/manufacturing/boms" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Bills of materials') %>
+          </a>
+          <a href="/manufacturing/material-classes/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= t('New material class') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Material class list') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Classes group products that can substitute each other in production.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(classes.length, 'class', 'classes', locale) %></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[1100px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Class') %></th>
+                <th class="table-th"><%= t('Unit') %></th>
+                <th class="table-th text-right"><%= t('Members') %></th>
+                <th class="table-th text-right"><%= t('Class stock') %></th>
+                <th class="table-th"><%= t('Preferred member') %></th>
+                <th class="table-th text-right"><%= t('Cost range') %></th>
+                <th class="table-th text-right"><%= t('BOMs') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% classes.forEach((row) => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <a href="/manufacturing/material-classes/<%= row.id %>/edit" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.name %></a>
+                    <p class="font-mono text-xs text-gray-400"><%= row.code %></p>
+                  </td>
+                  <td class="table-td"><%= row.unit %></td>
+                  <td class="table-td text-right"><%= row.active_member_count %> / <%= row.member_count %></td>
+                  <td class="table-td text-right font-medium"><%= h.formatQty(row.stock_qty) %> <span class="text-xs font-normal text-gray-400"><%= row.unit %></span></td>
+                  <td class="table-td">
+                    <% if (row.preferred_member) { %>
+                      <p class="font-medium text-gray-800 dark:text-gray-200"><%= row.preferred_member.name %></p>
+                      <p class="text-xs text-gray-400"><%= row.preferred_member.product_sku %> · <%= t('Priority') %> <%= row.preferred_member.priority %></p>
+                    <% } else { %>
+                      <span class="text-gray-400"><%= t('No active members') %></span>
+                    <% } %>
+                  </td>
+                  <td class="table-td text-right">
+                    <% if (row.cost_min === row.cost_max) { %>
+                      <%= money(row.cost_min) %>
+                    <% } else { %>
+                      <span class="font-medium"><%= money(row.cost_min) %> – <%= money(row.cost_max) %></span>
+                    <% } %>
+                    <span class="block text-xs text-gray-400"><%= t('per {unit}', { unit: row.unit }) %></span>
+                  </td>
+                  <td class="table-td text-right"><%= row.bom_count %></td>
+                  <td class="table-td"><%- statusBadge(row.status) %></td>
+                  <td class="table-td text-right">
+                    <div class="flex items-center justify-end gap-1">
+                      <a href="/manufacturing/material-classes/<%= row.id %>/edit" class="btn-icon" title="<%= t('Edit') %>">
+                        <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %>
+                      </a>
+                      <% if (row.bom_count === 0) { %>
+                        <form action="/manufacturing/material-classes/<%= row.id %>/delete" method="POST" class="inline" data-confirm="<%= t('Delete this material class?') %>">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <button type="submit" class="btn-icon text-error-500 hover:bg-error-50 hover:text-error-600 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Delete') %>">
+                            <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                          </button>
+                        </form>
+                      <% } %>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!classes.length) { %>
+                <tr><td colspan="9" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No material classes yet. Create one to start using flexible BOM components.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-5 rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How material classes work') %></p>
+        <p class="mt-2"><%= t('The BOM states how many class units are required. The production order converts that requirement into member quantities using the conversion factor and current stock.') %></p>
+        <p class="mt-1"><%= t('Members are consumed in priority order. Lower priority numbers are preferred. If mixing is allowed, a run can use more than one member.') %></p>
+        <p class="mt-1"><%= t('Conversion factor: class units supplied by one member unit. Example: one 20 kg film reel = 20 kg; one 2,500-label roll = 2,500 units.') %></p>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

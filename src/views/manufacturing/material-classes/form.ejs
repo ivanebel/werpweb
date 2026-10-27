@@ -1,0 +1,219 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const backUrl = '/manufacturing/material-classes';
+  const errorList = [...new Set([...Object.values(errors || {}), ...(memberErrors || [])])];
+  const productById = {};
+  products.forEach((product) => { productById[String(product.value)] = product; });
+  const lines = items && items.length ? items : [{ product_id: '', priority: 100, conversion_factor: 1, status: 'active', notes: '' }];
+  const isMix = Number(row.allow_mix) === 1 || row.allow_mix === true;
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New material class') : t('Edit material class') %></h1>
+          <p class="page-subtitle"><%= t('Group interchangeable products and define their substitution priority.') %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Material classes') %>
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the material class:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach((message) => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>" data-material-class-form>
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Class details') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The unit is the unit used by BOM requirements. Members convert their own stock unit into this unit.') %></p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div>
+              <label for="class-code" class="form-label"><%= t('Code') %> <span class="text-error-500">*</span></label>
+              <input id="class-code" name="code" type="text" maxlength="30" required value="<%= row.code || '' %>" class="form-input font-mono <%= errors.code ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. MOZZ-200') %>">
+              <% if (errors.code) { %><p class="form-error"><%= errors.code %></p><% } %>
+            </div>
+            <div class="md:col-span-2">
+              <label for="class-name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+              <input id="class-name" name="name" type="text" maxlength="150" required value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Mozzarella cheese') %>">
+              <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+            </div>
+            <div>
+              <label for="class-unit" class="form-label"><%= t('Class unit') %> <span class="text-error-500">*</span></label>
+              <input id="class-unit" name="unit" type="text" maxlength="20" required value="<%= row.unit || 'unit' %>" class="form-input <%= errors.unit ? 'form-input-error' : '' %>" placeholder="<%= t('kg, unit, m') %>">
+              <% if (errors.unit) { %><p class="form-error"><%= errors.unit %></p><% } %>
+            </div>
+            <div>
+              <label for="class-cost-method" class="form-label"><%= t('Cost method') %></label>
+              <select id="class-cost-method" name="cost_method" class="form-select">
+                <% [
+                  ['priority', t('Priority member cost')],
+                  ['average', t('Average member cost')],
+                  ['lowest', t('Lowest member cost')],
+                  ['highest', t('Highest member cost')]
+                ].forEach(([value, label]) => { %>
+                  <option value="<%= value %>" <%= row.cost_method === value ? 'selected' : '' %>><%= label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="flex items-center gap-3 pt-7">
+              <input id="class-allow-mix" name="allow_mix" type="checkbox" value="1" class="form-checkbox" <%= isMix ? 'checked' : '' %>>
+              <label for="class-allow-mix" class="text-sm text-gray-700 dark:text-gray-300"><%= t('Allow mixing members') %></label>
+            </div>
+            <div>
+              <label for="class-status" class="form-label"><%= t('Status') %></label>
+              <select id="class-status" name="status" class="form-select">
+                <option value="active" <%= row.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+                <option value="inactive" <%= row.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label for="class-notes" class="form-label"><%= t('Notes') %></label>
+              <input id="class-notes" name="notes" type="text" maxlength="500" value="<%= row.notes || '' %>" class="form-input" placeholder="<%= t('Optional notes') %>">
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Members') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Products that can satisfy this class, in priority order. Lower numbers are preferred.') %></p>
+            </div>
+            <button type="button" id="add-class-member" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+              <%= t('Add member') %>
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[1100px]">
+              <thead>
+                <tr>
+                  <th class="table-th w-8">#</th>
+                  <th class="table-th min-w-[280px]"><%= t('Product') %></th>
+                  <th class="table-th w-24 text-right"><%= t('Priority') %></th>
+                  <th class="table-th w-36 text-right"><%= t('Conversion factor') %></th>
+                  <th class="table-th min-w-[190px]"><%= t('Member stock') %></th>
+                  <th class="table-th w-32"><%= t('Status') %></th>
+                  <th class="table-th min-w-[160px]"><%= t('Notes') %></th>
+                  <th class="table-th w-12"></th>
+                </tr>
+              </thead>
+              <tbody id="class-members">
+                <% lines.forEach((item, index) => { const product = productById[String(item.product_id || '')]; %>
+                  <tr data-class-member class="align-top">
+                    <td class="table-td pt-5 text-xs text-gray-400"><span data-member-number><%= index + 1 %></span></td>
+                    <td class="table-td">
+                      <select name="member_product_id[]" data-member-product class="form-select w-full">
+                        <option value=""><%= t('Select a product') %></option>
+                        <% products.forEach((productOption) => { %>
+                          <option value="<%= productOption.value %>" data-unit="<%= productOption.unit %>" data-stock="<%= productOption.stock %>" data-cost="<%= productOption.cost %>" data-status="<%= productOption.status %>" <%= String(item.product_id || '') === String(productOption.value) ? 'selected' : '' %>><%= productOption.label %></option>
+                        <% }) %>
+                      </select>
+                      <span class="mt-1 block text-[11px] text-gray-400" data-member-hint>
+                        <% if (product) { %><%= t('{unit} · stock {stock}', { unit: product.unit, stock: h.formatQty(product.stock) }) %><% } else { %><%= t('Select a product to see its stock and unit.') %><% } %>
+                      </span>
+                    </td>
+                    <td class="table-td">
+                      <input name="member_priority[]" type="number" min="0" step="1" value="<%= item.priority !== undefined ? item.priority : 100 %>" class="form-input text-right">
+                    </td>
+                    <td class="table-td">
+                      <input name="member_conversion_factor[]" type="number" min="0.000001" step="0.000001" value="<%= item.conversion_factor !== undefined ? item.conversion_factor : 1 %>" class="form-input text-right" data-member-factor>
+                      <span class="mt-1 block text-[11px] text-gray-400" data-member-factor-hint><%= t('class units per member unit') %></span>
+                    </td>
+                    <td class="table-td pt-6 text-xs text-gray-500 dark:text-gray-400">
+                      <% if (product) { %>
+                        <%= h.formatQty(product.stock) %> <%= product.unit %>
+                      <% } else { %>—<% } %>
+                    </td>
+                    <td class="table-td">
+                      <select name="member_status[]" class="form-select">
+                        <option value="active" <%= item.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+                        <option value="inactive" <%= item.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+                      </select>
+                    </td>
+                    <td class="table-td">
+                      <input name="member_notes[]" type="text" maxlength="255" value="<%= item.notes || '' %>" class="form-input" placeholder="<%= t('Optional') %>">
+                    </td>
+                    <td class="table-td pt-4 text-right">
+                      <button type="button" data-remove-class-member class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove') %>">
+                        <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                      </button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <div class="border-t border-gray-100 px-5 py-4 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400 md:px-6">
+            <%= t('Conversion factor: class units supplied by one member unit. Examples: a 20 kg film reel = 20; a 2,500-label roll = 2,500; a 10 kg cheese box = 10.') %>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+          <a href="<%= backUrl %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary">
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= mode === 'create' ? t('Create material class') : t('Save changes') %>
+          </button>
+        </div>
+      </form>
+
+      <template id="class-member-template">
+        <tr data-class-member class="align-top">
+          <td class="table-td pt-5 text-xs text-gray-400"><span data-member-number></span></td>
+          <td class="table-td">
+            <select name="member_product_id[]" data-member-product class="form-select w-full">
+              <option value=""><%= t('Select a product') %></option>
+              <% products.forEach((productOption) => { %>
+                <option value="<%= productOption.value %>" data-unit="<%= productOption.unit %>" data-stock="<%= productOption.stock %>" data-cost="<%= productOption.cost %>" data-status="<%= productOption.status %>"><%= productOption.label %></option>
+              <% }) %>
+            </select>
+            <span class="mt-1 block text-[11px] text-gray-400" data-member-hint><%= t('Select a product to see its stock and unit.') %></span>
+          </td>
+          <td class="table-td"><input name="member_priority[]" type="number" min="0" step="1" value="100" class="form-input text-right"></td>
+          <td class="table-td">
+            <input name="member_conversion_factor[]" type="number" min="0.000001" step="0.000001" value="1" class="form-input text-right" data-member-factor>
+            <span class="mt-1 block text-[11px] text-gray-400" data-member-factor-hint><%= t('class units per member unit') %></span>
+          </td>
+          <td class="table-td pt-6 text-xs text-gray-500 dark:text-gray-400">—</td>
+          <td class="table-td">
+            <select name="member_status[]" class="form-select">
+              <option value="active"><%= t('Active') %></option>
+              <option value="inactive"><%= t('Inactive') %></option>
+            </select>
+          </td>
+          <td class="table-td"><input name="member_notes[]" type="text" maxlength="255" class="form-input" placeholder="<%= t('Optional') %>"></td>
+          <td class="table-td pt-4 text-right">
+            <button type="button" data-remove-class-member class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove') %>">
+              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+            </button>
+          </td>
+        </tr>
+      </template>
+    </div>
+  </main>
+  <script src="/js/material-class.js"></script>
+  <%- include('/layouts/footer') %>
+</div>

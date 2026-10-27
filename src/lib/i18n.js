@@ -3585,6 +3585,185 @@ const ES = {
   'Check the server logs for more information.': 'Revisá los registros del servidor para más información.',
   'company': 'comercio',
   'companies': 'comercios',
+
+  // ------------------------------------------------- material classes / BOM
+  'Material classes': 'Clases de materiales',
+  'Material class': 'Clase de material',
+  'New material class': 'Nueva clase de material',
+  'Edit material class': 'Editar clase de material',
+  'Material class list': 'Lista de clases de material',
+  'Define interchangeable materials, their priority and the conversion to the BOM unit.':
+    'Definí materiales intercambiables, su prioridad y la conversión a la unidad de la BOM.',
+  'A BOM can require a material class instead of a single product. Production orders then allocate available members by priority.':
+    'Una BOM puede requerir una clase de material en lugar de un producto único. Las órdenes de producción asignan entonces los miembros disponibles por prioridad.',
+  'Classes group products that can substitute each other in production.':
+    'Las clases agrupan productos que pueden sustituirse entre sí en producción.',
+  'Class': 'Clase',
+  'Class details': 'Datos de la clase',
+  'Class unit': 'Unidad de la clase',
+  'Class stock': 'Stock de la clase',
+  'Class quantity per output unit': 'Cantidad de clase por unidad de salida',
+  'Preferred member': 'Miembro preferido',
+  'Preferred member cost': 'Costo del miembro preferido',
+  'Priority member cost': 'Costo del miembro prioritario',
+  'Average member cost': 'Costo promedio de los miembros',
+  'Lowest member cost': 'Costo más bajo de los miembros',
+  'Highest member cost': 'Costo más alto de los miembros',
+  'Cost method': 'Método de costo',
+  'Cost range': 'Rango de costos',
+  '{count} class lines': '{count} líneas de clase',
+  'No active members': 'Sin miembros activos',
+  'Members': 'Miembros',
+  'Member': 'Miembro',
+  'Member stock': 'Stock del miembro',
+  'Add member': 'Agregar miembro',
+  'Conversion factor': 'Factor de conversión',
+  'class units per member unit': 'unidades de clase por unidad del miembro',
+  'Conversion factor: class units supplied by one member unit. Example: one 20 kg film reel = 20 kg; one 2,500-label roll = 2,500 units.':
+    'Factor de conversión: unidades de clase que aporta una unidad del miembro. Ejemplo: un rollo de film de 20 kg = 20 kg; un rollo de 2.500 etiquetas = 2.500 unidades.',
+  'Conversion factor: class units supplied by one member unit. Examples: a 20 kg film reel = 20; a 2,500-label roll = 2,500; a 10 kg cheese box = 10.':
+    'Factor de conversión: unidades de clase que aporta una unidad del miembro. Ejemplos: un rollo de film de 20 kg = 20; un rollo de 2.500 etiquetas = 2.500; una caja de queso de 10 kg = 10.',
+  'Allow mixing members': 'Permitir mezclar miembros',
+  'Products that can satisfy this class, in priority order. Lower numbers are preferred.':
+    'Productos que pueden cubrir esta clase, por orden de prioridad. Los números más bajos son preferidos.',
+  'How material classes work': 'Cómo funcionan las clases de material',
+  'The BOM states how many class units are required. The production order converts that requirement into member quantities using the conversion factor and current stock.':
+    'La BOM indica cuántas unidades de clase se requieren. La orden de producción convierte ese requerimiento en cantidades de miembros usando el factor de conversión y el stock actual.',
+  'Members are consumed in priority order. Lower priority numbers are preferred. If mixing is allowed, a run can use more than one member.':
+    'Los miembros se consumen por orden de prioridad. Los números de prioridad más bajos son preferidos. Si se permite mezclar, una corrida puede usar más de un miembro.',
+  'No material classes yet. Create one to start using flexible BOM components.':
+    'Todavía no hay clases de material. Creá una para empezar a usar componentes flexibles en las BOM.',
+  'Delete this material class?': '¿Eliminar esta clase de material?',
+  'Group interchangeable products and define their substitution priority.':
+    'Agrupá productos intercambiables y definí su prioridad de sustitución.',
+  'Please review the material class:': 'Revisá la clase de material:',
+  'The unit is the unit used by BOM requirements. Members convert their own stock unit into this unit.':
+    'La unidad es la que usan los requerimientos de la BOM. Los miembros convierten su propia unidad de stock a esta unidad.',
+  'e.g. MOZZ-200': 'p. ej. MOZZ-200',
+  'e.g. Mozzarella cheese': 'p. ej. Queso mozzarella',
+  'kg, unit, m': 'kg, unidad, m',
+  'Select a product': 'Seleccioná un producto',
+  'Select a product to see its stock and unit.': 'Seleccioná un producto para ver su stock y unidad.',
+  '{unit} · stock {stock}': '{unit} · stock {stock}',
+  'Optional': 'Opcional',
+  'Optional notes': 'Notas opcionales',
+  'Priority': 'Prioridad',
+  'per {unit}': 'por {unit}',
+  'Create material class': 'Crear clase de material',
+  'Material class not found.': 'No se encontró la clase de material.',
+  'Material class created.': 'Clase de material creada.',
+  'Material class updated.': 'Clase de material actualizada.',
+  'Material class deleted.': 'Clase de material eliminada.',
+  'This material class is used by a BOM or production order. Mark it inactive instead.':
+    'Esta clase de material se usa en una BOM u orden de producción. Marcala como inactiva en su lugar.',
+  'A material class with this code or name already exists.': 'Ya existe una clase de material con este código o nombre.',
+  'Use 2-30 letters, numbers, hyphens or underscores.': 'Usá de 2 a 30 letras, números, guiones o guiones bajos.',
+  'Name is required.': 'El nombre es obligatorio.',
+  'Name must be 150 characters or fewer.': 'El nombre debe tener 150 caracteres o menos.',
+  'Unit is required.': 'La unidad es obligatoria.',
+  'Member {line}: select an active product.': 'Miembro {line}: seleccioná un producto.',
+  'Member {line}: services cannot be used as material class members.':
+    'Miembro {line}: los servicios no pueden ser miembros de una clase de material.',
+  'The same product cannot be added twice to a material class.':
+    'El mismo producto no puede agregarse dos veces a una clase de material.',
+  'Member {line}: conversion factor must be greater than zero.':
+    'Miembro {line}: el factor de conversión debe ser mayor que cero.',
+  'Member {line}: priority must be zero or greater.': 'Miembro {line}: la prioridad debe ser cero o mayor.',
+  'Add at least one active product member to the material class.':
+    'Agregá al menos un producto como miembro de la clase de material.',
+  'Fixed component': 'Componente fijo',
+  'Select component': 'Seleccioná un componente',
+  'Select material class': 'Seleccioná una clase de material',
+  '{unit} · stock {qty}': '{unit} · stock {qty}',
+  '{unit} · class stock {qty}': '{unit} · stock de clase {qty}',
+  'Based on preferred component and material class costs, including scrap allowance.':
+    'Basado en los costos preferidos de componentes y clases de material, incluido el desperdicio.',
+  'Material / class': 'Material / clase',
+  'No components or material classes in this BOM yet.': 'Todavía no hay componentes ni clases de material en esta BOM.',
+  'Preferred: {name} (priority {priority})': 'Preferido: {name} (prioridad {priority})',
+  'Preferred {preferred} · range {min} – {max}': 'Preferido {preferred} · rango {min} – {max}',
+  'One or more material classes have no active members.': 'Una o más clases de material no tienen miembros activos.',
+  'Material class substitution options': 'Opciones de sustitución de la clase de material',
+  'Members are eligible for this requirement in priority order. Production orders allocate actual stock using these rules.':
+    'Los miembros son elegibles para este requerimiento por orden de prioridad. Las órdenes de producción asignan el stock real con estas reglas.',
+  'Manage material classes': 'Administrar clases de material',
+  'Requirement: {qty} {unit} per BOM output. Effective: {effective} {unit}.':
+    'Requerimiento: {qty} {unit} por salida de BOM. Efectivo: {effective} {unit}.',
+  'No preferred member': 'Sin miembro preferido',
+  'Cost range {min} – {max}': 'Rango de costos {min} – {max}',
+  'Effective quantity includes scrap. Material class lines use the preferred member cost; the substitution range is shown under the unit cost.':
+    'La cantidad efectiva incluye el desperdicio. Las líneas de clase de material usan el costo del miembro preferido; el rango de sustitución se muestra debajo del costo unitario.',
+  'Every material class line needs a class.': 'Cada línea de clase de material necesita una clase.',
+  'Select a valid material class.': 'Seleccioná una clase de material válida.',
+  'A BOM cannot contain its own output product through a material class.':
+    'Una BOM no puede contener su propio producto de salida a través de una clase de material.',
+  'The same material class cannot be added twice.': 'La misma clase de material no puede agregarse dos veces.',
+  'Every material class needs a quantity greater than zero.':
+    'Cada clase de material necesita una cantidad mayor que cero.',
+  'Every component line needs a component.': 'Cada línea de componente necesita un componente.',
+  'A BOM cannot contain its own output product.': 'Una BOM no puede contener su propio producto de salida.',
+  'Add at least one component or material class to the BOM.':
+    'Agregá al menos un componente o clase de material a la BOM.',
+  'Edit material allocation': 'Editar asignación de materiales',
+  'Material allocation': 'Asignación de materiales',
+  'Choose which member products cover each material class requirement.':
+    'Elegí qué productos miembros cubren cada requerimiento de clase de material.',
+  'Reset to priority allocation': 'Restablecer asignación por prioridad',
+  'Replace the current allocation with the priority and current stock allocation?':
+    '¿Reemplazar la asignación actual por la asignación por prioridad y stock actual?',
+  'The material allocation could not be saved:': 'No se pudo guardar la asignación de materiales:',
+  'Shortage': 'Faltante',
+  'Required: {qty} {unit}': 'Requerido: {qty} {unit}',
+  'Allocated: {qty}': 'Asignado: {qty}',
+  'Shortage: {qty}': 'Faltante: {qty}',
+  'Reserved elsewhere': 'Reservado en otras órdenes',
+  'Available': 'Disponible',
+  'Allocate': 'Asignar',
+  'Product inactive': 'Producto inactivo',
+  'This material class has no members. Add members in Material classes.':
+    'Esta clase de material no tiene miembros. Agregá miembros en Clases de material.',
+  'Enter member quantities. The class quantity is quantity × conversion factor.':
+    'Ingresá las cantidades de los miembros. La cantidad de clase es cantidad × factor de conversión.',
+  'Planned class quantity:': 'Cantidad de clase planificada:',
+  'Component': 'Componente',
+  'Required': 'Requerido',
+  'Allocated': 'Asignado',
+  'Fixed components are allocated in full. If stock is insufficient, receive stock or change the BOM; there is no substitution for this line.':
+    'Los componentes fijos se asignan completos. Si el stock no alcanza, recibí stock o cambiá la BOM; esta línea no tiene sustitución.',
+  'This production order has no material requirements. Add BOM lines first.':
+    'Esta orden de producción no tiene requerimientos de materiales. Agregá líneas de BOM primero.',
+  'Save allocation': 'Guardar asignación',
+  'Material allocation cannot be changed for this production order.':
+    'La asignación de materiales no se puede cambiar para esta orden de producción.',
+  'Material allocation updated.': 'Asignación de materiales actualizada.',
+  'Material allocation recalculated by priority and available stock.':
+    'Asignación de materiales recalculada por prioridad y stock disponible.',
+  'Line {line}: quantities must be zero or greater.': 'Línea {line}: las cantidades deben ser cero o mayores.',
+  'Line {line}: {product} only has {available} available.':
+    'Línea {line}: {product} solo tiene {available} disponible.',
+  'Line {line}: allocation exceeds the requirement of {required} {unit}.':
+    'Línea {line}: la asignación supera el requerimiento de {required} {unit}.',
+  'Aggregated from {count} BOM lines. Material classes are allocated across their members.':
+    'Agregado de {count} líneas de BOM. Las clases de material se asignan entre sus miembros.',
+  'Material allocations': 'Asignaciones de materiales',
+  'Actual member products selected for each requirement.':
+    'Productos miembros reales seleccionados para cada requerimiento.',
+  'BOM lines': 'Líneas de BOM',
+  'Availability': 'Disponibilidad',
+  'Short': 'Faltante',
+  'Covered': 'Cubierto',
+  'Consumed': 'Consumido',
+  'On hand': 'En existencia',
+  'Unit cost': 'Costo unitario',
+  'Line cost': 'Costo de línea',
+  'Not tracked': 'Sin seguimiento',
+  'No material requirements snapped for this order.': 'No se generaron requerimientos de materiales para esta orden.',
+  'No material allocations for this order.': 'No hay asignaciones de materiales para esta orden.',
+  'Estimated material cost': 'Costo estimado de materiales',
+  'Edit allocation': 'Editar asignación',
+  'Purchase member: {name}': 'Miembro de compra: {name}',
+  'Material classes are planned as one class requirement. Member stock and open orders are converted into class units and any purchase is assigned to the preferred member.':
+    'Las clases de material se planifican como un único requerimiento de clase. El stock y las órdenes abiertas de los miembros se convierten a unidades de clase y cualquier compra se asigna al miembro preferido.',
 };
 
 function normalizeLocale(value) {

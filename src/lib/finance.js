@@ -1,6 +1,7 @@
 'use strict';
 
 const { query } = require('../db');
+const materials = require('./materials');
 
 const round2 = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const round3 = (value) => Math.round((Number(value) + Number.EPSILON) * 1000) / 1000;
@@ -190,7 +191,7 @@ async function loadActuals(period) {
 async function buildCostDashboard(period) {
   const range = periodRange(period);
 
-  const [costItems, salesRows, invoiceTotalsRows, palletRows, laborRows, bomRows, actuals] = await Promise.all([
+  const [costItems, salesRows, invoiceTotalsRows, palletRows, laborRows, actuals] = await Promise.all([
     loadCostItems({ activeOnly: true, period: range.period }),
     query(
       `SELECT ii.invoice_id, ii.product_id, p.category_id, p.sku, p.name, p.type AS product_type,
@@ -251,34 +252,12 @@ async function buildCostDashboard(period) {
           AND worked_minutes IS NOT NULL`,
       [range.start, range.end],
     ),
-    query(
-      `SELECT b.id, b.product_id, b.output_qty,
-              SUM(bi.quantity * (1 + bi.scrap_percent / 100) *
-                  COALESCE(
-                    NULLIF(cp.cost_gross_price, 0) + (cp.cost_gross_price * cp.cost_levy_rate / 100),
-                    cp.cost_price,
-                    0
-                  )) AS material_cost
-         FROM boms b
-         JOIN bom_items bi ON bi.bom_id = b.id
-         JOIN products cp ON cp.id = bi.component_id
-        WHERE b.status = 'active'
-        GROUP BY b.id, b.product_id, b.output_qty
-        ORDER BY b.id DESC`,
-    ),
     loadActuals(range.period),
   ]);
 
-  const bomByProduct = new Map();
-  for (const row of bomRows) {
-    const productId = Number(row.product_id);
-    if (bomByProduct.has(productId)) continue;
-    const output = Number(row.output_qty) || 1;
-    bomByProduct.set(productId, {
-      bom_id: Number(row.id),
-      unit_cost: round4((Number(row.material_cost) || 0) / output),
-    });
-  }
+  const bomByProduct = await materials.loadBomCostsForProducts(
+    [...new Set(salesRows.map((row) => Number(row.product_id)).filter((id) => id > 0))],
+  );
 
   const palletsByProduct = new Map();
   for (const row of palletRows) {

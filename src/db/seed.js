@@ -1494,17 +1494,42 @@ async function main() {
         sort_order: 0,
       });
       const [bomComponents] = await conn.query(
-        `SELECT component_id, quantity, scrap_percent FROM bom_items WHERE bom_id = ?`,
+        `SELECT bi.component_id, bi.quantity, bi.scrap_percent, p.unit,
+                COALESCE(
+                  NULLIF(p.cost_gross_price, 0) + (p.cost_gross_price * p.cost_levy_rate / 100),
+                  p.cost_price,
+                  0
+                ) AS unit_cost
+           FROM bom_items bi
+           JOIN products p ON p.id = bi.component_id
+          WHERE bi.bom_id = ?
+            AND bi.component_id IS NOT NULL`,
         [bom[finishedLine.sku]],
       );
+      let requirementSort = 0;
       for (const comp of bomComponents) {
         const required = round2(comp.quantity * finishedLine.quantity * (1 + comp.scrap_percent / 100));
+        const requirementId = await insert(conn, 'production_order_requirements', {
+          production_order_id: productionId,
+          component_id: comp.component_id,
+          unit: comp.unit,
+          quantity_required: required,
+          quantity_allocated: required,
+          quantity_consumed: status === 'completed' ? required : 0,
+          shortage_qty: 0,
+          source_count: 1,
+          sort_order: requirementSort++,
+        });
         await insert(conn, 'production_order_materials', {
           production_order_id: productionId,
+          requirement_id: requirementId,
           component_id: comp.component_id,
           quantity_required: required,
           quantity_consumed: status === 'completed' ? required : 0,
           source_count: 1,
+          priority: 0,
+          unit_cost: comp.unit_cost,
+          is_substitute: 0,
         });
         if (status === 'completed') {
           await insert(conn, 'stock_movements', {

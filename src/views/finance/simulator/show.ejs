@@ -335,12 +335,23 @@
                     <td class="table-td">
                       <p class="font-medium text-gray-800 dark:text-gray-200"><%= row.name %></p>
                       <p class="text-xs text-gray-400"><%= row.sku %> · <%= row.unit %></p>
+                      <% if (row.is_class) { %>
+                        <span class="mt-1 inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"><%= t('Material class') %></span>
+                        <p class="mt-1 text-xs text-gray-400">
+                          <%= row.preferred_member
+                            ? t('Purchase member: {name}', { name: row.member_name })
+                            : t('No active members') %>
+                        </p>
+                      <% } %>
                     </td>
                     <td class="table-td text-right"><%= h.formatQty(row.total) %></td>
                     <td class="table-td text-right"><%= h.formatQty(row.stock) %></td>
                     <td class="table-td text-right"><%= h.formatQty(row.open_po) %></td>
                     <td class="table-td text-right"><%= h.formatQty(row.net_required) %></td>
-                    <td class="table-td text-right font-semibold"><%= h.formatQty(row.order_quantity) %></td>
+                    <td class="table-td text-right font-semibold">
+                      <%= h.formatQty(row.order_quantity) %>
+                      <span class="mt-0.5 block text-[10px] font-normal text-gray-400"><%= row.purchase_unit %></span>
+                    </td>
                     <td class="table-td text-right"><%= money(row.unit_cost) %></td>
                     <td class="table-td text-right font-medium"><%= money(row.total_cost) %></td>
                     <td class="table-td whitespace-nowrap"><%= row.first_need_period ? periodLabels[row.first_need_period] : '—' %></td>
@@ -458,6 +469,7 @@
           <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How this scenario is calculated') %></p>
           <p class="mt-2"><%= t('Revenue uses the planned net price and discount. Material cost uses the active BOM when available; otherwise the product net cost.') %></p>
           <p class="mt-1"><%= t('Purchase requirements are net of stock and open purchase orders, rounded to the product minimum order quantity and order multiple.') %></p>
+          <p class="mt-1"><%= t('Material classes are planned as one class requirement. Member stock and open orders are converted into class units and any purchase is assigned to the preferred member.') %></p>
           <p class="mt-1"><%= t('Invoice-driven costs use the number of simulated sales lines as a proxy for invoices.') %></p>
           <p class="mt-1"><%= t('The cash projection shifts collections and supplier payments by the assumptions and uses a simplified inventory balance. It is not a substitute for the cash-flow module.') %></p>
         </div>

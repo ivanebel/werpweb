@@ -321,6 +321,49 @@ CREATE TABLE IF NOT EXISTS customer_product_codes (
     REFERENCES products (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------------
+-- Material classes: a BOM requirement can point to a functional material
+-- class instead of a single product. Class members are interchangeable
+-- products with a priority and a conversion factor to the class unit.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS material_classes (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code        VARCHAR(30) NOT NULL,
+  name        VARCHAR(150) NOT NULL,
+  unit        VARCHAR(20) NOT NULL DEFAULT 'unit',
+  allow_mix   TINYINT(1) NOT NULL DEFAULT 1,
+  cost_method ENUM('priority','average','lowest','highest') NOT NULL DEFAULT 'priority',
+  status      ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  notes       VARCHAR(500) NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_material_classes_code (code),
+  UNIQUE KEY uq_material_classes_name (name),
+  KEY idx_material_classes_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS material_class_members (
+  id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  class_id          INT UNSIGNED NOT NULL,
+  product_id        INT UNSIGNED NOT NULL,
+  priority          INT NOT NULL DEFAULT 100,
+  conversion_factor DECIMAL(18,6) NOT NULL DEFAULT 1,
+  status            ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  notes             VARCHAR(255) NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_material_class_member (class_id, product_id),
+  KEY idx_material_class_members_priority (class_id, priority),
+  KEY idx_material_class_members_product (product_id),
+  CONSTRAINT fk_material_class_members_class FOREIGN KEY (class_id)
+    REFERENCES material_classes (id) ON DELETE CASCADE,
+  CONSTRAINT fk_material_class_members_product FOREIGN KEY (product_id)
+    REFERENCES products (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS boms (
   id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   product_id INT UNSIGNED NOT NULL,
@@ -339,18 +382,26 @@ CREATE TABLE IF NOT EXISTS boms (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS bom_items (
-  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  bom_id       INT UNSIGNED NOT NULL,
-  component_id INT UNSIGNED NOT NULL,
-  quantity     DECIMAL(14,3) NOT NULL DEFAULT 1,
-  scrap_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
-  sort_order   INT NOT NULL DEFAULT 0,
+  id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  bom_id            INT UNSIGNED NOT NULL,
+  component_id      INT UNSIGNED NULL,
+  material_class_id INT UNSIGNED NULL,
+  quantity          DECIMAL(14,3) NOT NULL DEFAULT 1,
+  scrap_percent     DECIMAL(5,2) NOT NULL DEFAULT 0,
+  sort_order        INT NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uq_bom_component (bom_id, component_id),
+  UNIQUE KEY uq_bom_material_class (bom_id, material_class_id),
+  KEY idx_bom_items_class (material_class_id),
   CONSTRAINT fk_bom_items_bom FOREIGN KEY (bom_id)
     REFERENCES boms (id) ON DELETE CASCADE,
   CONSTRAINT fk_bom_items_component FOREIGN KEY (component_id)
-    REFERENCES products (id) ON DELETE RESTRICT
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_bom_items_class FOREIGN KEY (material_class_id)
+    REFERENCES material_classes (id) ON DELETE RESTRICT,
+  CONSTRAINT chk_bom_items_source CHECK (
+    (component_id IS NULL) <> (material_class_id IS NULL)
+  )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sales_orders (
@@ -1228,17 +1279,58 @@ CREATE TABLE IF NOT EXISTS production_order_lines (
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS production_order_requirements (
+  id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  production_order_id INT UNSIGNED NOT NULL,
+  material_class_id   INT UNSIGNED NULL,
+  component_id        INT UNSIGNED NULL,
+  unit                VARCHAR(20) NOT NULL DEFAULT 'unit',
+  quantity_required   DECIMAL(14,3) NOT NULL DEFAULT 0,
+  quantity_allocated  DECIMAL(14,3) NOT NULL DEFAULT 0,
+  quantity_consumed   DECIMAL(14,3) NOT NULL DEFAULT 0,
+  shortage_qty        DECIMAL(14,3) NOT NULL DEFAULT 0,
+  source_count        INT UNSIGNED NOT NULL DEFAULT 1,
+  sort_order          INT NOT NULL DEFAULT 0,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_por_class (production_order_id, material_class_id),
+  UNIQUE KEY uq_por_component (production_order_id, component_id),
+  KEY idx_por_order (production_order_id),
+  KEY idx_por_class (material_class_id),
+  CONSTRAINT fk_por_order FOREIGN KEY (production_order_id)
+    REFERENCES production_orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_por_class FOREIGN KEY (material_class_id)
+    REFERENCES material_classes (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_por_component FOREIGN KEY (component_id)
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT chk_por_source CHECK (
+    (material_class_id IS NULL) <> (component_id IS NULL)
+  )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS production_order_materials (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_order_id INT UNSIGNED NOT NULL,
+  requirement_id    INT UNSIGNED NULL,
+  material_class_id INT UNSIGNED NULL,
   component_id      INT UNSIGNED NOT NULL,
   quantity_required DECIMAL(14,3) NOT NULL DEFAULT 0,
   quantity_consumed DECIMAL(14,3) NOT NULL DEFAULT 0,
   source_count      INT UNSIGNED NOT NULL DEFAULT 1,
+  priority          INT NOT NULL DEFAULT 0,
+  conversion_factor DECIMAL(18,6) NOT NULL DEFAULT 1,
+  unit_cost         DECIMAL(14,2) NOT NULL DEFAULT 0,
+  is_substitute     TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_pom_order (production_order_id),
+  KEY idx_pom_requirement (requirement_id),
+  KEY idx_pom_class (material_class_id),
   CONSTRAINT fk_pom_order FOREIGN KEY (production_order_id)
     REFERENCES production_orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_pom_requirement FOREIGN KEY (requirement_id)
+    REFERENCES production_order_requirements (id) ON DELETE CASCADE,
+  CONSTRAINT fk_pom_class FOREIGN KEY (material_class_id)
+    REFERENCES material_classes (id) ON DELETE SET NULL,
   CONSTRAINT fk_pom_component FOREIGN KEY (component_id)
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

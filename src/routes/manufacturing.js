@@ -3,10 +3,15 @@
 const express = require('express');
 const { query, one, scalar, getPool, withTransaction } = require('../db');
 const { nextNumber } = require('../lib/sequences');
-const { pagination, todayISO, addDaysISO, lotFromDate, toNumber, statusInfo } = require('../lib/helpers');
+const { pagination, todayISO, addDaysISO, lotFromDate, toNumber, statusInfo, formatMoney } = require('../lib/helpers');
 const { snapshotMaterials, completeProductionOrder } = require('../lib/production');
+const materials = require('../lib/materials');
+const { requireRole } = require('../middleware/web');
+
+const round3 = materials.round3;
 
 const router = express.Router();
+const manageMaterials = requireRole('admin', 'manager');
 
 function arr(value) {
   if (value === undefined || value === null) return [];
@@ -70,8 +75,27 @@ async function productOptions() {
     label: `${p.sku} — ${p.name}`,
     cost: Number(p.cost_price),
     sale: Number(p.sale_price),
+    stock: Number(p.stock_qty),
     unit: p.unit,
     type: p.type,
+  }));
+}
+
+async function materialProductOptions() {
+  const rows = await query(
+    `SELECT id, sku, name, type, unit, cost_price, stock_qty, status
+       FROM products
+      WHERE type <> 'service'
+      ORDER BY status, name`,
+  );
+  return rows.map((p) => ({
+    value: String(p.id),
+    label: `${p.sku} - ${p.name}${p.status === 'inactive' ? ' (inactive)' : ''}`,
+    cost: Number(p.cost_price),
+    stock: Number(p.stock_qty),
+    unit: p.unit,
+    type: p.type,
+    status: p.status,
   }));
 }
 
@@ -88,15 +112,314 @@ async function loadBom(id) {
 }
 
 async function loadBomItems(id) {
+  const lineCosts = await materials.loadBomLineCosts([id]);
+  return lineCosts.get(Number(id)) || [];
+}
+
+// -------------------------------------------------------- material classes
+async function loadMaterialClass(id) {
+  return one('SELECT * FROM material_classes WHERE id = ? LIMIT 1', [id]);
+}
+
+async function loadMaterialClassMembers(id) {
   return query(
-    `SELECT bi.*, p.sku, p.name, p.unit, p.cost_price, p.stock_qty, p.type,
-            (bi.quantity * (1 + bi.scrap_percent / 100)) AS qty_with_scrap,
-            (bi.quantity * (1 + bi.scrap_percent / 100) * p.cost_price) AS line_cost
-       FROM bom_items bi JOIN products p ON p.id = bi.component_id
-      WHERE bi.bom_id = ? ORDER BY bi.sort_order, bi.id`,
+    `SELECT mcm.*, p.sku, p.name, p.unit AS product_unit, p.type AS product_type,
+            p.stock_qty, p.cost_price, p.cost_gross_price, p.cost_levy_rate
+       FROM material_class_members mcm
+       JOIN products p ON p.id = mcm.product_id
+      WHERE mcm.class_id = ?
+      ORDER BY mcm.priority, mcm.id`,
     [id],
   );
 }
+
+function materialClassDefaults() {
+  return {
+    code: '',
+    name: '',
+    unit: 'unit',
+    allow_mix: 1,
+    cost_method: 'priority',
+    status: 'active',
+    notes: '',
+    members: [{ product_id: '', priority: 100, conversion_factor: 1, status: 'active', notes: '' }],
+  };
+}
+
+function collectClassMembers(body, productMap, t = (value) => value) {
+  const productIds = arr(body.member_product_id);
+  const priorities = arr(body.member_priority);
+  const factors = arr(body.member_conversion_factor);
+  const statuses = arr(body.member_status);
+  const notes = arr(body.member_notes);
+  const count = Math.max(productIds.length, priorities.length, factors.length, statuses.length, notes.length);
+  const rows = [];
+  const errors = [];
+  const seen = new Set();
+  for (let i = 0; i < count; i += 1) {
+    const productId = Number.parseInt(productIds[i], 10);
+    if (!productId) continue;
+    const product = productMap.get(productId);
+    if (!product) {
+      errors.push(t('Member {line}: select an active product.', { line: rows.length + 1 }));
+      continue;
+    }
+    if (product.type === 'service') {
+      errors.push(t('Member {line}: services cannot be used as material class members.', { line: rows.length + 1 }));
+      continue;
+    }
+    if (seen.has(productId)) {
+      errors.push(t('The same product cannot be added twice to a material class.'));
+      continue;
+    }
+    const factor = toNumber(factors[i], 0);
+    if (factor <= 0) {
+      errors.push(t('Member {line}: conversion factor must be greater than zero.', { line: rows.length + 1 }));
+      continue;
+    }
+    const priority = Number.parseInt(priorities[i], 10);
+    if (!Number.isInteger(priority) || priority < 0) {
+      errors.push(t('Member {line}: priority must be zero or greater.', { line: rows.length + 1 }));
+      continue;
+    }
+    seen.add(productId);
+    rows.push({
+      product_id: productId,
+      priority,
+      conversion_factor: factor,
+      status: statuses[i] === 'inactive' ? 'inactive' : 'active',
+      notes: String(notes[i] || '').trim().slice(0, 255) || null,
+    });
+  }
+  if (!rows.length) errors.push(t('Add at least one active product member to the material class.'));
+  return { rows, errors };
+}
+
+function validateMaterialClass(body, req) {
+  const values = {
+    code: String(body.code || '').trim().toUpperCase(),
+    name: String(body.name || '').trim(),
+    unit: String(body.unit || '').trim().slice(0, 20),
+    allow_mix: body.allow_mix === '1' || body.allow_mix === 'on' || body.allow_mix === 'true' ? 1 : 0,
+    cost_method: ['priority', 'average', 'lowest', 'highest'].includes(body.cost_method) ? body.cost_method : 'priority',
+    status: body.status === 'inactive' ? 'inactive' : 'active',
+    notes: String(body.notes || '').trim().slice(0, 500) || null,
+  };
+  const errors = {};
+  if (!/^[A-Z0-9_-]{2,30}$/.test(values.code)) {
+    errors.code = req.t('Use 2-30 letters, numbers, hyphens or underscores.');
+  }
+  if (!values.name) errors.name = req.t('Name is required.');
+  else if (values.name.length > 150) errors.name = req.t('Name must be 150 characters or fewer.');
+  if (!values.unit) errors.unit = req.t('Unit is required.');
+  return { values, errors };
+}
+
+async function renderMaterialClassForm(req, res, options = {}) {
+  const { status = 200, row, items, errors = {}, memberErrors = [], mode = 'create' } = options;
+  const products = await materialProductOptions();
+  return res.status(status).render('manufacturing/material-classes/form', {
+    title: mode === 'create' ? req.t('New material class') : req.t('Edit material class'),
+    active: 'manufacturing-material-classes',
+    breadcrumbs: [
+      { label: req.t('Manufacturing') },
+      { label: req.t('Material classes'), href: '/manufacturing/material-classes' },
+      { label: mode === 'create' ? req.t('New material class') : (row.name || req.t('Edit')) },
+    ],
+    products,
+    row,
+    items: items && items.length ? items : materialClassDefaults().members,
+    errors,
+    memberErrors,
+    mode,
+    action: mode === 'create' ? '/manufacturing/material-classes' : `/manufacturing/material-classes/${row.id}`,
+  });
+}
+
+router.get('/material-classes', manageMaterials, async (req, res, next) => {
+  try {
+    const classes = await materials.loadMaterialClasses();
+    const usage = await query(
+      `SELECT material_class_id, COUNT(*) AS bom_count
+         FROM bom_items
+        WHERE material_class_id IS NOT NULL
+        GROUP BY material_class_id`,
+    );
+    const usageById = new Map(usage.map((row) => [Number(row.material_class_id), Number(row.bom_count) || 0]));
+    res.render('manufacturing/material-classes/index', {
+      title: req.t('Material classes'),
+      active: 'manufacturing-material-classes',
+      breadcrumbs: [
+        { label: req.t('Manufacturing') },
+        { label: req.t('Material classes') },
+      ],
+      classes: classes.map((row) => ({ ...row, bom_count: usageById.get(Number(row.id)) || 0 })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/material-classes/new', manageMaterials, async (req, res, next) => {
+  try {
+    return renderMaterialClassForm(req, res, {
+      row: materialClassDefaults(),
+      items: materialClassDefaults().members,
+      mode: 'create',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/material-classes/:id(\\d+)/edit', manageMaterials, async (req, res, next) => {
+  try {
+    const row = await loadMaterialClass(req.params.id);
+    if (!row) return next(Object.assign(new Error(req.t('Material class not found.')), { status: 404 }));
+    const members = await loadMaterialClassMembers(row.id);
+    return renderMaterialClassForm(req, res, {
+      row: { ...row, allow_mix: Number(row.allow_mix) === 1 ? 1 : 0 },
+      items: members,
+      mode: 'edit',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/material-classes', manageMaterials, async (req, res, next) => {
+  try {
+    const products = await materialProductOptions();
+    const productMap = new Map(products.map((product) => [Number(product.value), product]));
+    const { values, errors } = validateMaterialClass(req.body, req);
+    const membersResult = collectClassMembers(req.body, productMap, req.t);
+    if (Object.keys(errors).length || membersResult.errors.length) {
+      return renderMaterialClassForm(req, res, {
+        status: 422,
+        row: { ...materialClassDefaults(), ...values, members: membersResult.rows },
+        items: membersResult.rows,
+        errors,
+        memberErrors: membersResult.errors,
+        mode: 'create',
+      });
+    }
+    const duplicate = await one('SELECT id FROM material_classes WHERE code = ? OR name = ? LIMIT 1', [values.code, values.name]);
+    if (duplicate) {
+      errors.code = req.t('A material class with this code or name already exists.');
+      return renderMaterialClassForm(req, res, {
+        status: 422,
+        row: { ...materialClassDefaults(), ...values, members: membersResult.rows },
+        items: membersResult.rows,
+        errors,
+        memberErrors: [],
+        mode: 'create',
+      });
+    }
+    const id = await withTransaction(async (conn) => {
+      const [result] = await conn.query(
+        `INSERT INTO material_classes (code, name, unit, allow_mix, cost_method, status, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [values.code, values.name, values.unit, values.allow_mix, values.cost_method, values.status, values.notes],
+      );
+      for (const member of membersResult.rows) {
+        await conn.query(
+          `INSERT INTO material_class_members (class_id, product_id, priority, conversion_factor, status, notes)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [result.insertId, member.product_id, member.priority, member.conversion_factor, member.status, member.notes],
+        );
+      }
+      return result.insertId;
+    });
+    req.flash('success', 'Material class created.');
+    return res.redirect(`/manufacturing/material-classes/${id}/edit`);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'A material class with this code or name already exists.');
+      return res.redirect('/manufacturing/material-classes/new');
+    }
+    next(err);
+  }
+});
+
+router.post('/material-classes/:id(\\d+)', manageMaterials, async (req, res, next) => {
+  try {
+    const existing = await loadMaterialClass(req.params.id);
+    if (!existing) return next(Object.assign(new Error(req.t('Material class not found.')), { status: 404 }));
+    const products = await materialProductOptions();
+    const productMap = new Map(products.map((product) => [Number(product.value), product]));
+    const { values, errors } = validateMaterialClass(req.body, req);
+    const membersResult = collectClassMembers(req.body, productMap, req.t);
+    if (Object.keys(errors).length || membersResult.errors.length) {
+      return renderMaterialClassForm(req, res, {
+        status: 422,
+        row: { ...existing, ...values, id: existing.id, members: membersResult.rows },
+        items: membersResult.rows,
+        errors,
+        memberErrors: membersResult.errors,
+        mode: 'edit',
+      });
+    }
+    const duplicate = await one(
+      'SELECT id FROM material_classes WHERE (code = ? OR name = ?) AND id <> ? LIMIT 1',
+      [values.code, values.name, existing.id],
+    );
+    if (duplicate) {
+      errors.code = req.t('A material class with this code or name already exists.');
+      return renderMaterialClassForm(req, res, {
+        status: 422,
+        row: { ...existing, ...values, id: existing.id, members: membersResult.rows },
+        items: membersResult.rows,
+        errors,
+        memberErrors: [],
+        mode: 'edit',
+      });
+    }
+    await withTransaction(async (conn) => {
+      await conn.query(
+        `UPDATE material_classes
+            SET code = ?, name = ?, unit = ?, allow_mix = ?, cost_method = ?, status = ?, notes = ?
+          WHERE id = ?`,
+        [values.code, values.name, values.unit, values.allow_mix, values.cost_method, values.status, values.notes, existing.id],
+      );
+      await conn.query('DELETE FROM material_class_members WHERE class_id = ?', [existing.id]);
+      for (const member of membersResult.rows) {
+        await conn.query(
+          `INSERT INTO material_class_members (class_id, product_id, priority, conversion_factor, status, notes)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [existing.id, member.product_id, member.priority, member.conversion_factor, member.status, member.notes],
+        );
+      }
+    });
+    req.flash('success', 'Material class updated.');
+    return res.redirect('/manufacturing/material-classes');
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'A material class with this code or name already exists.');
+      return res.redirect(`/manufacturing/material-classes/${req.params.id}/edit`);
+    }
+    next(err);
+  }
+});
+
+router.post('/material-classes/:id(\\d+)/delete', manageMaterials, async (req, res, next) => {
+  try {
+    const existing = await loadMaterialClass(req.params.id);
+    if (!existing) return next(Object.assign(new Error(req.t('Material class not found.')), { status: 404 }));
+    const [usage, requirements] = await Promise.all([
+      scalar('SELECT COUNT(*) FROM bom_items WHERE material_class_id = ?', [existing.id]),
+      scalar('SELECT COUNT(*) FROM production_order_requirements WHERE material_class_id = ?', [existing.id]),
+    ]);
+    if (Number(usage) > 0 || Number(requirements) > 0) {
+      req.flash('error', 'This material class is used by a BOM or production order. Mark it inactive instead.');
+      return res.redirect('/manufacturing/material-classes');
+    }
+    await getPool().query('DELETE FROM material_classes WHERE id = ?', [existing.id]);
+    req.flash('success', 'Material class deleted.');
+    return res.redirect('/manufacturing/material-classes');
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ------------------------------------------------------------------- BOM list
 router.get('/boms', async (req, res, next) => {
@@ -126,17 +449,19 @@ router.get('/boms', async (req, res, next) => {
     const rows = await query(
       `SELECT b.*, p.name AS product_name, p.sku AS product_sku, p.sale_price,
               (SELECT COUNT(*) FROM bom_items bi WHERE bi.bom_id = b.id) AS component_count,
-              COALESCE((
-                SELECT SUM(bi.quantity * (1 + bi.scrap_percent / 100) * cp.cost_price)
-                  FROM bom_items bi JOIN products cp ON cp.id = bi.component_id
-                 WHERE bi.bom_id = b.id
-              ), 0) / NULLIF(b.output_qty, 0) AS unit_cost
+              (SELECT COUNT(*) FROM bom_items bi WHERE bi.bom_id = b.id AND bi.material_class_id IS NOT NULL) AS class_count
          FROM boms b JOIN products p ON p.id = b.product_id
          ${whereSql}
         ORDER BY b.id DESC
         LIMIT ? OFFSET ?`,
       [...params, perPage, (pag.page - 1) * perPage],
     );
+    const lineCosts = await materials.loadBomLineCosts(rows.map((row) => Number(row.id)));
+    for (const row of rows) {
+      const items = lineCosts.get(Number(row.id)) || [];
+      const materialCost = items.reduce((sum, item) => sum + item.line_cost, 0);
+      row.unit_cost = materialCost / (Number(row.output_qty) || 1);
+    }
 
     res.render('manufacturing/boms/index', {
       title: req.t('Bills of Materials'),
@@ -154,7 +479,7 @@ router.get('/boms', async (req, res, next) => {
 
 router.get('/boms/new', async (req, res, next) => {
   try {
-    const products = await productOptions();
+    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
     const row = {
       product_id: req.query.product_id || '',
       name: '',
@@ -163,7 +488,7 @@ router.get('/boms/new', async (req, res, next) => {
       status: 'draft',
       notes: '',
     };
-    const items = [{ component_id: '', quantity: 1, scrap_percent: 0 }];
+    const items = [{ item_type: 'component', component_id: '', material_class_id: '', quantity: 1, scrap_percent: 0 }];
     res.render('manufacturing/boms/form', {
       title: req.t('New BOM'),
       active: 'manufacturing-boms',
@@ -173,6 +498,7 @@ router.get('/boms/new', async (req, res, next) => {
         { label: req.t('New BOM') },
       ],
       products,
+      classes,
       row,
       items,
       errors: {},
@@ -185,43 +511,93 @@ router.get('/boms/new', async (req, res, next) => {
   }
 });
 
-function collectBomItems(body, t = (value) => value) {
-  const ids = arr(body.component_id);
+function collectBomItems(body, t = (value) => value, classMap = new Map(), outputProductId = 0) {
+  const types = arr(body.item_type);
+  const componentIds = arr(body.component_id);
+  const classIds = arr(body.material_class_id);
   const qtys = arr(body.quantity);
   const scraps = arr(body.scrap_percent);
+  const count = Math.max(types.length, componentIds.length, classIds.length, qtys.length, scraps.length);
   const items = [];
   const errors = [];
   const seen = new Set();
-  for (let i = 0; i < ids.length; i++) {
-    const componentId = Number.parseInt(ids[i], 10);
-    if (!componentId) continue;
+  for (let i = 0; i < count; i++) {
+    const type = types[i] === 'class' ? 'class' : 'component';
+    const componentId = Number.parseInt(componentIds[i], 10);
+    const classId = Number.parseInt(classIds[i], 10);
     const qty = toNumber(qtys[i], 0);
     const scrap = toNumber(scraps[i], 0);
-    if (qty <= 0) {
-      errors.push(t('Every component needs a quantity greater than zero.'));
-      continue;
+    const hasValue = (type === 'class' ? classId : componentId) || qty || scrap;
+    if (!hasValue) continue;
+    if (type === 'class') {
+      if (!classId) {
+        errors.push(t('Every material class line needs a class.'));
+        continue;
+      }
+      const materialClass = classMap.get(classId);
+      if (!materialClass) {
+        errors.push(t('Select a valid material class.'));
+        continue;
+      }
+      if ((materialClass.members || []).some((member) => Number(member.product_id) === Number(outputProductId))) {
+        errors.push(t('A BOM cannot contain its own output product through a material class.'));
+        continue;
+      }
+      if (seen.has(`class:${classId}`)) {
+        errors.push(t('The same material class cannot be added twice.'));
+        continue;
+      }
+      seen.add(`class:${classId}`);
+      if (qty <= 0) {
+        errors.push(t('Every material class needs a quantity greater than zero.'));
+        continue;
+      }
+      items.push({
+        item_type: 'class',
+        component_id: null,
+        material_class_id: classId,
+        quantity: qty,
+        scrap_percent: scrap,
+      });
+    } else {
+      if (!componentId) {
+        errors.push(t('Every component line needs a component.'));
+        continue;
+      }
+      if (Number(componentId) === Number(outputProductId)) {
+        errors.push(t('A BOM cannot contain its own output product.'));
+        continue;
+      }
+      if (seen.has(`component:${componentId}`)) {
+        errors.push(t('The same component cannot be added twice.'));
+        continue;
+      }
+      seen.add(`component:${componentId}`);
+      if (qty <= 0) {
+        errors.push(t('Every component needs a quantity greater than zero.'));
+        continue;
+      }
+      items.push({
+        item_type: 'component',
+        component_id: componentId,
+        material_class_id: null,
+        quantity: qty,
+        scrap_percent: scrap,
+      });
     }
-    if (seen.has(componentId)) {
-      errors.push(t('The same component cannot be added twice.'));
-      continue;
-    }
-    seen.add(componentId);
-    items.push({ component_id: componentId, quantity: qty, scrap_percent: scrap });
   }
-  if (!items.length) errors.push(t('Add at least one component to the BOM.'));
+  if (!items.length) errors.push(t('Add at least one component or material class to the BOM.'));
   return { items, errors };
 }
 
 router.post('/boms', async (req, res, next) => {
   try {
-    const products = await productOptions();
+    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
+    const classMap = new Map(classes.map((row) => [Number(row.id), row]));
     const productId = Number.parseInt(req.body.product_id, 10);
-    const { items, errors } = collectBomItems(req.body, req.t);
+    const { items, errors } = collectBomItems(req.body, req.t, classMap, productId);
     const fieldErrors = {};
     if (!productId) fieldErrors.product_id = req.t('Select the product this BOM produces.');
-    if (items.some((i) => i.component_id === productId)) {
-      errors.push(req.t('A BOM cannot contain its own output product.'));
-    }
     if (!['draft', 'active', 'archived'].includes(req.body.status)) fieldErrors.status = req.t('Invalid status.');
     if (toNumber(req.body.output_qty, 0) <= 0) {
       fieldErrors.output_qty = req.t('Output quantity must be greater than zero.');
@@ -238,8 +614,9 @@ router.post('/boms', async (req, res, next) => {
           { label: req.t('New BOM') },
         ],
         products,
+        classes,
         row: req.body,
-        items: items.length ? items : [{ component_id: '', quantity: 1, scrap_percent: 0 }],
+        items: items.length ? items : [{ item_type: 'component', component_id: '', material_class_id: '', quantity: 1, scrap_percent: 0 }],
         errors: fieldErrors,
         itemErrors: errors,
         mode: 'create',
@@ -262,8 +639,10 @@ router.post('/boms', async (req, res, next) => {
       let sort = 0;
       for (const item of items) {
         await conn.query(
-          'INSERT INTO bom_items (bom_id, component_id, quantity, scrap_percent, sort_order) VALUES (?, ?, ?, ?, ?)',
-          [result.insertId, item.component_id, item.quantity, item.scrap_percent, sort++],
+          `INSERT INTO bom_items
+             (bom_id, component_id, material_class_id, quantity, scrap_percent, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [result.insertId, item.component_id, item.material_class_id, item.quantity, item.scrap_percent, sort++],
         );
       }
       return result.insertId;
@@ -326,7 +705,7 @@ router.get('/boms/:id(\\d+)/edit', async (req, res, next) => {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('BOM') })), { status: 404 }));
     }
     const items = await loadBomItems(bom.id);
-    const products = await productOptions();
+    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
     res.render('manufacturing/boms/form', {
       title: req.t('Edit {name}', { name: bom.name }),
       active: 'manufacturing-boms',
@@ -337,6 +716,7 @@ router.get('/boms/:id(\\d+)/edit', async (req, res, next) => {
         { label: req.t('Edit') },
       ],
       products,
+      classes,
       row: bom,
       items,
       errors: {},
@@ -355,14 +735,12 @@ router.post('/boms/:id(\\d+)', async (req, res, next) => {
     if (!bom) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('BOM') })), { status: 404 }));
     }
-    const products = await productOptions();
+    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
+    const classMap = new Map(classes.map((row) => [Number(row.id), row]));
     const productId = Number.parseInt(req.body.product_id, 10);
-    const { items, errors } = collectBomItems(req.body, req.t);
+    const { items, errors } = collectBomItems(req.body, req.t, classMap, productId);
     const fieldErrors = {};
     if (!productId) fieldErrors.product_id = req.t('Select the product this BOM produces.');
-    if (items.some((i) => i.component_id === productId)) {
-      errors.push(req.t('A BOM cannot contain its own output product.'));
-    }
     if (!['draft', 'active', 'archived'].includes(req.body.status)) fieldErrors.status = req.t('Invalid status.');
     if (toNumber(req.body.output_qty, 0) <= 0) {
       fieldErrors.output_qty = req.t('Output quantity must be greater than zero.');
@@ -380,8 +758,9 @@ router.post('/boms/:id(\\d+)', async (req, res, next) => {
           { label: req.t('Edit') },
         ],
         products,
+        classes,
         row: { ...bom, ...req.body },
-        items: items.length ? items : [{ component_id: '', quantity: 1, scrap_percent: 0 }],
+        items: items.length ? items : [{ item_type: 'component', component_id: '', material_class_id: '', quantity: 1, scrap_percent: 0 }],
         errors: fieldErrors,
         itemErrors: errors,
         mode: 'edit',
@@ -406,8 +785,10 @@ router.post('/boms/:id(\\d+)', async (req, res, next) => {
       let sort = 0;
       for (const item of items) {
         await conn.query(
-          'INSERT INTO bom_items (bom_id, component_id, quantity, scrap_percent, sort_order) VALUES (?, ?, ?, ?, ?)',
-          [bom.id, item.component_id, item.quantity, item.scrap_percent, sort++],
+          `INSERT INTO bom_items
+             (bom_id, component_id, material_class_id, quantity, scrap_percent, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [bom.id, item.component_id, item.material_class_id, item.quantity, item.scrap_percent, sort++],
         );
       }
     });
@@ -556,16 +937,46 @@ async function loadProductionLines(productionOrderId) {
   );
 }
 
+async function loadProductionRequirements(productionOrderId) {
+  return query(
+    `SELECT r.*, mc.code AS class_code, mc.name AS class_name, mc.unit AS class_unit,
+            p.sku AS component_sku, p.name AS component_name, p.unit AS component_unit,
+            p.stock_qty AS component_stock
+       FROM production_order_requirements r
+       LEFT JOIN material_classes mc ON mc.id = r.material_class_id
+       LEFT JOIN products p ON p.id = r.component_id
+      WHERE r.production_order_id = ?
+      ORDER BY r.sort_order, r.id`,
+    [productionOrderId],
+  );
+}
+
 async function loadProductionMaterials(productionOrderId) {
   return query(
     `SELECT m.*, p.sku, p.name, p.unit, p.stock_qty, p.track_stock, p.cost_price,
-            (m.quantity_required * p.cost_price) AS line_cost
+            r.material_class_id, mc.code AS class_code, mc.name AS class_name,
+            (m.quantity_required * COALESCE(NULLIF(m.unit_cost, 0), p.cost_price)) AS line_cost
        FROM production_order_materials m
        JOIN products p ON p.id = m.component_id
+       LEFT JOIN production_order_requirements r ON r.id = m.requirement_id
+       LEFT JOIN material_classes mc ON mc.id = m.material_class_id
       WHERE m.production_order_id = ?
-      ORDER BY p.name, m.id`,
+      ORDER BY COALESCE(mc.name, p.name), m.priority, m.id`,
     [productionOrderId],
   );
+}
+
+async function reservedForOrder(productionOrderId) {
+  const rows = await query(
+    `SELECT m.component_id, SUM(m.quantity_required) AS quantity
+       FROM production_order_materials m
+       JOIN production_orders po ON po.id = m.production_order_id
+      WHERE po.status IN ('planned', 'released', 'in_progress')
+        AND po.id <> ?
+      GROUP BY m.component_id`,
+    [productionOrderId],
+  );
+  return new Map(rows.map((row) => [Number(row.component_id), Number(row.quantity) || 0]));
 }
 
 async function loadProductionOrder(productionOrderId) {
@@ -794,8 +1205,21 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
     }
     const lines = await loadProductionLines(order.id);
-    const materials = await loadProductionMaterials(order.id);
-    const shortage = materials.some((m) => m.track_stock && Number(m.stock_qty) < Number(m.quantity_required));
+    const requirements = await loadProductionRequirements(order.id);
+    const allocations = await loadProductionMaterials(order.id);
+    const reserved = await reservedForOrder(order.id);
+    for (const allocation of allocations) {
+      allocation.reserved_other = reserved.get(Number(allocation.component_id)) || 0;
+      allocation.available = Math.max(
+        0,
+        (Number(allocation.stock_qty) || 0) - allocation.reserved_other,
+      );
+    }
+    const shortage = requirements.some((requirement) => Number(requirement.shortage_qty) > 0.0005)
+      || allocations.some((allocation) => (
+        Number(allocation.track_stock) === 1
+        && Number(allocation.stock_qty) < Number(allocation.quantity_required)
+      ));
 
     const actions = [];
     if (order.status === 'planned') {
@@ -809,6 +1233,7 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
       actions.push({ action: 'status', value: 'completed', label: req.t('Complete & consume stock'), tone: 'success', confirm: true });
     }
     if (['planned', 'released', 'in_progress'].includes(order.status)) {
+      actions.push({ href: `/manufacturing/production-orders/${order.id}/materials`, label: req.t('Edit material allocation'), tone: 'secondary' });
       actions.push({ href: `/manufacturing/production-orders/${order.id}/batches`, label: req.t('Edit batch details'), tone: 'secondary' });
       actions.push({ action: 'status', value: 'cancelled', label: req.t('Cancel'), tone: 'danger', confirm: true });
     }
@@ -823,10 +1248,226 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
       ],
       order,
       lines,
-      materials,
+      requirements,
+      allocations,
+      materials: allocations,
       shortage,
       actions,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function loadAllocationPageData(orderId) {
+  const requirements = await loadProductionRequirements(orderId);
+  const allocations = await loadProductionMaterials(orderId);
+  const reserved = await reservedForOrder(orderId);
+  const classIds = requirements.filter((row) => row.material_class_id).map((row) => Number(row.material_class_id));
+  const members = await materials.loadClassMembers({ classIds, activeOnly: false });
+  const membersByClass = new Map();
+  for (const member of members) {
+    const list = membersByClass.get(member.class_id) || [];
+    list.push(member);
+    membersByClass.set(member.class_id, list);
+  }
+  const allocationsByRequirement = new Map();
+  for (const allocation of allocations) {
+    const key = Number(allocation.requirement_id);
+    const list = allocationsByRequirement.get(key) || [];
+    list.push(allocation);
+    allocationsByRequirement.set(key, list);
+  }
+  for (const requirement of requirements) {
+    const requirementAllocations = allocationsByRequirement.get(Number(requirement.id)) || [];
+    requirement.allocations = requirementAllocations;
+    if (requirement.material_class_id) {
+      requirement.members = (membersByClass.get(Number(requirement.material_class_id)) || [])
+        .sort(materials.sortMembers)
+        .map((member) => {
+          const allocated = requirementAllocations
+            .filter((row) => Number(row.component_id) === Number(member.product_id))
+            .reduce((sum, row) => sum + Number(row.quantity_required), 0);
+          const reservedQty = reserved.get(Number(member.product_id)) || 0;
+          const available = Math.max(0, (Number(member.stock_qty) || 0) - reservedQty);
+          return {
+            ...member,
+            unit_cost: materials.memberUnitCost(member),
+            reserved_other: reservedQty,
+            available,
+            allocated: Number(allocated) || 0,
+          };
+        });
+    } else {
+      const allocation = requirementAllocations[0] || null;
+      const reservedQty = reserved.get(Number(requirement.component_id)) || 0;
+      requirement.members = [];
+      requirement.allocation = allocation;
+      requirement.reserved_other = reservedQty;
+      requirement.available = Math.max(0, (Number(requirement.component_stock) || 0) - reservedQty);
+    }
+  }
+  return { requirements, allocations, reserved };
+}
+
+async function renderAllocationPage(req, res, options = {}) {
+  const { status = 200, order, errors = [], posted = {} } = options;
+  const data = await loadAllocationPageData(order.id);
+  const currency = (res.locals.settings && res.locals.settings.currency) || 'USD';
+  return res.status(status).render('manufacturing/production/materials', {
+    title: req.t('Material allocation'),
+    active: 'manufacturing-production',
+    breadcrumbs: [
+      { label: req.t('Manufacturing') },
+      { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
+      { label: order.production_no, href: `/manufacturing/production-orders/${order.id}` },
+      { label: req.t('Material allocation') },
+    ],
+    order,
+    ...data,
+    errors,
+    posted,
+    money: (value) => formatMoney(value, currency, req.locale),
+  });
+}
+
+router.get('/production-orders/:id(\\d+)/materials', async (req, res, next) => {
+  try {
+    const order = await loadProductionOrder(req.params.id);
+    if (!order) return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
+    if (!['planned', 'released', 'in_progress'].includes(order.status)) {
+      req.flash('error', 'Material allocation cannot be changed for this production order.');
+      return res.redirect(`/manufacturing/production-orders/${order.id}`);
+    }
+    return renderAllocationPage(req, res, { order });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/production-orders/:id(\\d+)/materials', async (req, res, next) => {
+  try {
+    const order = await loadProductionOrder(req.params.id);
+    if (!order) return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
+    if (!['planned', 'released', 'in_progress'].includes(order.status)) {
+      req.flash('error', 'Material allocation cannot be changed for this production order.');
+      return res.redirect(`/manufacturing/production-orders/${order.id}`);
+    }
+
+    const data = await loadAllocationPageData(order.id);
+    const errors = [];
+    const posted = {};
+    const reservedInOrder = new Map();
+    const classRequirements = data.requirements.filter((row) => row.material_class_id);
+    for (const requirement of classRequirements) {
+      let totalClass = 0;
+      for (const member of requirement.members) {
+        if (member.status !== 'active' || member.product_status === 'inactive') continue;
+        const field = `allocation_${requirement.id}_${member.product_id}`;
+        const raw = req.body[field];
+        const quantity = raw === undefined || raw === '' ? 0 : Number(raw);
+        posted[field] = raw === undefined ? '' : raw;
+        if (!Number.isFinite(quantity) || quantity < 0) {
+          errors.push(req.t('Line {line}: quantities must be zero or greater.', { line: requirement.class_name || requirement.id }));
+          continue;
+        }
+        const available = Math.max(
+          0,
+          Number(member.available) - (reservedInOrder.get(Number(member.product_id)) || 0),
+        );
+        if (quantity > available + 0.0005) {
+          errors.push(req.t('Line {line}: {product} only has {available} available.', {
+            line: requirement.class_name || requirement.id,
+            product: member.name,
+            available,
+          }));
+          continue;
+        }
+        reservedInOrder.set(
+          Number(member.product_id),
+          (reservedInOrder.get(Number(member.product_id)) || 0) + quantity,
+        );
+        totalClass += quantity * Number(member.conversion_factor);
+      }
+      if (totalClass > Number(requirement.quantity_required) + 0.0005) {
+        errors.push(req.t('Line {line}: allocation exceeds the requirement of {required} {unit}.', {
+          line: requirement.class_name || requirement.id,
+          required: requirement.quantity_required,
+          unit: requirement.unit,
+        }));
+      }
+    }
+
+    if (errors.length) {
+      return renderAllocationPage(req, res, { status: 422, order, errors, posted });
+    }
+
+    await withTransaction(async (conn) => {
+      for (const requirement of classRequirements) {
+        const members = requirement.members;
+        const firstPriority = members.filter((member) => member.status === 'active' && member.product_status !== 'inactive').sort(materials.sortMembers)[0]?.priority;
+        let totalClass = 0;
+        await conn.query('DELETE FROM production_order_materials WHERE requirement_id = ?', [requirement.id]);
+        for (const member of members) {
+          if (member.status !== 'active' || member.product_status === 'inactive') continue;
+          const field = `allocation_${requirement.id}_${member.product_id}`;
+          const quantity = Number(req.body[field] || 0);
+          if (!Number.isFinite(quantity) || quantity <= 0) continue;
+          const classQuantity = quantity * Number(member.conversion_factor);
+          totalClass += classQuantity;
+          await conn.query(
+            `INSERT INTO production_order_materials
+               (production_order_id, requirement_id, material_class_id, component_id,
+                quantity_required, quantity_consumed, source_count, priority,
+                conversion_factor, unit_cost, is_substitute)
+             VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+            [
+              order.id,
+              requirement.id,
+              requirement.material_class_id,
+              member.product_id,
+              quantity,
+              requirement.source_count,
+              member.priority,
+              member.conversion_factor,
+              materials.memberUnitCost(member),
+              firstPriority !== undefined && Number(member.priority) > Number(firstPriority) ? 1 : 0,
+            ],
+          );
+        }
+        await conn.query(
+          `UPDATE production_order_requirements
+              SET quantity_allocated = ?, shortage_qty = ?
+            WHERE id = ?`,
+          [
+            round3(totalClass),
+            Math.max(0, round3(Number(requirement.quantity_required) - totalClass)),
+            requirement.id,
+          ],
+        );
+      }
+    });
+
+    req.flash('success', 'Material allocation updated.');
+    return res.redirect(`/manufacturing/production-orders/${order.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/production-orders/:id(\\d+)/reallocate', async (req, res, next) => {
+  try {
+    const order = await loadProductionOrder(req.params.id);
+    if (!order) return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
+    if (!['planned', 'released', 'in_progress'].includes(order.status)) {
+      req.flash('error', 'Material allocation cannot be changed for this production order.');
+      return res.redirect(`/manufacturing/production-orders/${order.id}`);
+    }
+    await withTransaction(async (conn) => {
+      await snapshotMaterials(conn, order.id);
+    });
+    req.flash('success', 'Material allocation recalculated by priority and available stock.');
+    return res.redirect(`/manufacturing/production-orders/${order.id}`);
   } catch (err) {
     next(err);
   }
@@ -896,6 +1537,13 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
       }));
     }
 
+    const existingLines = await loadProductionLines(order.id);
+    const linesChanged = existingLines.length !== lines.length
+      || existingLines.some((line, index) => (
+        Number(line.bom_id) !== Number(lines[index].bom_id)
+        || Math.abs(Number(line.quantity) - Number(lines[index].quantity)) > 0.0005
+      ));
+
     await withTransaction(async (conn) => {
       await conn.query(
         `UPDATE production_orders
@@ -929,7 +1577,7 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
           ],
         );
       }
-      await snapshotMaterials(conn, order.id);
+      if (linesChanged) await snapshotMaterials(conn, order.id);
     });
 
     req.flash('success', 'Production order updated.');

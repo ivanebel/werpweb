@@ -1,0 +1,176 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1500px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Material allocation') %></h1>
+          <p class="page-subtitle"><%= order.production_no %> · <%= t('Choose which member products cover each material class requirement.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/manufacturing/production-orders/<%= order.id %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('Production order') %>
+          </a>
+          <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/reallocate" data-confirm="<%= t('Replace the current allocation with the priority and current stock allocation?') %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'refresh', className: 'h-4 w-4' }) %>
+              <%= t('Reset to priority allocation') %>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <% if (errors && errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <p class="font-semibold"><%= t('The material allocation could not be saved:') %></p>
+          <ul class="mt-1 list-inside list-disc space-y-1">
+            <% errors.forEach((message) => { %><li><%= message %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/materials" class="space-y-5">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <% requirements.forEach((requirement) => { %>
+          <div class="card" data-allocation-requirement data-required="<%= requirement.quantity_required %>">
+            <div class="card-header">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="card-title"><%= requirement.material_class_id ? requirement.class_name : requirement.component_name %></h2>
+                  <% if (requirement.material_class_id) { %><span class="badge bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"><%= t('Material class') %></span><% } %>
+                  <% if (Number(requirement.shortage_qty) > 0.0005) { %><span class="badge bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Shortage') %></span><% } %>
+                </div>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                  <%= t('Required: {qty} {unit}', { qty: h.formatQty(requirement.quantity_required), unit: requirement.unit }) %>
+                  · <%= t('Allocated: {qty}', { qty: h.formatQty(requirement.quantity_allocated) }) %>
+                  · <%= t('Shortage: {qty}', { qty: h.formatQty(requirement.shortage_qty) }) %>
+                </p>
+              </div>
+              <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= requirement.unit %></span>
+            </div>
+
+            <% if (requirement.material_class_id) { %>
+              <div class="table-wrap">
+                <table class="table-base min-w-[1050px]">
+                  <thead>
+                    <tr>
+                      <th class="table-th"><%= t('Member') %></th>
+                      <th class="table-th text-right"><%= t('Priority') %></th>
+                      <th class="table-th text-right"><%= t('Conversion factor') %></th>
+                      <th class="table-th text-right"><%= t('Stock') %></th>
+                      <th class="table-th text-right"><%= t('Reserved elsewhere') %></th>
+                      <th class="table-th text-right"><%= t('Available') %></th>
+                      <th class="table-th text-right"><%= t('Allocate') %></th>
+                      <th class="table-th text-right"><%= t('Unit cost') %></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% requirement.members.forEach((member) => {
+                      const active = member.status === 'active' && member.product_status !== 'inactive';
+                      const field = `allocation_${requirement.id}_${member.product_id}`;
+                      const value = posted[field] !== undefined ? posted[field] : member.allocated;
+                    %>
+                      <tr class="table-row <%= active ? '' : 'opacity-60' %>">
+                        <td class="table-td">
+                          <a href="/products/<%= member.product_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= member.name %></a>
+                          <p class="mt-0.5 font-mono text-xs text-gray-400"><%= member.product_sku %> · <%= member.product_unit %> · <%= member.status === 'active' ? (member.product_status === 'active' ? t('Active') : t('Product inactive')) : t('Inactive') %></p>
+                        </td>
+                        <td class="table-td text-right"><%= member.priority %></td>
+                        <td class="table-td text-right"><%= h.formatNumber(member.conversion_factor, 6) %></td>
+                        <td class="table-td text-right"><%= h.formatQty(member.stock_qty) %></td>
+                        <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(member.reserved_other) %></td>
+                        <td class="table-td text-right font-medium"><%= h.formatQty(member.available) %></td>
+                        <td class="table-td text-right">
+                          <input name="<%= field %>" data-allocation-qty data-factor="<%= member.conversion_factor %>" type="number" min="0" step="0.001" max="<%= member.available %>" value="<%= active ? value : 0 %>" class="form-input w-32 text-right" <%= active ? '' : 'disabled' %>>
+                          <span class="mt-0.5 block text-[10px] text-gray-400"><%= member.product_unit %></span>
+                        </td>
+                        <td class="table-td text-right"><%= money(member.unit_cost) %></td>
+                      </tr>
+                    <% }) %>
+                    <% if (!requirement.members.length) { %>
+                      <tr><td colspan="8" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('This material class has no members. Add members in Material classes.') %></td></tr>
+                    <% } %>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-5 py-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                <span><%= t('Enter member quantities. The class quantity is quantity × conversion factor.') %></span>
+                <span><%= t('Planned class quantity:') %> <strong data-class-total>0</strong> / <%= h.formatQty(requirement.quantity_required) %> <%= requirement.unit %></span>
+              </div>
+            <% } else { %>
+              <div class="table-wrap">
+                <table class="table-base">
+                  <thead>
+                    <tr>
+                      <th class="table-th"><%= t('Component') %></th>
+                      <th class="table-th text-right"><%= t('Required') %></th>
+                      <th class="table-th text-right"><%= t('Stock') %></th>
+                      <th class="table-th text-right"><%= t('Reserved elsewhere') %></th>
+                      <th class="table-th text-right"><%= t('Available') %></th>
+                      <th class="table-th text-right"><%= t('Allocated') %></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <a href="/products/<%= requirement.component_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= requirement.component_name %></a>
+                        <p class="mt-0.5 font-mono text-xs text-gray-400"><%= requirement.component_sku %> · <%= requirement.component_unit %></p>
+                      </td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.quantity_required) %></td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.component_stock) %></td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.reserved_other) %></td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.available) %></td>
+                      <td class="table-td text-right font-medium"><%= h.formatQty(requirement.quantity_allocated) %></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+                <%= t('Fixed components are allocated in full. If stock is insufficient, receive stock or change the BOM; there is no substitution for this line.') %>
+              </p>
+            <% } %>
+          </div>
+        <% }) %>
+
+        <% if (!requirements.length) { %>
+          <div class="card p-8 text-center">
+            <p class="text-sm text-gray-400"><%= t('This production order has no material requirements. Add BOM lines first.') %></p>
+          </div>
+        <% } %>
+
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <a href="/manufacturing/production-orders/<%= order.id %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary" <%= requirements.length ? '' : 'disabled' %>>
+            <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+            <%= t('Save allocation') %>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <script>
+  (function () {
+    function fmt(value) {
+      return Number(value || 0).toLocaleString(document.body.dataset.locale || document.documentElement.lang || 'en-US', { maximumFractionDigits: 3 });
+    }
+    document.querySelectorAll('[data-allocation-requirement]').forEach((card) => {
+      const inputs = [...card.querySelectorAll('[data-allocation-qty]')];
+      const totalEl = card.querySelector('[data-class-total]');
+      function update() {
+        if (!totalEl) return;
+        const total = inputs.reduce((sum, input) => sum + Number(input.value || 0) * Number(input.dataset.factor || 0), 0);
+        totalEl.textContent = fmt(total);
+      }
+      inputs.forEach((input) => input.addEventListener('input', update));
+      update();
+    });
+  })();
+  </script>
+  <%- include('/layouts/footer') %>
+</div>
