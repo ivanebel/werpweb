@@ -115,6 +115,23 @@ async function handleMessage(message, chat) {
     return { text: format.formatShortages(result), user: link };
   }
 
+  if (['stock', 'existencia', 'existencias'].includes(command)) {
+    const reference = args.split(/\s+/)[0] || '';
+    if (!reference) {
+      return {
+        text: 'Usá <code>/stock 32</code> para consultar SKU-00032, o <code>/stock SKU-00032</code>.',
+        user: link,
+      };
+    }
+    const result = await queries.getProductStock(reference);
+    return {
+      text: result.product
+        ? format.formatProductStock(result.product, result.matched_sku, reference)
+        : format.formatStockNotFound(reference, result.candidates),
+      user: link,
+    };
+  }
+
   return { text: format.helpMessage(), user: link };
 }
 

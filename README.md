@@ -27,7 +27,7 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Finance: taxes** - an Argentine-oriented management tax estimate for a date range: VAT by rate (output minus input), Ingresos Brutos by jurisdiction with annual Convenio Multilateral coefficients and rates, IIBB perceptions linked to purchase invoices, withholdings classified from customer payments, and municipal tax. The IIBB base is net sales without VAT, allocated to each jurisdiction by its annual coefficient and then taxed at the jurisdiction rate; perceptions and withholdings reduce the jurisdiction balance. Credit notes reduce the corresponding amounts; a negative net is shown as a credit balance. Administrators configure jurisdictions, coefficients and rates; managers can view the report and enter perceptions/classify withholdings. The report is based on invoices and payments, excludes POS sales, and is not a statutory tax return.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
 - **Outgoing email** - configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
-- **Telegram bot (read-only)** - link an ERP account from **My profile**, then query active production orders, order details and material shortages from Telegram with Spanish commands. The bot is internal-only, read-only, uses long polling (no public webhook required) and never exposes costs or financial data.
+- **Telegram bot (read-only)** - link an ERP account from **My profile**, then query active production orders, order details, material shortages and product stock from Telegram with Spanish commands. The bot is internal-only, read-only, uses long polling (no public webhook required) and never exposes costs or financial data.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
 - **Auth and roles** — session login, CSRF protection, flash messages and `admin` / `manager` / `staff` permissions.
 - **Settings** — company profile, currency, default tax rate, document footer, SMTP/email settings and user management.
@@ -187,6 +187,7 @@ The Telegram bot is an internal, read-only way to check production from a phone.
    - `/produccion planificadas`, `/produccion liberadas`, `/produccion en-proceso`, `/produccion todas`
    - `/orden PRD-2026-0006` — order detail
    - `/faltantes` — active orders with material shortages
+   - `/stock 32` — stock for SKU-00032 (you can omit the `SKU-` prefix and leading zeros)
    - `/desvincular` — remove the Telegram link
 7. The order link opens the read-only production page. Users must be signed in to the ERP in their browser.
 

@@ -84,6 +84,7 @@ function helpMessage() {
     '/produccion todas',
     '/orden PRD-2026-0006 — detalle de una orden',
     '/faltantes — órdenes con faltantes de materiales',
+    '/stock 32 — stock de un producto (SKU-00032)',
     '/vincular CODIGO — vincular tu cuenta del ERP',
     '/desvincular — quitar el vínculo actual',
     '',
@@ -218,6 +219,44 @@ function trimMessage(text) {
   return `${value.slice(0, 3900)}\n… mensaje truncado.`;
 }
 
+function formatProductStock(product, matchedSku, reference) {
+  const tracked = Number(product.track_stock) === 1;
+  const stock = Number(product.stock_qty) || 0;
+  const reorder = Number(product.reorder_level) || 0;
+  const low = tracked && reorder > 0 && stock <= reorder;
+  const lines = [
+    `<b>${escapeHtml(product.name)}</b>`,
+    `SKU: <code>${escapeHtml(product.sku)}</code>`,
+    '',
+  ];
+  if (reference && String(reference).trim().toUpperCase() !== String(product.sku).toUpperCase()) {
+    lines.push(`Buscado como: ${escapeHtml(reference)}`);
+  }
+  if (tracked) {
+    lines.push(`Stock actual: <b>${formatQty(stock)} ${escapeHtml(product.unit)}</b>`);
+    if (reorder > 0) {
+      lines.push(`Nivel de reposición: ${formatQty(reorder)} ${escapeHtml(product.unit)}`);
+    }
+    lines.push(low ? '<b>⚠️ Bajo stock</b>' : 'Stock OK');
+  } else {
+    lines.push('Stock: sin control');
+  }
+  if (product.status === 'inactive') lines.push('Producto inactivo.');
+  return lines.join('\n');
+}
+
+function formatStockNotFound(reference, candidates) {
+  const attempted = (candidates || [])
+    .map((candidate) => `<code>${escapeHtml(candidate)}</code>`)
+    .join(', ');
+  return [
+    `No encontré un producto con SKU <b>${escapeHtml(reference)}</b>.`,
+    attempted ? `Probé con: ${attempted}.` : '',
+    '',
+    'Usá <code>/stock 32</code> para SKU-00032 o el SKU completo.',
+  ].filter(Boolean).join('\n');
+}
+
 module.exports = {
   STATUS_LABELS,
   STATUS_FILTERS,
@@ -234,5 +273,7 @@ module.exports = {
   formatOrderList,
   formatOrderDetail,
   formatShortages,
+  formatProductStock,
+  formatStockNotFound,
   trimMessage,
 };

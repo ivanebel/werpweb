@@ -157,6 +157,38 @@ async function listShortageOrders(statuses = ACTIVE_STATUSES, limit = 10) {
   };
 }
 
+function skuCandidates(reference) {
+  const raw = String(reference || '').trim();
+  if (!raw) return [];
+  const candidates = [];
+  const add = (value) => {
+    const normalized = String(value || '').trim().toUpperCase();
+    if (normalized && !candidates.includes(normalized)) candidates.push(normalized);
+  };
+  add(raw);
+  const digits = raw.match(/^(?:SKU-?)?(\d+)$/i);
+  if (digits) {
+    add(`SKU-${digits[1].padStart(5, '0')}`);
+  }
+  return candidates;
+}
+
+async function getProductStock(reference) {
+  const candidates = skuCandidates(reference);
+  for (const candidate of candidates) {
+    const product = await one(
+      `SELECT id, sku, name, unit, stock_qty, reorder_level, track_stock,
+              status, is_manufactured, is_sellable, is_purchasable
+         FROM products
+        WHERE UPPER(sku) = ?
+        LIMIT 1`,
+      [candidate],
+    );
+    if (product) return { product, matched_sku: candidate, candidates };
+  }
+  return { product: null, matched_sku: null, candidates };
+}
+
 module.exports = {
   ACTIVE_STATUSES,
   ALL_STATUSES,
@@ -166,4 +198,6 @@ module.exports = {
   getOrderLines,
   getOrderRequirements,
   listShortageOrders,
+  skuCandidates,
+  getProductStock,
 };

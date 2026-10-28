@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const commands = require('../src/lib/telegram/commands.js');
+const queries = require('../src/lib/telegram/queries.js');
 const format = require('../src/lib/telegram/formatters.js');
 const config = require('../src/config.js');
 
@@ -103,6 +104,37 @@ assert.ok(shortageText.includes('Mozzarella: faltan 120 kg'));
 
 assert.ok(format.helpMessage().includes('/produccion'));
 assert.ok(format.helpMessage().includes('/orden PRD-2026-0006'));
+assert.ok(format.helpMessage().includes('/stock 32'));
 assert.ok(format.linkInstructions().includes('/vincular'));
+
+assert.deepEqual(queries.skuCandidates('32'), ['32', 'SKU-00032']);
+assert.deepEqual(queries.skuCandidates('SKU-32'), ['SKU-32', 'SKU-00032']);
+assert.deepEqual(queries.skuCandidates('sku-00032'), ['SKU-00032']);
+assert.deepEqual(queries.skuCandidates('AUR-P100'), ['AUR-P100']);
+assert.deepEqual(queries.skuCandidates(''), []);
+
+const stockText = format.formatProductStock(
+  {
+    sku: 'SKU-00032',
+    name: 'Producto de prueba',
+    unit: 'pcs',
+    stock_qty: 4,
+    reorder_level: 5,
+    track_stock: 1,
+    status: 'active',
+  },
+  'SKU-00032',
+  '32',
+);
+assert.ok(stockText.includes('Producto de prueba'));
+assert.ok(stockText.includes('SKU-00032'));
+assert.ok(stockText.includes('Buscado como: 32'));
+assert.ok(stockText.includes('Stock actual: <b>4 pcs</b>'));
+assert.ok(stockText.includes('Bajo stock'));
+
+const noStockText = format.formatStockNotFound('99999', ['99999', 'SKU-99999']);
+assert.ok(noStockText.includes('No encontré un producto'));
+assert.ok(noStockText.includes('SKU-99999'));
+assert.ok(noStockText.includes('/stock 32'));
 
 console.log('All Telegram checks passed.');
