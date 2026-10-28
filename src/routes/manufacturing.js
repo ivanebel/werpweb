@@ -1259,6 +1259,39 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
   }
 });
 
+router.get('/production-orders/:id(\\d+)/readonly', async (req, res, next) => {
+  try {
+    const order = await loadProductionOrder(req.params.id);
+    if (!order) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Production order') })), { status: 404 }));
+    }
+    const [lines, requirements, allocations] = await Promise.all([
+      loadProductionLines(order.id),
+      loadProductionRequirements(order.id),
+      loadProductionMaterials(order.id),
+    ]);
+    const shortage = requirements.some((requirement) => Number(requirement.shortage_qty) > 0.0005);
+    res.set('X-Robots-Tag', 'noindex, nofollow');
+    return res.render('manufacturing/production/readonly', {
+      title: `${order.production_no} · ${req.t('Read-only')}`,
+      active: 'manufacturing-production',
+      breadcrumbs: [
+        { label: req.t('Manufacturing') },
+        { label: req.t('Production orders'), href: '/manufacturing/production-orders' },
+        { label: order.production_no },
+        { label: req.t('Read-only') },
+      ],
+      order,
+      lines,
+      requirements,
+      allocations,
+      shortage,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 async function loadAllocationPageData(orderId) {
   const requirements = await loadProductionRequirements(orderId);
   const allocations = await loadProductionMaterials(orderId);

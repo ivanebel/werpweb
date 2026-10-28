@@ -20,7 +20,8 @@
     "test:manufacturing": "node tests/manufacturing-test.mjs",
     "test:cashflow": "node tests/cashflow-test.mjs",
     "test:prices": "node tests/price-analysis-test.mjs",
-    "test:taxes": "node tests/taxes-test.mjs"
+    "test:taxes": "node tests/taxes-test.mjs",
+    "test:telegram": "node tests/telegram-test.mjs"
   },
   "dependencies": {
     "apexcharts": "^4.5.0",

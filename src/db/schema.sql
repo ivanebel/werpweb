@@ -785,6 +785,70 @@ CREATE TABLE IF NOT EXISTS tax_jurisdiction_coefficients (
     REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------------------------------------------------------------
+-- Telegram bot: account links, one-time linking codes, polling state and an
+-- audit trail of commands. The bot is read-only and only exposes production
+-- information to linked active users.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS telegram_links (
+  id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id          INT UNSIGNED NOT NULL,
+  telegram_user_id BIGINT NOT NULL,
+  chat_id          BIGINT NOT NULL,
+  username         VARCHAR(64) NULL,
+  first_name       VARCHAR(120) NULL,
+  last_name        VARCHAR(120) NULL,
+  linked_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at     DATETIME NULL,
+  revoked_at       DATETIME NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_telegram_links_telegram_user (telegram_user_id),
+  KEY idx_telegram_links_user (user_id),
+  KEY idx_telegram_links_revoked (revoked_at),
+  CONSTRAINT fk_telegram_links_user FOREIGN KEY (user_id)
+    REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_link_codes (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id    INT UNSIGNED NOT NULL,
+  code       CHAR(8) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  used_at    DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_telegram_link_codes_code (code),
+  KEY idx_telegram_link_codes_user (user_id),
+  KEY idx_telegram_link_codes_expiry (expires_at),
+  CONSTRAINT fk_telegram_link_codes_user FOREIGN KEY (user_id)
+    REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_bot_state (
+  id             TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  last_update_id BIGINT NOT NULL DEFAULT 0,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_audit_log (
+  id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  direction        ENUM('in','out') NOT NULL DEFAULT 'in',
+  user_id          INT UNSIGNED NULL,
+  telegram_user_id BIGINT NULL,
+  chat_id          BIGINT NULL,
+  command          VARCHAR(120) NULL,
+  success          TINYINT(1) NOT NULL DEFAULT 1,
+  response         VARCHAR(500) NULL,
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_telegram_audit_created (created_at),
+  KEY idx_telegram_audit_user (user_id),
+  CONSTRAINT fk_telegram_audit_user FOREIGN KEY (user_id)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS tax_settings (
   id                      TINYINT UNSIGNED NOT NULL DEFAULT 1,
   default_jurisdiction_id INT UNSIGNED NULL,

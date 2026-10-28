@@ -26,7 +26,8 @@ Built with **Node.js + Express**, **EJS** server-rendered views, **MySQL 8** and
 - **Finance: price analysis** — search competitor product prices from the bundled Python scraper. Results are grouped by retailer (DIA and Carrefour), sorted from the lowest price, summarised with price ranges and averages, and each product opens the original store page in a new tab. The page is restricted to administrators and managers; searches are not stored in the ERP.
 - **Finance: taxes** - an Argentine-oriented management tax estimate for a date range: VAT by rate (output minus input), Ingresos Brutos by jurisdiction with annual Convenio Multilateral coefficients and rates, IIBB perceptions linked to purchase invoices, withholdings classified from customer payments, and municipal tax. The IIBB base is net sales without VAT, allocated to each jurisdiction by its annual coefficient and then taxed at the jurisdiction rate; perceptions and withholdings reduce the jurisdiction balance. Credit notes reduce the corresponding amounts; a negative net is shown as a credit balance. Administrators configure jurisdictions, coefficients and rates; managers can view the report and enter perceptions/classify withholdings. The report is based on invoices and payments, excludes POS sales, and is not a statutory tax return.
 - **Documents** — printable sales orders, purchase orders, invoices and packing slips. Unit prices are tax-inclusive; VAT is displayed as an extracted (included) amount rather than added again.
-- **Outgoing email** — configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
+- **Outgoing email** - configure SMTP in the app and email purchase orders, purchase invoices, sales orders, sales invoices, supplier/customer payment orders and delivery notes. Messages contain the full document details as inline HTML with an optional signature, and every send attempt is recorded in the email log.
+- **Telegram bot (read-only)** - link an ERP account from **My profile**, then query active production orders, order details and material shortages from Telegram with Spanish commands. The bot is internal-only, read-only, uses long polling (no public webhook required) and never exposes costs or financial data.
 - **Search** across customers, suppliers, products, orders, invoices and POS tickets.
 - **Auth and roles** — session login, CSRF protection, flash messages and `admin` / `manager` / `staff` permissions.
 - **Settings** — company profile, currency, default tax rate, document footer, SMTP/email settings and user management.
@@ -103,6 +104,11 @@ All settings live in `.env` (see `.env.example`).
 | `SSH_PRIVATE_KEY_PASSPHRASE` | empty | Passphrase for the private key. |
 | `DB_REMOTE_HOST` | `127.0.0.1` | MySQL host **as seen from the SSH server**. |
 | `DB_REMOTE_PORT` | `3306` | MySQL port **as seen from the SSH server**. |
+| `TELEGRAM_ENABLED` | `false` | Enable the read-only Telegram production bot. |
+| `TELEGRAM_BOT_TOKEN` | empty | Bot token from @BotFather. Keep it secret. |
+| `TELEGRAM_BOT_USERNAME` | empty | Optional bot username shown in linking instructions. |
+| `APP_PUBLIC_URL` | empty | Public ERP URL used in Telegram order links. |
+| `TELEGRAM_POLL_TIMEOUT` | `25` | Long-polling timeout in seconds. |
 | `PYTHON_BIN` | `python` / `python3` | Python executable used by the price-analysis scraper. |
 | `PRICE_SCRAPER_TIMEOUT_MS` | `90000` | Maximum time for one price search. |
 | `PRICE_SCRAPER_SCRIPT` | `scraper/main.py` | Scraper entry point. Relative paths resolve from the project root. |
@@ -163,6 +169,31 @@ The SMTP password is stored in the `settings` table and is never rendered in the
 
 Open an order, invoice, payment or delivery and choose **Email** to compose a message. The recipient defaults to the party email address, and the message includes the document details, totals and signature as inline HTML. Attachments are not generated.
 
+## Telegram bot
+
+The Telegram bot is an internal, read-only way to check production from a phone. It uses long polling, so the ERP does not need a public webhook or an open inbound port.
+
+1. Create a bot with Telegram **@BotFather** and copy its token.
+2. Set these variables in `.env`:
+   - `TELEGRAM_ENABLED=true`
+   - `TELEGRAM_BOT_TOKEN=...`
+   - `TELEGRAM_BOT_USERNAME=your_company_bot` (optional, shown in the profile instructions)
+   - `APP_PUBLIC_URL=https://your-erp.example.com` (required for clickable order links)
+3. Restart the app. The log should show `[telegram] bot @... ready`.
+4. Open **My profile** in the ERP and choose **Generate linking code**.
+5. Send `/vincular CODIGO` to the bot. The code expires after 10 minutes.
+6. Use these commands in Spanish:
+   - `/produccion` — active orders
+   - `/produccion planificadas`, `/produccion liberadas`, `/produccion en-proceso`, `/produccion todas`
+   - `/orden PRD-2026-0006` — order detail
+   - `/faltantes` — active orders with material shortages
+   - `/desvincular` — remove the Telegram link
+7. The order link opens the read-only production page. Users must be signed in to the ERP in their browser.
+
+Only linked, active ERP users can query. Every command is written to `telegram_audit_log`. The bot never changes data, and it does not expose costs or margins. Automatic notifications are not implemented yet.
+
+If the app runs in multiple processes or containers, only one process should run the Telegram poller; otherwise Telegram returns a conflict error.
+
 ## Checks integration test
 
 Start the app with `npm run dev` (or `npm start`) and, in another terminal, run:
@@ -182,6 +213,7 @@ npm run test:materials
 npm run test:cashflow
 npm run test:prices
 npm run test:taxes
+npm run test:telegram
 ```
 
 `npm run test:materials` checks the material-class allocation and costing helpers without a database. `npm run test:manufacturing` uses the configured development database: it creates its own products, class, BOM and production orders, verifies reservation and completion behaviour, and removes everything it created.
@@ -408,6 +440,7 @@ src/
     sequences.js         Per-year document numbering
     production.js        BOM snapshots, material allocation and production completion
     materials.js         Material classes, member costs, stock and BOM costing
+    telegram/            Telegram bot client, commands, links and read-only queries
     checks.js            Check statuses, history, payment links and reversal
     finance.js           Cost items, periods and profitability calculations
     simulator.js         Sales scenario, purchase plan and cash calculations

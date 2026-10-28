@@ -42,6 +42,13 @@ const config = {
       remotePort: int(process.env.DB_REMOTE_PORT, 3306),
     },
   },
+  telegram: {
+    enabled: bool(process.env.TELEGRAM_ENABLED),
+    token: String(process.env.TELEGRAM_BOT_TOKEN || '').trim(),
+    username: String(process.env.TELEGRAM_BOT_USERNAME || '').trim().replace(/^@/, ''),
+    appPublicUrl: String(process.env.APP_PUBLIC_URL || '').trim().replace(/\/+$/, ''),
+    pollTimeoutSeconds: int(process.env.TELEGRAM_POLL_TIMEOUT, 25),
+  },
 };
 
 // Read the private key once so the tunnel can reconnect without disk access.

@@ -5,6 +5,8 @@ const bcrypt = require('bcryptjs');
 const { query, one, scalar } = require('../db');
 const { getSettings, updateSettings } = require('../lib/settings');
 const { requireRole } = require('../middleware/web');
+const config = require('../config');
+const telegramLinks = require('../lib/telegram/links');
 const {
   isEmailConfigured,
   fromEmail,
@@ -350,12 +352,21 @@ router.post('/settings/users/:id(\\d+)/delete', requireRole('admin'), async (req
 router.get('/profile', async (req, res, next) => {
   try {
     const row = await one('SELECT id, name, email, role, last_login_at FROM users WHERE id = ?', [req.session.user.id]);
+    const [telegramLink, telegramCode] = await Promise.all([
+      telegramLinks.loadActiveLinkForUser(req.session.user.id),
+      telegramLinks.loadPendingCode(req.session.user.id),
+    ]);
     res.render('settings/profile', {
       title: req.t('My profile'),
       active: 'profile',
       breadcrumbs: [{ label: req.t('My profile') }],
       row,
       errors: {},
+      telegramLink,
+      telegramCode,
+      telegramEnabled: Boolean(config.telegram.enabled && config.telegram.token),
+      telegramBotUsername: config.telegram.username,
+      telegramTtlMinutes: telegramLinks.CODE_TTL_MINUTES,
     });
   } catch (err) {
     next(err);
@@ -405,6 +416,30 @@ router.post('/profile', async (req, res, next) => {
       req.flash('error', 'That email address is already in use.');
       return res.redirect('/profile');
     }
+    next(err);
+  }
+});
+
+router.post('/profile/telegram/link', async (req, res, next) => {
+  try {
+    if (!config.telegram.enabled || !config.telegram.token) {
+      req.flash('error', 'Telegram is not configured on this server.');
+      return res.redirect('/profile');
+    }
+    await telegramLinks.createLinkCode(req.session.user.id);
+    req.flash('success', 'Telegram linking code generated.');
+    return res.redirect('/profile');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/profile/telegram/revoke', async (req, res, next) => {
+  try {
+    await telegramLinks.revokeTelegramLinkForUser(req.session.user.id);
+    req.flash('success', 'Telegram account unlinked.');
+    return res.redirect('/profile');
+  } catch (err) {
     next(err);
   }
 });

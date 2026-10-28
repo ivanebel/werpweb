@@ -3,6 +3,7 @@
 const config = require('./config');
 const { initDb, closeDb } = require('./db');
 const { createApp } = require('./app');
+const { startTelegramBot, stopTelegramBot } = require('./lib/telegram');
 
 async function start() {
   try {
@@ -17,8 +18,13 @@ async function start() {
       console.log(`  Environment: ${config.env}\n`);
     });
 
+    startTelegramBot().catch((error) => {
+      console.error('[telegram] could not start:', error.message);
+    });
+
     const shutdown = async (signal) => {
       console.log(`\n[shutdown] ${signal} received, closing…`);
+      await stopTelegramBot().catch(() => {});
       server.close(async () => {
         await closeDb();
         process.exit(0);

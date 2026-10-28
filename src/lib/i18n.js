@@ -3810,6 +3810,50 @@ const ES = {
   'Purchase member: {name}': 'Miembro de compra: {name}',
   'Material classes are planned as one class requirement. Member stock and open orders are converted into class units and any purchase is assigned to the preferred member.':
     'Las clases de material se planifican como un único requerimiento de clase. El stock y las órdenes abiertas de los miembros se convierten a unidades de clase y cualquier compra se asigna al miembro preferido.',
+
+  // ------------------------------------------------------------------ telegram
+  'Telegram': 'Telegram',
+  'Read-only production queries from Telegram.': 'Consultas de producción de solo lectura desde Telegram.',
+  'Linked': 'Vinculado',
+  'Not linked': 'Sin vincular',
+  'Telegram is not configured on this server. Ask an administrator to set TELEGRAM_ENABLED and TELEGRAM_BOT_TOKEN.':
+    'Telegram no está configurado en este servidor. Pedile a un administrador que configure TELEGRAM_ENABLED y TELEGRAM_BOT_TOKEN.',
+  'Telegram account': 'Cuenta de Telegram',
+  'Linked {date}': 'Vinculado {date}',
+  'Send /produccion, /orden PRD-2026-0006 or /faltantes to the bot.':
+    'Enviá /produccion, /orden PRD-2026-0006 o /faltantes al bot.',
+  'Unlink this Telegram account?': '¿Desvincular esta cuenta de Telegram?',
+  'Unlink Telegram': 'Desvincular Telegram',
+  'Link your Telegram account to query production orders. The bot is read-only and uses your ERP permissions.':
+    'Vinculá tu cuenta de Telegram para consultar órdenes de producción. El bot es de solo lectura y usa los permisos de tu usuario del ERP.',
+  'Generate linking code': 'Generar código de vinculación',
+  'Your linking code': 'Tu código de vinculación',
+  'Send /vincular {code} to {bot}.': 'Enviá /vincular {code} a {bot}.',
+  'Send /vincular {code} to the Telegram bot.': 'Enviá /vincular {code} al bot de Telegram.',
+  'the Telegram bot': 'el bot de Telegram',
+  'The code expires {date}.': 'El código vence el {date}.',
+  'Generate a code, then send /vincular CODIGO to the bot. The code expires in {minutes} minutes.':
+    'Generá un código y enviá /vincular CODIGO al bot. El código vence en {minutes} minutos.',
+  'Telegram linking code generated.': 'Código de vinculación de Telegram generado.',
+  'Telegram account unlinked.': 'Cuenta de Telegram desvinculada.',
+  'Telegram is not configured on this server.': 'Telegram no está configurado en este servidor.',
+  'Read-only': 'Solo lectura',
+  'Production order snapshot. This page does not allow changes.':
+    'Vista de la orden de producción. Esta página no permite cambios.',
+  'This order has material shortages.': 'Esta orden tiene faltantes de materiales.',
+  'Products and batch data for this order.': 'Productos y datos de lote de esta orden.',
+  'No products on this order.': 'No hay productos en esta orden.',
+  'Required, allocated, consumed and shortage quantities.':
+    'Cantidades requeridas, asignadas, consumidas y faltantes.',
+  'No material requirements for this order.': 'No hay requerimientos de materiales para esta orden.',
+  'Member products selected for each requirement.': 'Productos miembros seleccionados para cada requerimiento.',
+  'Order summary': 'Resumen de la orden',
+  'This read-only page is intended for Telegram links and production status sharing. Change the order in the production module.':
+    'Esta página de solo lectura está pensada para enlaces de Telegram y para compartir el estado de producción. Los cambios se hacen en el módulo de producción.',
+  'allocation': 'asignación',
+  'allocations': 'asignaciones',
+  'requirement': 'requerimiento',
+  'requirements': 'requerimientos',
 };
 
 function normalizeLocale(value) {

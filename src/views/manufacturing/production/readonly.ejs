@@ -1,0 +1,185 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= order.production_no %></h1>
+            <%- statusBadge(order.status) %>
+            <span class="badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('Read-only') %></span>
+          </div>
+          <p class="page-subtitle"><%= t('Production order snapshot. This page does not allow changes.') %></p>
+        </div>
+        <a href="/manufacturing/production-orders" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Production orders') %>
+        </a>
+      </div>
+
+      <% if (shortage) { %>
+        <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+          <%= t('This order has material shortages.') %>
+        </div>
+      <% } %>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="space-y-5 xl:col-span-2">
+          <div class="card overflow-hidden">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Products') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Products and batch data for this order.') %></p>
+              </div>
+              <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(lines.length, 'line') %></span>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[800px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Product') %></th>
+                    <th class="table-th text-right"><%= t('Quantity') %></th>
+                    <th class="table-th"><%= t('Lot number') %></th>
+                    <th class="table-th"><%= t('Expiry date') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% lines.forEach((line) => { %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <p class="font-medium text-gray-900 dark:text-white/90"><%= line.product_name %></p>
+                        <p class="mt-0.5 font-mono text-xs text-gray-400"><%= line.sku %></p>
+                      </td>
+                      <td class="table-td text-right"><%= h.formatQty(line.quantity) %> <span class="text-xs text-gray-400"><%= line.unit %></span></td>
+                      <td class="table-td"><%= line.lot_number || '—' %></td>
+                      <td class="table-td"><%= line.expiry_date ? h.formatDate(line.expiry_date) : '—' %></td>
+                    </tr>
+                  <% }) %>
+                  <% if (!lines.length) { %>
+                    <tr><td colspan="4" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No products on this order.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card overflow-hidden">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Material requirements') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Required, allocated, consumed and shortage quantities.') %></p>
+              </div>
+              <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(requirements.length, 'requirement') %></span>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[900px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Material / class') %></th>
+                    <th class="table-th text-right"><%= t('Required') %></th>
+                    <th class="table-th text-right"><%= t('Allocated') %></th>
+                    <th class="table-th text-right"><%= t('Consumed') %></th>
+                    <th class="table-th text-right"><%= t('Shortage') %></th>
+                    <th class="table-th"><%= t('Unit') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% requirements.forEach((requirement) => { const short = Number(requirement.shortage_qty) > 0.0005; %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <p class="font-medium text-gray-800 dark:text-gray-200"><%= requirement.material_class_id ? requirement.class_name : requirement.component_name %></p>
+                        <p class="mt-0.5 font-mono text-xs text-gray-400"><%= requirement.material_class_id ? requirement.class_code : requirement.component_sku %></p>
+                      </td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.quantity_required) %></td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.quantity_allocated) %></td>
+                      <td class="table-td text-right"><%= h.formatQty(requirement.quantity_consumed) %></td>
+                      <td class="table-td text-right font-semibold <%= short ? 'text-warning-600 dark:text-warning-400' : 'text-gray-400' %>"><%= h.formatQty(requirement.shortage_qty) %></td>
+                      <td class="table-td"><%= requirement.unit %></td>
+                    </tr>
+                  <% }) %>
+                  <% if (!requirements.length) { %>
+                    <tr><td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No material requirements for this order.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card overflow-hidden">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Material allocations') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Member products selected for each requirement.') %></p>
+              </div>
+              <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= h.pluralize(allocations.length, 'allocation') %></span>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[800px]">
+                <thead>
+                  <tr>
+                    <th class="table-th"><%= t('Member') %></th>
+                    <th class="table-th"><%= t('Class') %></th>
+                    <th class="table-th text-right"><%= t('Priority') %></th>
+                    <th class="table-th text-right"><%= t('Allocated') %></th>
+                    <th class="table-th text-right"><%= t('Consumed') %></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% allocations.forEach((allocation) => { %>
+                    <tr class="table-row">
+                      <td class="table-td">
+                        <p class="font-medium text-gray-800 dark:text-gray-200"><%= allocation.name %></p>
+                        <p class="mt-0.5 font-mono text-xs text-gray-400"><%= allocation.sku %> · <%= allocation.unit %></p>
+                      </td>
+                      <td class="table-td"><%= allocation.class_name || '—' %></td>
+                      <td class="table-td text-right"><%= allocation.priority %></td>
+                      <td class="table-td text-right"><%= h.formatQty(allocation.quantity_required) %></td>
+                      <td class="table-td text-right"><%= h.formatQty(allocation.quantity_consumed) %></td>
+                    </tr>
+                  <% }) %>
+                  <% if (!allocations.length) { %>
+                    <tr><td colspan="5" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No material allocations for this order.') %></td></tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card p-5 md:p-6">
+            <h2 class="card-title"><%= t('Order summary') %></h2>
+            <dl class="mt-4 space-y-3 text-sm">
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Status') %></dt><dd><%- statusBadge(order.status) %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Start date') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.start_date) %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Due date') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.due_date) %></dd></div>
+              <% if (order.completed_at) { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Completed') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(order.completed_at) %></dd></div>
+              <% } %>
+              <% if (order.customer_name) { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Customer') %></dt><dd class="text-right font-medium text-gray-700 dark:text-gray-300"><%= order.customer_name %></dd></div>
+              <% } %>
+              <% if (order.order_no) { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Sales order') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= order.order_no %></dd></div>
+              <% } %>
+            </dl>
+          </div>
+
+          <% if (order.notes) { %>
+            <div class="card p-5 md:p-6">
+              <h2 class="card-title"><%= t('Order notes') %></h2>
+              <p class="mt-3 whitespace-pre-line text-sm text-gray-600 dark:text-gray-400"><%= order.notes %></p>
+            </div>
+          <% } %>
+
+          <div class="rounded-xl border border-gray-200 bg-white p-4 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+            <%= t('This read-only page is intended for Telegram links and production status sharing. Change the order in the production module.') %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>
