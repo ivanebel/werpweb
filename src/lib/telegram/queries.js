@@ -173,20 +173,28 @@ function skuCandidates(reference) {
   return candidates;
 }
 
-async function getProductStock(reference) {
+async function getProductBySku(reference) {
   const candidates = skuCandidates(reference);
   for (const candidate of candidates) {
     const product = await one(
-      `SELECT id, sku, name, unit, stock_qty, reorder_level, track_stock,
-              status, is_manufactured, is_sellable, is_purchasable
-         FROM products
-        WHERE UPPER(sku) = ?
+      `SELECT p.id, p.sku, p.name, p.unit, p.stock_qty, p.reorder_level,
+              p.track_stock, p.status, p.is_manufactured, p.is_sellable,
+              p.is_purchasable, p.cost_gross_price, p.cost_vat_rate,
+              p.cost_levy_rate, p.cost_price, p.sale_gross_price,
+              p.sale_vat_rate, p.sale_price, b.name AS brand_name
+         FROM products p
+         LEFT JOIN brands b ON b.id = p.brand_id
+        WHERE UPPER(p.sku) = ?
         LIMIT 1`,
       [candidate],
     );
     if (product) return { product, matched_sku: candidate, candidates };
   }
   return { product: null, matched_sku: null, candidates };
+}
+
+async function getProductStock(reference) {
+  return getProductBySku(reference);
 }
 
 module.exports = {
@@ -199,5 +207,6 @@ module.exports = {
   getOrderRequirements,
   listShortageOrders,
   skuCandidates,
+  getProductBySku,
   getProductStock,
 };

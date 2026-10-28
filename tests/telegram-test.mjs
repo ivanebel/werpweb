@@ -105,6 +105,7 @@ assert.ok(shortageText.includes('Mozzarella: faltan 120 kg'));
 assert.ok(format.helpMessage().includes('/produccion'));
 assert.ok(format.helpMessage().includes('/orden PRD-2026-0006'));
 assert.ok(format.helpMessage().includes('/stock 32'));
+assert.ok(format.helpMessage().includes('/price 32'));
 assert.ok(format.linkInstructions().includes('/vincular'));
 
 assert.deepEqual(queries.skuCandidates('32'), ['32', 'SKU-00032']);
@@ -136,5 +137,30 @@ const noStockText = format.formatStockNotFound('99999', ['99999', 'SKU-99999']);
 assert.ok(noStockText.includes('No encontré un producto'));
 assert.ok(noStockText.includes('SKU-99999'));
 assert.ok(noStockText.includes('/stock 32'));
+
+const priceText = format.formatProductPrice(
+  {
+    sku: 'SKU-00032',
+    name: 'Producto de prueba',
+    brand_name: 'Marca de prueba',
+    cost_gross_price: 10,
+    cost_price: 12.1,
+    sale_gross_price: 20,
+    sale_price: 24.2,
+    status: 'active',
+  },
+  '32',
+  'USD',
+);
+assert.ok(priceText.includes('<b>Marca de prueba - Producto de prueba</b>'));
+assert.ok(priceText.includes('Buscado como: 32'));
+assert.ok(priceText.includes('Costo bruto'));
+assert.ok(priceText.includes('Costo neto'));
+assert.ok(priceText.includes('Venta bruta'));
+assert.ok(priceText.includes('Venta neta'));
+
+const noPriceText = format.formatPriceNotFound('99999', ['99999', 'SKU-99999']);
+assert.ok(noPriceText.includes('No encontré un producto'));
+assert.ok(noPriceText.includes('/price 32'));
 
 console.log('All Telegram checks passed.');

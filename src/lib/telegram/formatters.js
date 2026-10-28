@@ -85,6 +85,7 @@ function helpMessage() {
     '/orden PRD-2026-0006 — detalle de una orden',
     '/faltantes — órdenes con faltantes de materiales',
     '/stock 32 — stock de un producto (SKU-00032)',
+    '/price 32 — precios de un producto (SKU-00032)',
     '/vincular CODIGO — vincular tu cuenta del ERP',
     '/desvincular — quitar el vínculo actual',
     '',
@@ -257,6 +258,52 @@ function formatStockNotFound(reference, candidates) {
   ].filter(Boolean).join('\n');
 }
 
+function formatMoney(value, currency = 'USD') {
+  const amount = Number(value) || 0;
+  try {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
+
+function formatProductPrice(product, reference, currency = 'USD') {
+  const brand = product.brand_name ? `${escapeHtml(product.brand_name)} - ` : '';
+  const lines = [
+    `<b>${brand}${escapeHtml(product.name)}</b>`,
+    `SKU: <code>${escapeHtml(product.sku)}</code>`,
+  ];
+  if (reference && String(reference).trim().toUpperCase() !== String(product.sku).toUpperCase()) {
+    lines.push(`Buscado como: ${escapeHtml(reference)}`);
+  }
+  lines.push(
+    '',
+    `Costo bruto: ${formatMoney(product.cost_gross_price, currency)}`,
+    `Costo neto: ${formatMoney(product.cost_price, currency)}`,
+    `Venta bruta: ${formatMoney(product.sale_gross_price, currency)}`,
+    `Venta neta: ${formatMoney(product.sale_price, currency)}`,
+  );
+  if (product.status === 'inactive') lines.push('', 'Producto inactivo.');
+  return lines.join('\n');
+}
+
+function formatPriceNotFound(reference, candidates) {
+  const attempted = (candidates || [])
+    .map((candidate) => `<code>${escapeHtml(candidate)}</code>`)
+    .join(', ');
+  return [
+    `No encontré un producto con SKU <b>${escapeHtml(reference)}</b>.`,
+    attempted ? `Probé con: ${attempted}.` : '',
+    '',
+    'Usá <code>/price 32</code> para SKU-00032 o el SKU completo.',
+  ].filter(Boolean).join('\n');
+}
+
 module.exports = {
   STATUS_LABELS,
   STATUS_FILTERS,
@@ -275,5 +322,8 @@ module.exports = {
   formatShortages,
   formatProductStock,
   formatStockNotFound,
+  formatMoney,
+  formatProductPrice,
+  formatPriceNotFound,
   trimMessage,
 };

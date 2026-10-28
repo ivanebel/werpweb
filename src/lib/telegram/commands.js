@@ -3,6 +3,7 @@
 const links = require('./links');
 const queries = require('./queries');
 const format = require('./formatters');
+const { getSettings } = require('../settings');
 
 function normalizeWord(value) {
   return String(value || '')
@@ -123,11 +124,30 @@ async function handleMessage(message, chat) {
         user: link,
       };
     }
-    const result = await queries.getProductStock(reference);
+    const result = await queries.getProductBySku(reference);
     return {
       text: result.product
         ? format.formatProductStock(result.product, result.matched_sku, reference)
         : format.formatStockNotFound(reference, result.candidates),
+      user: link,
+    };
+  }
+
+  if (['price', 'precio', 'precios'].includes(command)) {
+    const reference = args.split(/\s+/)[0] || '';
+    if (!reference) {
+      return {
+        text: 'Usá <code>/price 32</code> para consultar SKU-00032, o <code>/price SKU-00032</code>.',
+        user: link,
+      };
+    }
+    const result = await queries.getProductBySku(reference);
+    if (!result.product) {
+      return { text: format.formatPriceNotFound(reference, result.candidates), user: link };
+    }
+    const settings = await getSettings();
+    return {
+      text: format.formatProductPrice(result.product, reference, settings.currency || 'USD'),
       user: link,
     };
   }
