@@ -253,6 +253,7 @@ CREATE TABLE IF NOT EXISTS brands (
 CREATE TABLE IF NOT EXISTS products (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
   sku           VARCHAR(50) NOT NULL,
+  old_id        INT UNSIGNED NULL,
   name          VARCHAR(180) NOT NULL,
   category_id   INT UNSIGNED NULL,
   brand_id      INT UNSIGNED NULL,

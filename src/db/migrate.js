@@ -88,6 +88,7 @@ async function upgradeSchema(conn, dbName) {
 
   await addColumn(conn, dbName, 'products', 'brand_id', 'INT UNSIGNED NULL AFTER category_id');
   await addColumn(conn, dbName, 'products', 'supplier_id', 'INT UNSIGNED NULL AFTER brand_id');
+  await addColumn(conn, dbName, 'products', 'old_id', 'INT UNSIGNED NULL AFTER sku');
   await addColumn(conn, dbName, 'products', 'ean13', 'VARCHAR(13) NULL AFTER supplier_id');
   await addColumn(conn, dbName, 'products', 'dun14', 'VARCHAR(14) NULL AFTER ean13');
   await addColumn(conn, dbName, 'products', 'plu', 'INT UNSIGNED NULL AFTER dun14');

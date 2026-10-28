@@ -169,6 +169,7 @@ async function applyPricingAndRules(data, existing = null) {
 
 const fields = [
   { name: 'sku', label: 'SKU', type: 'text', section: 'Product', help: 'Leave blank to generate automatically.', maxLength: 50 },
+  { name: 'old_id', label: 'Old ID', type: 'number', min: 0, integer: true, section: 'Product', help: 'Optional ID from the previous database, used for product data migration.' },
   { name: 'status', label: 'Status', type: 'select', options: statusOptions, default: 'active', section: 'Product' },
   { name: 'name', label: 'Product name', type: 'text', required: true, full: true, section: 'Product' },
   { name: 'category_id', label: 'Category', type: 'select', section: 'Product', optionsFrom: async () => {
