@@ -291,23 +291,36 @@
   const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
   const messages = <%- JSON.stringify(jsMessages || {}) %>;
   const charts = <%- JSON.stringify(charts) %>;
-  const isDark = () => document.documentElement.classList.contains('dark');
-  const palette = ['#465FFF', '#12B76A', '#F79009', '#0BA5EC', '#7A5AF8', '#F04438'];
+  const chartColors = () => (window.werpChartColors ? window.werpChartColors() : {
+    fore: '#667085',
+    grid: '#F2F4F7',
+    ink: '#1D2939',
+    tooltip: 'light',
+    series: ['#465FFF', '#12B76A', '#F79009', '#0BA5EC', '#7A5AF8', '#F04438', '#EE46BC', '#84CC16'],
+  });
+  const palette = () => chartColors().series;
 
   function money(v) {
     try { return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(v || 0)); }
     catch (e) { return currency + ' ' + Number(v || 0).toFixed(0); }
   }
   function themeAxis() {
+    const colors = chartColors();
     return {
-      foreColor: isDark() ? '#98A2B3' : '#667085',
-      grid: isDark() ? '#1F2937' : '#F2F4F7',
-      tooltipTheme: isDark() ? 'dark' : 'light',
+      foreColor: colors.fore,
+      grid: colors.grid,
+      ink: colors.ink,
+      tooltipTheme: colors.tooltip,
     };
+  }
+  function paintCategoryDots() {
+    const colors = palette();
+    categoryDots.forEach((dot, i) => { dot.style.backgroundColor = colors[i % colors.length]; });
   }
 
   const categoryDots = document.querySelectorAll('[data-chart-dot]');
-  categoryDots.forEach((dot, i) => { dot.style.backgroundColor = palette[i % palette.length]; });
+  paintCategoryDots();
+  document.addEventListener('werp:theme', paintCategoryDots);
 
   const revenueEl = document.querySelector('#revenue-chart');
   if (revenueEl) {
@@ -318,7 +331,7 @@
         { name: messages.revenue || 'Revenue', data: charts.revenue },
         { name: messages.purchases || 'Purchases', data: charts.purchases }
       ],
-      colors: ['#465FFF', '#9CB9FF'],
+      colors: palette().slice(0, 2),
       stroke: { curve: 'smooth', width: 3 },
       fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.28, opacityTo: 0.02, stops: [0, 95] } },
       dataLabels: { enabled: false },
@@ -332,7 +345,7 @@
     revenue.render();
     document.addEventListener('werp:theme', () => {
       const nt = themeAxis();
-      revenue.updateOptions({ chart: { foreColor: nt.foreColor }, grid: { borderColor: nt.grid }, tooltip: { theme: nt.tooltipTheme } });
+      revenue.updateOptions({ chart: { foreColor: nt.foreColor }, colors: palette().slice(0, 2), grid: { borderColor: nt.grid }, tooltip: { theme: nt.tooltipTheme } });
     });
   }
 
@@ -343,22 +356,22 @@
       chart: { type: 'donut', height: 240, fontFamily: 'Outfit, sans-serif', foreColor: themeAxis().foreColor },
       series: hasData ? charts.categories.values : [1],
       labels: hasData ? charts.categories.labels : [messages.noData || 'No data'],
-      colors: hasData ? palette : ['#E4E7EC'],
+      colors: hasData ? palette() : [chartColors().grid],
       stroke: { width: 0 },
       legend: { show: false },
       dataLabels: { enabled: false },
       plotOptions: { pie: { donut: { size: '72%', labels: {
         show: true,
         name: { show: false },
-        value: { show: true, fontSize: '20px', fontWeight: 600, color: isDark() ? '#F9FAFB' : '#1D2939', formatter: (v) => money(v) },
-        total: { show: true, showAlways: true, label: messages.sales90 || '90-day sales', fontSize: '12px', color: '#98A2B3', formatter: () => money(charts.categories.values.reduce((a, b) => a + b, 0)) }
+        value: { show: true, fontSize: '20px', fontWeight: 600, color: chartColors().ink, formatter: (v) => money(v) },
+        total: { show: true, showAlways: true, label: messages.sales90 || '90-day sales', fontSize: '12px', color: chartColors().fore, formatter: () => money(charts.categories.values.reduce((a, b) => a + b, 0)) }
       } } } },
       tooltip: { theme: themeAxis().tooltipTheme, y: { formatter: money } }
     });
     category.render();
     document.addEventListener('werp:theme', () => {
       const nt = themeAxis();
-      category.updateOptions({ chart: { foreColor: nt.foreColor }, tooltip: { theme: nt.tooltipTheme } });
+      category.updateOptions({ chart: { foreColor: nt.foreColor }, colors: hasData ? palette() : [chartColors().grid], tooltip: { theme: nt.tooltipTheme } });
     });
   }
 
@@ -367,7 +380,7 @@
     const production = new ApexCharts(productionEl, {
       chart: { type: 'bar', height: 200, toolbar: { show: false }, fontFamily: 'Outfit, sans-serif', foreColor: themeAxis().foreColor },
       series: [{ name: messages.orders || 'Orders', data: charts.production.values }],
-      colors: ['#465FFF'],
+      colors: [palette()[0]],
       plotOptions: { bar: { horizontal: true, borderRadius: 6, barHeight: '55%' } },
       dataLabels: { enabled: true, style: { fontSize: '11px', fontWeight: 600 }, offsetX: 4 },
       grid: { show: false, padding: { left: 0, right: 12 } },
@@ -379,7 +392,7 @@
     production.render();
     document.addEventListener('werp:theme', () => {
       const nt = themeAxis();
-      production.updateOptions({ chart: { foreColor: nt.foreColor }, tooltip: { theme: nt.tooltipTheme } });
+      production.updateOptions({ chart: { foreColor: nt.foreColor }, colors: [palette()[0]], tooltip: { theme: nt.tooltipTheme } });
     });
   }
 })();

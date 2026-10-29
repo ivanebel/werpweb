@@ -398,8 +398,12 @@
       const trend = <%- JSON.stringify(trend) %>;
       const billedLabel = <%- JSON.stringify(t(meta.billedLabel)) %>;
       const paymentsLabel = <%- JSON.stringify(t('Payments')) %>;
-      const isDark = () => document.documentElement.classList.contains('dark');
-      const palette = ['#465FFF', '#12B76A'];
+      const chartColors = () => (window.werpChartColors ? window.werpChartColors() : {
+        fore: '#667085',
+        grid: '#F2F4F7',
+        tooltip: 'light',
+        series: ['#465FFF', '#12B76A'],
+      });
       function money(value) {
         try {
           return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -408,10 +412,12 @@
         }
       }
       function theme() {
+        const colors = chartColors();
         return {
-          foreColor: isDark() ? '#98A2B3' : '#667085',
-          grid: isDark() ? '#1F2937' : '#F2F4F7',
-          tooltip: isDark() ? 'dark' : 'light',
+          foreColor: colors.fore,
+          grid: colors.grid,
+          tooltip: colors.tooltip,
+          colors: colors.series.slice(0, 2),
         };
       }
       const element = document.querySelector('#account-trend-chart');
@@ -423,7 +429,7 @@
           { name: billedLabel, data: trend.invoices },
           { name: paymentsLabel, data: trend.payments }
         ],
-        colors: palette,
+        colors: initial.colors,
         plotOptions: { bar: { borderRadius: 4, columnWidth: '45%' } },
         dataLabels: { enabled: false },
         grid: { borderColor: initial.grid, strokeDashArray: 4, padding: { left: 8, right: 8 } },
@@ -435,7 +441,7 @@
       chart.render();
       document.addEventListener('werp:theme', () => {
         const next = theme();
-        chart.updateOptions({ chart: { foreColor: next.foreColor }, grid: { borderColor: next.grid }, tooltip: { theme: next.tooltip } });
+        chart.updateOptions({ chart: { foreColor: next.foreColor }, colors: next.colors, grid: { borderColor: next.grid }, tooltip: { theme: next.tooltip } });
       });
     })();
   </script>

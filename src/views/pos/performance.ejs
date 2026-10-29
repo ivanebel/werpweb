@@ -256,7 +256,12 @@
   const currency = <%- JSON.stringify(currency) %>;
   const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
   const charts = <%- JSON.stringify(charts) %>;
-  const isDark = () => document.documentElement.classList.contains('dark');
+  const chartColors = () => (window.werpChartColors ? window.werpChartColors() : {
+    fore: '#667085',
+    grid: '#F2F4F7',
+    tooltip: 'light',
+    series: ['#465FFF', '#12B76A'],
+  });
   function money(v) {
     try { return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(v || 0)); }
     catch (e) { return currency + ' ' + Number(v || 0).toFixed(0); }
@@ -266,10 +271,12 @@
     catch (e) { return String(Number(v || 0)); }
   }
   function themeAxis() {
+    const colors = chartColors();
     return {
-      foreColor: isDark() ? '#98A2B3' : '#667085',
-      grid: isDark() ? '#1F2937' : '#F2F4F7',
-      tooltipTheme: isDark() ? 'dark' : 'light'
+      foreColor: colors.fore,
+      grid: colors.grid,
+      tooltipTheme: colors.tooltip,
+      colors: colors.series.slice(0, 1),
     };
   }
 
@@ -279,7 +286,7 @@
     const chart = new ApexCharts(el, {
       chart: { type: 'bar', height: 330, toolbar: { show: false }, fontFamily: 'Outfit, sans-serif', foreColor: t.foreColor },
       series: [{ name: <%- JSON.stringify(t('Revenue')) %>, data: charts.products.map(p => p.revenue) }],
-      colors: ['#465FFF'],
+      colors: t.colors,
       plotOptions: { bar: { horizontal: true, borderRadius: 6, barHeight: '58%' } },
       dataLabels: { enabled: false },
       grid: { borderColor: t.grid, strokeDashArray: 4, padding: { left: 8, right: 12 } },
@@ -291,7 +298,7 @@
     chart.render();
     document.addEventListener('werp:theme', () => {
       const nt = themeAxis();
-      chart.updateOptions({ chart: { foreColor: nt.foreColor }, grid: { borderColor: nt.grid }, tooltip: { theme: nt.tooltipTheme } });
+      chart.updateOptions({ chart: { foreColor: nt.foreColor }, colors: nt.colors, grid: { borderColor: nt.grid }, tooltip: { theme: nt.tooltipTheme } });
     });
   }
 })();

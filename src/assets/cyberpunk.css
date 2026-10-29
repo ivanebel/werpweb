@@ -1,0 +1,937 @@
+﻿/* ==========================================================================
+   Cyberpunk palette (dark only)
+   Selected through <html data-palette="cyberpunk">. Light/dark stays the
+   mode dimension; this palette is only valid together with .dark.
+
+   The utility overrides at the end of this file are scoped to the palette
+   and map the color utility classes used by the views. If a new screen adds
+   a color utility that is not covered, add it to the mapping in the palette
+   generator or extend this file.
+   ========================================================================== */
+
+:root {
+  --chart-fore: #667085;
+  --chart-grid: #f2f4f7;
+  --chart-ink: #1d2939;
+  --chart-tooltip: light;
+  --chart-1: #465fff;
+  --chart-2: #12b76a;
+  --chart-3: #f79009;
+  --chart-4: #0ba5ec;
+  --chart-5: #7a5af8;
+  --chart-6: #f04438;
+  --chart-7: #ee46bc;
+  --chart-8: #84cc16;
+}
+
+html.dark {
+  --chart-fore: #98a2b3;
+  --chart-grid: #1f2937;
+  --chart-ink: #f9fafb;
+  --chart-tooltip: dark;
+}
+
+html[data-palette="cyberpunk"] {
+  color-scheme: dark;
+
+  --cp-page: #05030a;
+  --cp-surface: #0d091b;
+  --cp-surface-2: #130d26;
+  --cp-surface-3: #1b1235;
+  --cp-line: #2b1f4d;
+  --cp-line-strong: #3d2b6b;
+  --cp-ink: #f1edff;
+  --cp-ink-strong: #ffffff;
+  --cp-muted: #a79ecb;
+  --cp-muted-2: #8b80b4;
+  --cp-muted-3: #6e6294;
+  --cp-cyan: #00e5ff;
+  --cp-magenta: #ff2bd6;
+  --cp-violet: #8b5cf6;
+  --cp-green: #39ff88;
+  --cp-amber: #ffb020;
+  --cp-red: #ff3b6b;
+
+  --chart-fore: #a79ecb;
+  --chart-grid: #2b1f4d;
+  --chart-ink: #f1edff;
+  --chart-tooltip: dark;
+  --chart-1: #00e5ff;
+  --chart-2: #ff2bd6;
+  --chart-3: #39ff88;
+  --chart-4: #ffb020;
+  --chart-5: #8b5cf6;
+  --chart-6: #ff3b6b;
+  --chart-7: #4d7cff;
+  --chart-8: #b6ff3b;
+}
+
+/* ----------------------------------------------------------------- shell */
+
+html[data-palette="cyberpunk"].dark,
+html[data-palette="cyberpunk"].dark body {
+  background-color: var(--cp-page);
+}
+
+html[data-palette="cyberpunk"].dark body {
+  color: var(--cp-ink);
+  background-image:
+    radial-gradient(900px 520px at 12% -10%, rgb(139 92 246 / 0.2), transparent 60%),
+    radial-gradient(760px 420px at 100% 0%, rgb(0 229 255 / 0.1), transparent 55%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+html[data-palette="cyberpunk"].dark ::selection {
+  background: rgb(255 43 214 / 0.35);
+  color: #fff;
+}
+
+html[data-palette="cyberpunk"].dark header {
+  border-color: rgb(0 229 255 / 0.16);
+  background-color: rgb(8 5 18 / 0.9);
+  box-shadow: 0 1px 0 rgb(0 229 255 / 0.08), 0 10px 30px rgb(0 0 0 / 0.35);
+}
+
+html[data-palette="cyberpunk"].dark #app-sidebar {
+  border-color: rgb(0 229 255 / 0.14);
+  background-color: rgb(8 5 18 / 0.96);
+  box-shadow: 1px 0 0 rgb(0 229 255 / 0.08), 8px 0 30px rgb(0 0 0 / 0.25);
+}
+
+html[data-palette="cyberpunk"].dark footer {
+  border-color: var(--cp-line);
+}
+
+/* ------------------------------------------------------------- components */
+
+html[data-palette="cyberpunk"].dark .card {
+  border-color: rgb(0 229 255 / 0.14);
+  background-color: rgb(13 9 27 / 0.84);
+  background-image: linear-gradient(180deg, rgb(19 13 38 / 0.9), rgb(11 8 24 / 0.92));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 0 26px rgb(139 92 246 / 0.08);
+}
+
+html[data-palette="cyberpunk"].dark .card-header {
+  border-color: var(--cp-line);
+}
+
+html[data-palette="cyberpunk"].dark .card-title,
+html[data-palette="cyberpunk"].dark .page-title,
+html[data-palette="cyberpunk"].dark .stat-value {
+  color: var(--cp-ink-strong);
+  text-shadow: 0 0 18px rgb(139 92 246 / 0.22);
+}
+
+html[data-palette="cyberpunk"].dark .page-subtitle,
+html[data-palette="cyberpunk"].dark .stat-label,
+html[data-palette="cyberpunk"].dark .form-label,
+html[data-palette="cyberpunk"].dark .menu-item,
+html[data-palette="cyberpunk"].dark .form-help {
+  color: var(--cp-muted);
+}
+
+html[data-palette="cyberpunk"].dark .menu-group {
+  color: var(--cp-muted-3);
+}
+
+html[data-palette="cyberpunk"].dark .form-error {
+  color: #ff8fa6;
+}
+
+html[data-palette="cyberpunk"].dark .btn-primary {
+  background-color: var(--cp-violet);
+  background-image: linear-gradient(135deg, #ff2bd6, #8b5cf6 55%, #00e5ff);
+  color: #fff;
+  box-shadow:
+    0 0 18px rgb(255 43 214 / 0.25),
+    0 0 34px rgb(0 229 255 / 0.12);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
+}
+
+html[data-palette="cyberpunk"].dark .btn-primary:hover {
+  filter: brightness(1.12) saturate(1.08);
+  box-shadow:
+    0 0 24px rgb(255 43 214 / 0.4),
+    0 0 44px rgb(0 229 255 / 0.18);
+}
+
+html[data-palette="cyberpunk"].dark .btn-secondary {
+  border-color: rgb(139 92 246 / 0.35);
+  background-color: rgb(19 13 38 / 0.9);
+  color: var(--cp-ink);
+}
+
+html[data-palette="cyberpunk"].dark .btn-secondary:hover {
+  border-color: rgb(0 229 255 / 0.55);
+  background-color: rgb(27 18 53 / 0.95);
+  box-shadow: 0 0 16px rgb(0 229 255 / 0.12);
+}
+
+html[data-palette="cyberpunk"].dark .btn-ghost {
+  color: var(--cp-muted);
+}
+
+html[data-palette="cyberpunk"].dark .btn-icon {
+  border-color: rgb(139 92 246 / 0.3);
+  background-color: rgb(13 9 27 / 0.85);
+  color: var(--cp-muted);
+}
+
+html[data-palette="cyberpunk"].dark .btn-icon:hover {
+  border-color: rgb(0 229 255 / 0.45);
+  background-color: rgb(27 18 53 / 0.95);
+  color: var(--cp-cyan);
+}
+
+html[data-palette="cyberpunk"].dark .btn-danger {
+  box-shadow: 0 0 18px rgb(255 59 107 / 0.25);
+}
+
+html[data-palette="cyberpunk"].dark .form-input,
+html[data-palette="cyberpunk"].dark .form-select,
+html[data-palette="cyberpunk"].dark .form-textarea {
+  border-color: rgb(61 43 107 / 0.8);
+  background-color: rgb(8 5 18 / 0.82);
+  color: var(--cp-ink);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02);
+}
+
+html[data-palette="cyberpunk"].dark .form-input:focus,
+html[data-palette="cyberpunk"].dark .form-select:focus,
+html[data-palette="cyberpunk"].dark .form-textarea:focus {
+  border-color: rgb(0 229 255 / 0.65);
+  box-shadow:
+    0 0 0 3px rgb(0 229 255 / 0.12),
+    0 0 18px rgb(0 229 255 / 0.1);
+  outline: none;
+}
+
+html[data-palette="cyberpunk"].dark .form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23a79ecb' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+html[data-palette="cyberpunk"].dark .form-checkbox {
+  border-color: var(--cp-line-strong);
+  background-color: var(--cp-surface);
+  accent-color: var(--cp-cyan);
+}
+
+html[data-palette="cyberpunk"].dark .link {
+  color: #67e8f9;
+  text-shadow: 0 0 12px rgb(0 229 255 / 0.2);
+}
+
+html[data-palette="cyberpunk"].dark .menu-item:hover {
+  background-color: rgb(0 229 255 / 0.07);
+  color: var(--cp-ink-strong);
+}
+
+html[data-palette="cyberpunk"].dark .menu-item-active {
+  background-color: rgb(0 229 255 / 0.12);
+  color: #67e8f9;
+  box-shadow: inset 2px 0 0 var(--cp-cyan), 0 0 18px rgb(0 229 255 / 0.08);
+}
+
+html[data-palette="cyberpunk"].dark .sidebar-user-card {
+  border: 1px solid rgb(139 92 246 / 0.2);
+  background-color: rgb(139 92 246 / 0.08);
+}
+
+html[data-palette="cyberpunk"].dark .badge {
+  box-shadow: 0 0 12px rgb(0 229 255 / 0.05);
+}
+
+html[data-palette="cyberpunk"].dark .table-th {
+  border-color: var(--cp-line);
+  color: var(--cp-muted);
+}
+
+html[data-palette="cyberpunk"].dark .table-td {
+  border-color: var(--cp-line);
+  color: var(--cp-ink);
+}
+
+html[data-palette="cyberpunk"].dark .table-row:hover {
+  background-color: rgb(0 229 255 / 0.04);
+}
+
+html[data-palette="cyberpunk"].dark [data-dropdown] {
+  border-color: rgb(0 229 255 / 0.18);
+  box-shadow:
+    0 12px 40px rgb(0 0 0 / 0.5),
+    0 0 24px rgb(139 92 246 / 0.12);
+}
+
+html[data-palette="cyberpunk"].dark :focus-visible {
+  outline-color: rgb(0 229 255 / 0.65);
+}
+
+html[data-palette="cyberpunk"].dark [data-theme-toggle][disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------ scrollbars */
+
+html[data-palette="cyberpunk"].dark {
+  scrollbar-color: var(--cp-line-strong) #0a0616;
+}
+
+html[data-palette="cyberpunk"].dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html[data-palette="cyberpunk"].dark ::-webkit-scrollbar-track {
+  background: #0a0616;
+}
+
+html[data-palette="cyberpunk"].dark ::-webkit-scrollbar-thumb {
+  border: 2px solid #0a0616;
+  border-radius: 999px;
+  background: var(--cp-line-strong);
+}
+
+html[data-palette="cyberpunk"].dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--cp-cyan);
+}
+
+/* -------------------------------------------------------------- utilities */
+
+/* Cyberpunk palette: dark-only utility overrides. */
+html[data-palette="cyberpunk"] [class~="from-brand-500"] {
+  --tw-gradient-from: rgb(139 92 246);
+}
+
+html[data-palette="cyberpunk"] [class~="from-brand-400"] {
+  --tw-gradient-from: rgb(167 139 250);
+}
+
+html[data-palette="cyberpunk"] [class~="to-brand-600"] {
+  --tw-gradient-to: rgb(0 229 255);
+}
+
+html[data-palette="cyberpunk"] [class~="to-brand-700"] {
+  --tw-gradient-to: rgb(103 232 249);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-brand-600/20"] {
+  --tw-ring-color: rgb(0 229 255 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-gray-500/20"] {
+  --tw-ring-color: rgb(110 98 148 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="focus:ring-brand-500/10"]:focus {
+  --tw-ring-color: rgb(139 92 246 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:ring-brand-500/20"] {
+  --tw-ring-color: rgb(139 92 246 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-brand-100"] {
+  --tw-ring-color: rgb(139 92 246 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:ring-purple-500/20"] {
+  --tw-ring-color: rgb(176 107 255 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-purple-100"] {
+  --tw-ring-color: rgb(176 107 255 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-warning-600/20"] {
+  --tw-ring-color: rgb(255 176 32 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:ring-white/10"] {
+  --tw-ring-color: rgb(255 255 255 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:ring-error-500/20"],
+html[data-palette="cyberpunk"] [class~="ring-error-600/20"] {
+  --tw-ring-color: rgb(255 59 107 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-error-100"] {
+  --tw-ring-color: rgb(255 59 107 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-gray-100"],
+html[data-palette="cyberpunk"] [class~="dark:ring-gray-800"] {
+  --tw-ring-color: rgb(43 31 77);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-black/5"] {
+  --tw-ring-color: rgb(5 3 10 / 0.05);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:ring-success-500/20"],
+html[data-palette="cyberpunk"] [class~="ring-success-600/20"] {
+  --tw-ring-color: rgb(57 255 136 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-success-100"] {
+  --tw-ring-color: rgb(57 255 136 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-brand-600/30"] {
+  background-color: rgb(0 229 255 / 0.3);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-500/15"] {
+  background-color: rgb(110 98 148 / 0.15);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-purple-500/15"] {
+  background-color: rgb(124 58 237 / 0.15);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-purple-500/20"] {
+  background-color: rgb(124 58 237 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-900/40"] {
+  background-color: rgb(13 9 27 / 0.4);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-gray-900/50"] {
+  background-color: rgb(13 9 27 / 0.5);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-900/95"] {
+  background-color: rgb(13 9 27 / 0.95);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-white"],
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-900"],
+html[data-palette="cyberpunk"] [class~="focus:bg-white"]:focus,
+html[data-palette="cyberpunk"] [class~="dark:focus:bg-gray-900"]:focus {
+  background-color: rgb(13 9 27);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-brand-500/5"]:hover,
+html[data-palette="cyberpunk"] [class~="dark:bg-brand-500/5"] {
+  background-color: rgb(139 92 246 / 0.05);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-brand-500/[0.06]"] {
+  background-color: rgb(139 92 246 / 0.06);
+}
+
+html[data-palette="cyberpunk"] [class~="file:bg-brand-50"]::file-selector-button,
+html[data-palette="cyberpunk"] [class~="bg-brand-50"],
+html[data-palette="cyberpunk"] [class~="dark:bg-brand-500/10"] {
+  background-color: rgb(139 92 246 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:file:bg-brand-500/15"]::file-selector-button,
+html[data-palette="cyberpunk"] [class~="dark:bg-brand-500/15"] {
+  background-color: rgb(139 92 246 / 0.15);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-brand-100"] {
+  background-color: rgb(139 92 246 / 0.16);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-brand-500/20"] {
+  background-color: rgb(139 92 246 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-brand-50/40"] {
+  background-color: rgb(139 92 246 / 0.4);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-brand-300"] {
+  background-color: rgb(139 92 246 / 0.45);
+}
+
+html[data-palette="cyberpunk"] [class~="hover:bg-brand-50/50"]:hover,
+html[data-palette="cyberpunk"] [class~="bg-brand-50/50"] {
+  background-color: rgb(139 92 246 / 0.5);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-brand-500"] {
+  background-color: rgb(139 92 246);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-success-500/10"] {
+  background-color: rgb(16 185 129 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-success-500/15"] {
+  background-color: rgb(16 185 129 / 0.15);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-success-500"] {
+  background-color: rgb(16 185 129);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-purple-50"] {
+  background-color: rgb(176 107 255 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-purple-100"] {
+  background-color: rgb(176 107 255 / 0.16);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-800/50"] {
+  background-color: rgb(19 13 38 / 0.5);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-800/60"] {
+  background-color: rgb(19 13 38 / 0.6);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-gray-50/70"] {
+  background-color: rgb(19 13 38 / 0.7);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-gray-100"],
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-800"],
+html[data-palette="cyberpunk"] [class~="bg-gray-50"],
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-700"],
+html[data-palette="cyberpunk"] [class~="hover:bg-gray-50"]:hover,
+html[data-palette="cyberpunk"] [class~="hover:bg-gray-100"]:hover,
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-gray-800"]:hover {
+  background-color: rgb(19 13 38);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-warning-500/5"] {
+  background-color: rgb(217 119 6 / 0.05);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-warning-500/10"] {
+  background-color: rgb(217 119 6 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-warning-500/15"] {
+  background-color: rgb(217 119 6 / 0.15);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-warning-500/20"] {
+  background-color: rgb(217 119 6 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-warning-500"] {
+  background-color: rgb(217 119 6);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-error-500/5"] {
+  background-color: rgb(225 29 72 / 0.05);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-error-500/10"],
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-error-500/10"]:hover {
+  background-color: rgb(225 29 72 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-error-500/15"] {
+  background-color: rgb(225 29 72 / 0.15);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-error-500/20"] {
+  background-color: rgb(225 29 72 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-error-500"] {
+  background-color: rgb(225 29 72);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-warning-50"] {
+  background-color: rgb(255 176 32 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-warning-100"] {
+  background-color: rgb(255 176 32 / 0.16);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-warning-50/60"] {
+  background-color: rgb(255 176 32 / 0.6);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-white/[0.02]"],
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-white/[0.02]"]:hover {
+  background-color: rgb(255 255 255 / 0.02);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-white/[0.03]"],
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-white/[0.03]"]:hover {
+  background-color: rgb(255 255 255 / 0.03);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-white/[0.04]"] {
+  background-color: rgb(255 255 255 / 0.04);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-white/5"] {
+  background-color: rgb(255 255 255 / 0.05);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-white/10"]:hover {
+  background-color: rgb(255 255 255 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="hover:bg-white/60"]:hover {
+  background-color: rgb(255 255 255 / 0.6);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-white/70"] {
+  background-color: rgb(255 255 255 / 0.7);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-white/95"] {
+  background-color: rgb(255 255 255 / 0.95);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-error-50"],
+html[data-palette="cyberpunk"] [class~="hover:bg-error-50"]:hover {
+  background-color: rgb(255 59 107 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-error-100"] {
+  background-color: rgb(255 59 107 / 0.16);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-error-50/50"] {
+  background-color: rgb(255 59 107 / 0.5);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-error-50/60"] {
+  background-color: rgb(255 59 107 / 0.6);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-gray-200"] {
+  background-color: rgb(27 18 53);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-blue-light-500/10"] {
+  background-color: rgb(37 99 235 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-blue-light-500/15"] {
+  background-color: rgb(37 99 235 / 0.15);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-blue-light-500/20"],
+html[data-palette="cyberpunk"] [class~="bg-blue-light-500/20"] {
+  background-color: rgb(37 99 235 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-blue-light-500"] {
+  background-color: rgb(37 99 235);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-950/40"] {
+  background-color: rgb(5 3 10 / 0.4);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-950"],
+html[data-palette="cyberpunk"] [class~="bg-gray-950"] {
+  background-color: rgb(5 3 10);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-success-50"] {
+  background-color: rgb(57 255 136 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-success-400"] {
+  background-color: rgb(57 255 136);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-gray-400"] {
+  background-color: rgb(61 43 107);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-blue-light-50"] {
+  background-color: rgb(77 124 255 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-blue-light-100"] {
+  background-color: rgb(77 124 255 / 0.16);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-blue-light-50/60"] {
+  background-color: rgb(77 124 255 / 0.6);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:border-blue-light-500/30"] {
+  border-color: rgb(103 232 249 / 0.3);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:border-brand-500/20"] {
+  border-color: rgb(139 92 246 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="border-brand-100"],
+html[data-palette="cyberpunk"] [class~="border-brand-200"] {
+  border-color: rgb(139 92 246 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:border-brand-500/30"] {
+  border-color: rgb(139 92 246 / 0.3);
+}
+
+html[data-palette="cyberpunk"] [class~="hover:border-brand-400"]:hover,
+html[data-palette="cyberpunk"] [class~="dark:hover:border-brand-500/50"]:hover,
+html[data-palette="cyberpunk"] [class~="focus:border-brand-300"]:focus,
+html[data-palette="cyberpunk"] [class~="hover:border-brand-300"]:hover {
+  border-color: rgb(139 92 246 / 0.5);
+}
+
+html[data-palette="cyberpunk"] [class~="border-warning-200"] {
+  border-color: rgb(255 176 32 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:border-warning-500/30"] {
+  border-color: rgb(255 176 32 / 0.3);
+}
+
+html[data-palette="cyberpunk"] [class~="border-white/10"] {
+  border-color: rgb(255 255 255 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:border-error-500/20"] {
+  border-color: rgb(255 59 107 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="border-error-200"],
+html[data-palette="cyberpunk"] [class~="border-error-100"] {
+  border-color: rgb(255 59 107 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:border-error-500/30"] {
+  border-color: rgb(255 59 107 / 0.3);
+}
+
+html[data-palette="cyberpunk"] [class~="border-error-500"] {
+  border-color: rgb(255 59 107);
+}
+
+html[data-palette="cyberpunk"] [class~="border-gray-100"],
+html[data-palette="cyberpunk"] [class~="dark:border-gray-800"],
+html[data-palette="cyberpunk"] [class~="divide-gray-100"] > :not([hidden]) ~ :not([hidden]),
+html[data-palette="cyberpunk"] [class~="dark:divide-gray-800"] > :not([hidden]) ~ :not([hidden]),
+html[data-palette="cyberpunk"] [class~="border-gray-200"],
+html[data-palette="cyberpunk"] [class~="dark:border-gray-700"] {
+  border-color: rgb(43 31 77);
+}
+
+html[data-palette="cyberpunk"] [class~="border-gray-300"] {
+  border-color: rgb(61 43 107);
+}
+
+html[data-palette="cyberpunk"] [class~="border-blue-light-200"] {
+  border-color: rgb(77 124 255 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="text-brand-600"],
+html[data-palette="cyberpunk"] [class~="text-blue-light-600"],
+html[data-palette="cyberpunk"] [class~="dark:text-blue-light-400"],
+html[data-palette="cyberpunk"] [class~="file:text-brand-700"]::file-selector-button,
+html[data-palette="cyberpunk"] [class~="dark:file:text-brand-300"]::file-selector-button,
+html[data-palette="cyberpunk"] [class~="hover:text-brand-700"]:hover,
+html[data-palette="cyberpunk"] [class~="text-brand-700"],
+html[data-palette="cyberpunk"] [class~="dark:text-brand-300"],
+html[data-palette="cyberpunk"] [class~="hover:text-brand-600"]:hover,
+html[data-palette="cyberpunk"] [class~="text-blue-light-700"],
+html[data-palette="cyberpunk"] [class~="dark:text-blue-light-300"],
+html[data-palette="cyberpunk"] [class~="text-brand-300"] {
+  color: rgb(103 232 249);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:text-gray-400"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-300"],
+html[data-palette="cyberpunk"] [class~="text-gray-400"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-200"],
+html[data-palette="cyberpunk"] [class~="dark:hover:text-gray-200"]:hover,
+html[data-palette="cyberpunk"] [class~="text-gray-300"],
+html[data-palette="cyberpunk"] [class~="placeholder:text-gray-400"]::placeholder {
+  color: rgb(110 98 148);
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-500"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-500"] {
+  color: rgb(139 128 180);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:text-brand-400"],
+html[data-palette="cyberpunk"] [class~="dark:hover:text-brand-400"]:hover,
+html[data-palette="cyberpunk"] [class~="hover:text-brand-500"]:hover,
+html[data-palette="cyberpunk"] [class~="text-brand-500/20"],
+html[data-palette="cyberpunk"] [class~="dark:text-brand-500/30"],
+html[data-palette="cyberpunk"] [class~="text-brand-500"] {
+  color: rgb(167 139 250);
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-600"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-600"],
+html[data-palette="cyberpunk"] [class~="hover:text-gray-600"]:hover {
+  color: rgb(167 158 203);
+}
+
+html[data-palette="cyberpunk"] [class~="text-purple-600"],
+html[data-palette="cyberpunk"] [class~="dark:text-purple-400"],
+html[data-palette="cyberpunk"] [class~="text-purple-700"],
+html[data-palette="cyberpunk"] [class~="dark:text-purple-300"] {
+  color: rgb(176 107 255);
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-700"],
+html[data-palette="cyberpunk"] [class~="hover:text-gray-700"]:hover,
+html[data-palette="cyberpunk"] [class~="dark:text-gray-700"] {
+  color: rgb(241 237 255);
+}
+
+html[data-palette="cyberpunk"] [class~="text-warning-700"],
+html[data-palette="cyberpunk"] [class~="dark:text-warning-400"],
+html[data-palette="cyberpunk"] [class~="text-warning-500"],
+html[data-palette="cyberpunk"] [class~="text-warning-600"],
+html[data-palette="cyberpunk"] [class~="dark:text-warning-300"] {
+  color: rgb(255 176 32);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:text-white/90"] {
+  color: rgb(255 255 255 / 0.9);
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-900"],
+html[data-palette="cyberpunk"] [class~="dark:text-white"],
+html[data-palette="cyberpunk"] [class~="text-gray-800"],
+html[data-palette="cyberpunk"] [class~="text-white"] {
+  color: rgb(255 255 255);
+}
+
+html[data-palette="cyberpunk"] [class~="text-error-500"],
+html[data-palette="cyberpunk"] [class~="text-error-700"],
+html[data-palette="cyberpunk"] [class~="dark:text-error-400"],
+html[data-palette="cyberpunk"] [class~="text-error-600"],
+html[data-palette="cyberpunk"] [class~="dark:text-error-300"],
+html[data-palette="cyberpunk"] [class~="text-error-600/80"],
+html[data-palette="cyberpunk"] [class~="dark:text-error-400/80"],
+html[data-palette="cyberpunk"] [class~="hover:text-error-600"]:hover {
+  color: rgb(255 59 107);
+}
+
+html[data-palette="cyberpunk"] [class~="text-success-600"],
+html[data-palette="cyberpunk"] [class~="dark:text-success-400"],
+html[data-palette="cyberpunk"] [class~="text-success-700"],
+html[data-palette="cyberpunk"] [class~="dark:text-success-300"],
+html[data-palette="cyberpunk"] [class~="text-success-500"] {
+  color: rgb(57 255 136);
+}
+/* ---------------------------------------------------- readability tuning */
+html[data-palette="cyberpunk"] [class~="text-gray-200"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-200"],
+html[data-palette="cyberpunk"] [class~="dark:hover:text-gray-200"]:hover {
+  color: #ece9ff;
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-300"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-300"],
+html[data-palette="cyberpunk"] [class~="dark:hover:text-gray-300"]:hover {
+  color: #cfc8ea;
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-400"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-400"],
+html[data-palette="cyberpunk"] [class~="dark:hover:text-gray-400"]:hover {
+  color: #9a90bf;
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-500"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-500"] {
+  color: #8b80b4;
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-600"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-600"] {
+  color: #a79ecb;
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-700"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-700"] {
+  color: #cfc8ea;
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-800"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-800"] {
+  color: #ece9ff;
+}
+
+html[data-palette="cyberpunk"] [class~="text-gray-900"],
+html[data-palette="cyberpunk"] [class~="dark:text-gray-900"] {
+  color: #ffffff;
+}
+/* ------------------------------------------- additional tone-map classes */
+html[data-palette="cyberpunk"] [class~="bg-gray-300"] {
+  background-color: rgb(61 43 107);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:bg-gray-600"] {
+  background-color: rgb(27 18 53);
+}
+
+html[data-palette="cyberpunk"] [class~="border-success-200"] {
+  border-color: rgb(57 255 136 / 0.25);
+}
+
+html[data-palette="cyberpunk"] [class~="dark:border-success-500/30"] {
+  border-color: rgb(57 255 136 / 0.3);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-success-50/70"],
+html[data-palette="cyberpunk"] [class~="hover:bg-success-50"]:hover,
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-success-500/10"]:hover {
+  background-color: rgb(57 255 136 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-warning-50/70"],
+html[data-palette="cyberpunk"] [class~="hover:bg-warning-50"]:hover,
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-warning-500/10"]:hover {
+  background-color: rgb(255 176 32 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-error-50/70"] {
+  background-color: rgb(255 59 107 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="bg-blue-light-50/70"],
+html[data-palette="cyberpunk"] [class~="hover:bg-blue-light-50"]:hover,
+html[data-palette="cyberpunk"] [class~="dark:hover:bg-blue-light-500/10"]:hover {
+  background-color: rgb(77 124 255 / 0.1);
+}
+
+html[data-palette="cyberpunk"] [class~="text-blue-light-500"] {
+  color: #67e8f9;
+}
+
+html[data-palette="cyberpunk"] [class~="ring-blue-light-600/20"] {
+  --tw-ring-color: rgb(103 232 249 / 0.2);
+}
+
+html[data-palette="cyberpunk"] [class~="ring-purple-600/20"] {
+  --tw-ring-color: rgb(176 107 255 / 0.2);
+}
+html[data-palette="cyberpunk"].dark .btn:focus {
+  --tw-ring-color: rgb(0 229 255 / 0.35);
+}
+
+html[data-palette="cyberpunk"].dark .btn-danger {
+  background-color: #c81e3f;
+}
+
+html[data-palette="cyberpunk"].dark .btn-success {
+  background-color: #0b8f5c;
+}
+
+html[data-palette="cyberpunk"].dark .form-input-error,
+html[data-palette="cyberpunk"].dark .form-input-error:focus {
+  border-color: rgb(255 59 107 / 0.7);
+}

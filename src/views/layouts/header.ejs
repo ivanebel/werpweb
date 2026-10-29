@@ -45,6 +45,14 @@
       <span class="dark:hidden"><%- include('/partials/icon', { name: 'moon', className: 'h-5 w-5' }) %></span>
     </button>
 
+    <div class="hidden sm:block">
+      <label for="palette-select" class="sr-only"><%= t('Palette') %></label>
+      <select id="palette-select" data-palette-select class="h-9 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 outline-none transition hover:bg-gray-50 focus:border-brand-300 focus:ring-2 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+        <option value="default"><%= t('Default palette') %></option>
+        <option value="cyberpunk"><%= t('Cyberpunk') %></option>
+      </select>
+    </div>
+
     <form action="/language" method="POST" class="flex items-center">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <input type="hidden" name="next" value="<%= currentPath %>">
@@ -71,6 +79,13 @@
         <div class="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
           <p class="text-sm font-semibold text-gray-800 dark:text-white/90"><%= currentUser.name %></p>
           <p class="truncate text-xs text-gray-500 dark:text-gray-400"><%= currentUser.email %></p>
+        </div>
+        <div class="border-b border-gray-100 px-4 py-3 dark:border-gray-800 sm:hidden">
+          <label for="palette-select-mobile" class="form-label"><%= t('Palette') %></label>
+          <select id="palette-select-mobile" data-palette-select class="form-select h-9 text-xs">
+            <option value="default"><%= t('Default palette') %></option>
+            <option value="cyberpunk"><%= t('Cyberpunk') %></option>
+          </select>
         </div>
         <div class="p-2">
           <a href="/profile" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800">

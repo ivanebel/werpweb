@@ -8,21 +8,57 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <script>
     (function () {
+      var root = document.documentElement;
+      var theme = 'light';
+      var palette = 'default';
       try {
-        if (localStorage.getItem('werp-theme') === 'dark') {
-          document.documentElement.classList.add('dark');
-        }
+        theme = localStorage.getItem('werp-theme') === 'dark' ? 'dark' : 'light';
+        palette = localStorage.getItem('werp-palette') === 'cyberpunk' ? 'cyberpunk' : 'default';
         if (localStorage.getItem('werp-sidebar') === 'collapsed') {
-          document.documentElement.classList.add('sidebar-collapsed');
+          root.classList.add('sidebar-collapsed');
         }
       } catch (e) {
         /* localStorage may be unavailable */
       }
+      if (palette === 'cyberpunk') theme = 'dark';
+      root.dataset.palette = palette;
+      root.classList.toggle('dark', theme === 'dark');
+
+      /*
+       * Chart colors follow the active palette. Chart scripts run before
+       * public/js/app.js, so this helper is defined before first paint and
+       * reads the CSS variables lazily when the charts are created.
+       */
+      window.werpChartColors = function () {
+        var styles = getComputedStyle(root);
+        var value = function (name, fallback) {
+          return styles.getPropertyValue(name).trim() || fallback;
+        };
+        return {
+          theme: root.classList.contains('dark') ? 'dark' : 'light',
+          palette: root.dataset.palette || 'default',
+          fore: value('--chart-fore', '#667085'),
+          grid: value('--chart-grid', '#f2f4f7'),
+          ink: value('--chart-ink', '#1d2939'),
+          tooltip: value('--chart-tooltip', 'light'),
+          series: [
+            value('--chart-1', '#465fff'),
+            value('--chart-2', '#12b76a'),
+            value('--chart-3', '#f79009'),
+            value('--chart-4', '#0ba5ec'),
+            value('--chart-5', '#7a5af8'),
+            value('--chart-6', '#f04438'),
+            value('--chart-7', '#ee46bc'),
+            value('--chart-8', '#84cc16'),
+          ],
+        };
+      };
     })();
   </script>
   <style>
     html { background-color: #f9fafb; color-scheme: light; }
     html.dark { background-color: #030712; color-scheme: dark; }
+    html[data-palette="cyberpunk"] { background-color: #05030a; color-scheme: dark; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

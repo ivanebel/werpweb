@@ -406,7 +406,13 @@
       <%- JSON.stringify(t('Variable costs')) %>,
       <%- JSON.stringify(t('One-off costs')) %>
     ];
-    const isDark = () => document.documentElement.classList.contains('dark');
+    const chartColors = () => (window.werpChartColors ? window.werpChartColors() : {
+      fore: '#667085',
+      grid: '#F2F4F7',
+      ink: '#1D2939',
+      tooltip: 'light',
+      series: ['#465FFF', '#12B76A', '#F79009'],
+    });
     const chartEl = document.querySelector('#cost-structure-chart');
     if (!chartEl || typeof ApexCharts === 'undefined') return;
 
@@ -422,26 +428,28 @@
     const shownLabels = oneOff > 0 ? labels : labels.slice(0, 2);
     const hasData = values.some((value) => value > 0);
     const chart = new ApexCharts(chartEl, {
-      chart: { type: 'donut', height: 230, fontFamily: 'Outfit, sans-serif', foreColor: isDark() ? '#98A2B3' : '#667085' },
+      chart: { type: 'donut', height: 230, fontFamily: 'Outfit, sans-serif', foreColor: chartColors().fore },
       series: hasData ? values : [1],
       labels: hasData ? shownLabels : [<%- JSON.stringify(t('No data')) %>],
-      colors: hasData ? ['#465FFF', '#12B76A', '#F79009'] : ['#E4E7EC'],
+      colors: hasData ? chartColors().series.slice(0, 3) : [chartColors().grid],
       stroke: { width: 0 },
       legend: { show: false },
       dataLabels: { enabled: false },
       plotOptions: { pie: { donut: { size: '72%', labels: {
         show: true,
         name: { show: false },
-        value: { show: true, fontSize: '18px', fontWeight: 600, color: isDark() ? '#F9FAFB' : '#1D2939', formatter: (value) => money(value) },
-        total: { show: true, showAlways: true, label: <%- JSON.stringify(t('Total costs')) %>, fontSize: '12px', color: '#98A2B3', formatter: () => money(values.reduce((sum, value) => sum + value, 0)) }
+        value: { show: true, fontSize: '18px', fontWeight: 600, color: chartColors().ink, formatter: (value) => money(value) },
+        total: { show: true, showAlways: true, label: <%- JSON.stringify(t('Total costs')) %>, fontSize: '12px', color: chartColors().fore, formatter: () => money(values.reduce((sum, value) => sum + value, 0)) }
       } } } },
-      tooltip: { theme: isDark() ? 'dark' : 'light', y: { formatter: money } }
+      tooltip: { theme: chartColors().tooltip, y: { formatter: money } }
     });
     chart.render();
     document.addEventListener('werp:theme', () => {
+      const colors = chartColors();
       chart.updateOptions({
-        chart: { foreColor: isDark() ? '#98A2B3' : '#667085' },
-        tooltip: { theme: isDark() ? 'dark' : 'light' }
+        chart: { foreColor: colors.fore },
+        colors: hasData ? colors.series.slice(0, 3) : [colors.grid],
+        tooltip: { theme: colors.tooltip }
       });
     });
   })();

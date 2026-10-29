@@ -10,31 +10,80 @@
   }
 
   // ---------------------------------------------------------------- theme
-  function applyTheme(theme) {
-    root.classList.toggle('dark', theme === 'dark');
+  function readStoredValue(key, fallback) {
     try {
-      localStorage.setItem('werp-theme', theme);
+      return localStorage.getItem(key) || fallback;
     } catch (e) {
-      /* ignore */
+      return fallback;
     }
-    const label = theme === 'dark' ? (messages.lightMode || 'Light mode') : (messages.darkMode || 'Dark mode');
+  }
+
+  let savedTheme = readStoredValue('werp-theme', 'light') === 'dark' ? 'dark' : 'light';
+  let palette = readStoredValue('werp-palette', 'default') === 'cyberpunk'
+    ? 'cyberpunk'
+    : 'default';
+  const paletteIsLocked = () => palette === 'cyberpunk';
+
+  function themeToggleLabel(theme) {
+    if (paletteIsLocked()) {
+      return messages.cyberpunkDarkOnly || 'Cyberpunk is dark only';
+    }
+    return theme === 'dark'
+      ? (messages.lightMode || 'Light mode')
+      : (messages.darkMode || 'Dark mode');
+  }
+
+  function syncThemeControls(theme) {
+    const label = themeToggleLabel(theme);
+    const locked = paletteIsLocked();
     document.querySelectorAll('[data-theme-label]').forEach((el) => {
       el.textContent = label;
     });
     document.querySelectorAll('[data-theme-toggle]').forEach((el) => {
       el.setAttribute('title', label);
       el.setAttribute('aria-label', label);
+      el.setAttribute('aria-disabled', String(locked));
+      if (el.tagName === 'BUTTON') el.disabled = locked;
     });
-    document.dispatchEvent(new CustomEvent('werp:theme', { detail: { theme } }));
+    document.querySelectorAll('[data-palette-select]').forEach((el) => {
+      el.value = palette;
+      el.setAttribute('title', messages.palette || 'Palette');
+    });
   }
 
-  let savedTheme = 'light';
-  try {
-    savedTheme = localStorage.getItem('werp-theme') || 'light';
-  } catch (e) {
-    /* ignore */
+  function applyTheme(theme, persist = true) {
+    const effective = paletteIsLocked() ? 'dark' : (theme === 'dark' ? 'dark' : 'light');
+    root.classList.toggle('dark', effective === 'dark');
+    if (persist && !paletteIsLocked()) {
+      savedTheme = effective;
+      try {
+        localStorage.setItem('werp-theme', effective);
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    syncThemeControls(effective);
+    document.dispatchEvent(new CustomEvent('werp:theme', {
+      detail: { theme: effective, palette },
+    }));
   }
-  applyTheme(savedTheme);
+
+  function applyPalette(next, persist = true) {
+    palette = next === 'cyberpunk' ? 'cyberpunk' : 'default';
+    root.dataset.palette = palette;
+    if (persist) {
+      try {
+        localStorage.setItem('werp-palette', palette);
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    applyTheme(paletteIsLocked() ? 'dark' : savedTheme, false);
+    // Charts redraw their SVG colors on the next resize after updateOptions.
+    window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+  }
+
+  applyPalette(palette, false);
 
   // -------------------------------------------------------------- sidebar
   function applySidebar(collapsed, persist, notify) {
@@ -77,6 +126,7 @@
     const toggle = event.target.closest('[data-theme-toggle]');
     if (toggle) {
       event.preventDefault();
+      if (paletteIsLocked()) return;
       applyTheme(root.classList.contains('dark') ? 'light' : 'dark');
       return;
     }
@@ -118,6 +168,12 @@
       const target = document.getElementById(dismiss.getAttribute('data-dismiss'));
       if (target) target.remove();
     }
+  });
+
+  document.addEventListener('change', (event) => {
+    const paletteSelect = event.target.closest('[data-palette-select]');
+    if (!paletteSelect) return;
+    applyPalette(paletteSelect.value);
   });
 
   // --------------------------------------------------------------- confirm

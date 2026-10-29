@@ -72,6 +72,8 @@ async function webLocals(req, res, next) {
       customerCodeLine: req.t('Customer code: {code}', { code: '{code}' }),
       lightMode: req.t('Light mode'),
       darkMode: req.t('Dark mode'),
+      palette: req.t('Palette'),
+      cyberpunkDarkOnly: req.t('Cyberpunk is dark only'),
       collapseSidebar: req.t('Collapse sidebar'),
       expandSidebar: req.t('Expand sidebar'),
       revenue: req.t('Revenue'),
