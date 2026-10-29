@@ -39,6 +39,7 @@ const simulatorRoutes = require('./routes/simulator');
 const cashflowRoutes = require('./routes/cashflow');
 const priceRoutes = require('./routes/prices');
 const taxRoutes = require('./routes/taxes');
+const salesArcaImportRoutes = require('./routes/salesArcaImport');
 const emailRoutes = require('./routes/emails');
 const settingsRoutes = require('./routes/settings');
 
@@ -76,6 +77,14 @@ async function createApp() {
   app.use(
     '/vendor/apexcharts',
     express.static(path.join(root, 'node_modules', 'apexcharts', 'dist'), { maxAge: '7d' }),
+  );
+  app.use(
+    '/vendor/pdfjs',
+    express.static(path.join(root, 'node_modules', 'pdfjs-dist', 'build'), { maxAge: '7d' }),
+  );
+  app.use(
+    '/vendor/jsqr',
+    express.static(path.join(root, 'node_modules', 'jsqr', 'dist'), { maxAge: '7d' }),
   );
 
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
@@ -144,6 +153,7 @@ async function createApp() {
   app.use('/brands', brandRoutes);
   app.use('/sales-orders', salesOrderRoutes);
   app.use('/purchase-orders', purchaseOrderRoutes);
+  app.use('/sales/import-arca', salesArcaImportRoutes);
   app.use('/sales', salesInvoiceRoutes);
   app.use('/purchases', purchaseInvoiceRoutes);
   app.use('/payments', paymentRoutes);

@@ -1,0 +1,93 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1000px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Import ARCA invoice') %></h1>
+          <p class="page-subtitle"><%= t('Scan the QR code on the first page of an ARCA PDF and import the fiscal data into a sales invoice.') %></p>
+        </div>
+        <a href="<%= invoice ? `/sales/${invoice.id}` : '/sales' %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= invoice ? t('Invoice') : t('Sales invoices') %>
+        </a>
+      </div>
+
+      <% if (invoice) { %>
+        <div class="mb-5 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
+          <%= t('Importing into draft invoice {number}.', { number: invoice.invoice_no }) %>
+        </div>
+      <% } %>
+
+      <% if (error) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <%= error %>
+        </div>
+      <% } %>
+
+      <form id="arca-import-form" method="POST" action="/sales/import-arca/preview" class="space-y-5">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="invoice_id" value="<%= invoice ? invoice.id : '' %>">
+        <input type="hidden" name="qr_data" id="arca-qr-data" value="">
+        <input type="hidden" name="source" id="arca-source" value="pdf_qr">
+        <input type="hidden" name="pdf_filename" id="arca-pdf-filename" value="">
+        <input type="hidden" name="pdf_sha256" id="arca-pdf-sha256" value="">
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Upload ARCA PDF') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Only the first page is scanned. The PDF is processed in your browser and is not uploaded or stored.') %></p>
+            </div>
+          </div>
+          <div class="space-y-5 p-5 md:p-6">
+            <div>
+              <label for="arca-pdf" class="form-label"><%= t('ARCA invoice PDF') %></label>
+              <input id="arca-pdf" type="file" accept="application/pdf,.pdf" class="form-input file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-700 dark:file:bg-brand-500/15 dark:file:text-brand-300">
+              <p class="form-help"><%= t('Factura A/B PDFs often contain several copies. Only the first page is used.') %></p>
+            </div>
+
+            <div class="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+              <span class="mt-0.5 text-brand-500"><%- include('/partials/icon', { name: 'info', className: 'h-5 w-5' }) %></span>
+              <p><%= t('If the PDF QR cannot be read, paste the QR link or the base64 payload below. The official ARCA verification page may ask for a CAPTCHA; this import does not depend on it.') %></p>
+            </div>
+
+            <div>
+              <label for="arca-manual-qr" class="form-label"><%= t('QR link or payload (optional)') %></label>
+              <textarea id="arca-manual-qr" rows="4" class="form-textarea font-mono text-xs" placeholder="<%= t('Paste the link from the invoice QR code') %>"></textarea>
+              <p class="form-help"><%= t('When this field is filled, the PDF is not scanned.') %></p>
+            </div>
+          </div>
+          <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+            <a href="<%= invoice ? `/sales/${invoice.id}` : '/sales' %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+            <button type="submit" id="arca-import-submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'barcode', className: 'h-4 w-4' }) %>
+              <%= t('Scan and review') %>
+            </button>
+          </div>
+        </div>
+
+        <p id="arca-import-status" class="hidden rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300"></p>
+      </form>
+    </div>
+  </main>
+  <script src="/vendor/jsqr/jsQR.js"></script>
+  <script>
+    window.ARCA_IMPORT_MESSAGES = <%- JSON.stringify({
+      scanning: t('Scanning the first PDF page...'),
+      noFile: t('Select an ARCA PDF or paste the QR link.'),
+      noQr: t('No QR code was found on the first page. Paste the QR link below and try again.'),
+      pdfError: t('The PDF could not be read. Check that it is a valid, unencrypted PDF.'),
+      pdfTooLarge: t('The PDF is larger than 20 MB.'),
+      scanned: t('QR code found. Opening the review...'),
+      qrError: t('The QR code could not be read.'),
+      reading: t('Reading PDF...'),
+      hashing: t('Preparing PDF...'),
+    }) %>;
+  </script>
+  <script type="module" src="/js/arca-import.js?v=<%= assetVersion %>"></script>
+  <%- include('/layouts/footer') %>
+</div>

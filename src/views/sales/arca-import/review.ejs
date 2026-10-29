@@ -1,0 +1,124 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Review ARCA import') %></h1>
+          <p class="page-subtitle">
+            <%= targetInvoice
+              ? t('Review the QR data before updating draft invoice {number}.', { number: targetInvoice.invoice_no })
+              : t('Review the QR data before creating a draft sales invoice.') %>
+          </p>
+        </div>
+        <a href="/sales/import-arca<%= targetInvoice ? `?invoice_id=${targetInvoice.id}` : '' %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Scan another PDF') %>
+        </a>
+      </div>
+
+      <% if (errors && errors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <p class="font-semibold"><%= t('The ARCA data cannot be imported yet:') %></p>
+          <ul class="mt-1 list-inside list-disc space-y-1">
+            <% errors.forEach((message) => { %><li><%= message %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <% if (warnings && warnings.length) { %>
+        <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+          <p class="font-semibold"><%= t('Warnings — review before importing:') %></p>
+          <ul class="mt-1 list-inside list-disc space-y-1">
+            <% warnings.forEach((message) => { %><li><%= message %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/sales/import-arca/confirm" class="space-y-5">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="invoice_id" value="<%= invoiceId || '' %>">
+        <input type="hidden" name="qr_data" value="<%= qrInput %>">
+        <input type="hidden" name="source" value="<%= source %>">
+        <input type="hidden" name="pdf_filename" value="<%= pdfFilename || '' %>">
+        <input type="hidden" name="pdf_sha256" value="<%= pdfSha256 || '' %>">
+
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div class="card lg:col-span-2">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Fiscal data from the QR') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('These values come from the ARCA QR code.') %></p>
+              </div>
+              <span class="badge bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400"><%= t('ARCA QR') %></span>
+            </div>
+            <dl class="grid grid-cols-1 gap-4 p-5 text-sm sm:grid-cols-2 md:p-6">
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Invoice number') %></dt><dd class="mt-1 font-mono font-medium text-gray-800 dark:text-gray-200"><%= fields.invoice_no %></dd></div>
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Invoice date') %></dt><dd class="mt-1 font-medium text-gray-800 dark:text-gray-200"><%= h.formatDate(fields.invoice_date) %></dd></div>
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Fiscal document type') %></dt><dd class="mt-1 font-medium text-gray-800 dark:text-gray-200"><%= fiscalType ? fiscalType.name : `${fields.document_type_code}` %></dd></div>
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Issuer CUIT') %></dt><dd class="mt-1 font-mono font-medium text-gray-800 dark:text-gray-200"><%= fields.issuer_cuit %></dd></div>
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Customer document') %></dt><dd class="mt-1 font-mono font-medium text-gray-800 dark:text-gray-200"><%= fields.receiver_doc_type %> · <%= fields.receiver_doc_number %></dd></div>
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Total') %></dt><dd class="mt-1 text-lg font-bold text-gray-900 dark:text-white"><%= qrMoney(fields.total) %></dd></div>
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Currency') %></dt><dd class="mt-1 font-medium text-gray-800 dark:text-gray-200"><%= fields.currency %> · <%= h.formatNumber(fields.exchange_rate, 4) %></dd></div>
+              <div><dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('CAE') %></dt><dd class="mt-1 font-mono font-medium text-gray-800 dark:text-gray-200"><%= fields.cae %></dd></div>
+              <div class="sm:col-span-2">
+                <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('ARCA verification link') %></dt>
+                <dd class="mt-1 break-all text-xs text-gray-500 dark:text-gray-400">
+                  <% if (qrUrl) { %><a href="<%= qrUrl %>" target="_blank" rel="noopener noreferrer" class="link"><%= qrUrl %></a><% } else { %>—<% } %>
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Import options') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Choose the customer and confirm the CAE expiry date.') %></p>
+              </div>
+            </div>
+            <div class="space-y-4 p-5 md:p-6">
+              <div>
+                <label for="arca-customer" class="form-label"><%= t('Customer') %> <span class="text-error-500">*</span></label>
+                <select id="arca-customer" name="customer_id" class="form-select" required>
+                  <option value=""><%= t('Select a customer') %></option>
+                  <% customers.forEach((customer) => { %>
+                    <option value="<%= customer.id %>" <%= String(selectedCustomerId) === String(customer.id) ? 'selected' : '' %>>
+                      <%= customer.company_name %><%= customer.tax_id ? ` · ${customer.tax_id}` : '' %><%= customer.status === 'inactive' ? ` (${t('Inactive')})` : '' %>
+                    </option>
+                  <% }) %>
+                </select>
+                <p class="form-help"><%= t('The QR customer document is {number}.', { number: fields.receiver_doc_number }) %></p>
+              </div>
+              <div>
+                <label for="arca-cae-expiry" class="form-label"><%= t('CAE expiry date') %></label>
+                <input id="arca-cae-expiry" name="cae_expiry_date" type="date" value="<%= caeExpiry %>" class="form-input" required>
+                <p class="form-help"><%= t('Defaults to the invoice date. Adjust it only if ARCA shows a different expiry date.') %></p>
+              </div>
+              <% if (!targetInvoice) { %>
+                <div class="rounded-lg border border-warning-200 bg-warning-50 p-3 text-xs text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+                  <%= t('A draft invoice will be created without line items. Add them from the invoice edit page before sending it.') %>
+                </div>
+              <% } else { %>
+                <div class="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                  <%= t('The draft invoice total will not be changed. A total mismatch is shown as a warning.') %>
+                </div>
+              <% } %>
+            </div>
+            <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+              <a href="<%= targetInvoice ? `/sales/${targetInvoice.id}` : '/sales' %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+              <button type="submit" class="btn btn-primary" <%= errors && errors.length ? 'disabled' : '' %>>
+                <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+                <%= targetInvoice ? t('Update draft invoice') : t('Create draft invoice') %>
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

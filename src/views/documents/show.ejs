@@ -40,6 +40,12 @@
               <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> Edit
             </a>
           <% } %>
+          <% if (isSalesInvoice && row.status === 'draft') { %>
+            <a href="/sales/import-arca?invoice_id=<%= row.id %>" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'barcode', className: 'h-4 w-4' }) %>
+              <%= t('Import ARCA PDF') %>
+            </a>
+          <% } %>
           <% actions.forEach(a => { %>
             <% if (a.href) { %>
               <a href="<%= a.href %>" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></a>

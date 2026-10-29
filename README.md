@@ -364,6 +364,18 @@ npm run test:telegram
 5. Sales invoices can link one or more **packing slips (remitos)** from the selected customer. Purchase invoices store an optional supplier remito number.
 6. Credit and debit notes can link one or more regular invoices for the same party. The related invoices/notes appear on the detail and print pages.
 
+### Importing ARCA sales invoices from the QR
+
+1. Open **Sales invoices** and use **Import ARCA PDF**, or open a draft sales invoice and use the same button to fill that draft. Every logged-in user can import.
+2. Choose the ARCA PDF. Only the first page is scanned, so Factura A/B files with several copies work as expected. The PDF is decoded in the browser with PDF.js and jsQR; it is never uploaded or stored.
+3. If the QR cannot be read, paste the QR link or base64 payload shown on the invoice. The official ARCA verification page may ask for a CAPTCHA, so this import does not depend on it.
+4. Review the extracted data: invoice number, date, fiscal document type, issuer CUIT, customer document, total, currency, CAE and verification link. The CAE expiry date is prefilled with the invoice date; adjust it if ARCA shows a different date.
+5. Choose the customer and confirm. Discrepancies are warnings, not errors. Imported data stays in **draft** status.
+6. When importing into an existing draft, the invoice number, date, customer, fiscal type, CAE and expiry are updated, but the invoice total and line items are left untouched. A total mismatch is shown as a warning. Creating a new import produces a draft header without line items; add them from the edit page before sending.
+7. Unsupported currencies (anything other than `PES`) and structurally invalid QR payloads are rejected. The raw QR payload, warnings, PDF file name and SHA-256 are stored in `sales_invoice_imports` for auditing; the PDF itself is not kept.
+
+The QR is treated as a data-entry helper, not as proof of authenticity. Run the parser checks with `npm run test:arca-qr`.
+
 ### Customer and supplier account dashboards
 
 1. Open **Contacts → Customers** or **Contacts → Suppliers** and click the chart icon on a row, or open the party and use **Account dashboard**.

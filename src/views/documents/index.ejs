@@ -10,10 +10,18 @@
           <h1 class="page-title"><%= doc.title %></h1>
           <p class="page-subtitle"><%= doc.indexSubtitle %></p>
         </div>
-        <a href="<%= doc.basePath %>/new" class="btn btn-primary btn-sm">
-          <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
-          <%= doc.newLabel %>
-        </a>
+        <div class="flex flex-wrap items-center gap-2">
+          <% if (doc.kind === 'sales_invoice') { %>
+            <a href="/sales/import-arca" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'barcode', className: 'h-4 w-4' }) %>
+              <%= t('Import ARCA PDF') %>
+            </a>
+          <% } %>
+          <a href="<%= doc.basePath %>/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+            <%= doc.newLabel %>
+          </a>
+        </div>
       </div>
 
       <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">

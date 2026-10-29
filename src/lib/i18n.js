@@ -3860,6 +3860,131 @@ const ES = {
   'allocations': 'asignaciones',
   'requirement': 'requerimiento',
   'requirements': 'requerimientos',
+
+  // ------------------------------------------------------------- ARCA import
+  'Import ARCA PDF': 'Importar PDF de ARCA',
+  'Import ARCA invoice': 'Importar factura de ARCA',
+  'Review ARCA import': 'Revisar importación de ARCA',
+  'Scan the QR code on the first page of an ARCA PDF and import the fiscal data into a sales invoice.':
+    'Escaneá el código QR de la primera página de un PDF de ARCA e importá los datos fiscales a una factura de venta.',
+  'Importing into draft invoice {number}.': 'Importando en la factura borrador {number}.',
+  'Upload ARCA PDF': 'Subir PDF de ARCA',
+  'Only the first page is scanned. The PDF is processed in your browser and is not uploaded or stored.':
+    'Solo se escanea la primera página. El PDF se procesa en tu navegador y no se sube ni se guarda.',
+  'ARCA invoice PDF': 'PDF de factura de ARCA',
+  'Factura A/B PDFs often contain several copies. Only the first page is used.':
+    'Los PDF de factura A/B suelen contener varias copias. Solo se usa la primera página.',
+  'If the PDF QR cannot be read, paste the QR link or the base64 payload below. The official ARCA verification page may ask for a CAPTCHA; this import does not depend on it.':
+    'Si no se puede leer el QR del PDF, pegá abajo el enlace del QR o el payload base64. La página oficial de constatación de ARCA puede pedir un CAPTCHA; esta importación no depende de ella.',
+  'QR link or payload (optional)': 'Enlace o payload del QR (opcional)',
+  'Paste the link from the invoice QR code': 'Pegá el enlace del código QR de la factura',
+  'When this field is filled, the PDF is not scanned.': 'Cuando completás este campo, no se escanea el PDF.',
+  'Scan and review': 'Escanear y revisar',
+  'Scanning the first PDF page...': 'Escaneando la primera página del PDF...',
+  'Select an ARCA PDF or paste the QR link.': 'Seleccioná un PDF de ARCA o pegá el enlace del QR.',
+  'No QR code was found on the first page. Paste the QR link below and try again.':
+    'No se encontró un código QR en la primera página. Pegá el enlace del QR abajo y volvé a intentar.',
+  'The PDF could not be read. Check that it is a valid, unencrypted PDF.':
+    'No se pudo leer el PDF. Verificá que sea un PDF válido y sin contraseña.',
+  'The QR code could not be read.': 'No se pudo leer el código QR.',
+  'Reading PDF...': 'Leyendo el PDF...',
+  'Preparing PDF...': 'Preparando el PDF...',
+  'The PDF is larger than 20 MB.': 'El PDF supera los 20 MB.',
+  'QR code found. Opening the review...': 'Código QR encontrado. Abriendo la revisión...',
+  'Review the QR data before updating draft invoice {number}.':
+    'Revisá los datos del QR antes de actualizar la factura borrador {number}.',
+  'Review the QR data before creating a draft sales invoice.':
+    'Revisá los datos del QR antes de crear una factura de venta borrador.',
+  'Scan another PDF': 'Escanear otro PDF',
+  'The ARCA data cannot be imported yet:': 'Todavía no se pueden importar los datos de ARCA:',
+  'Warnings — review before importing:': 'Advertencias: revisá antes de importar:',
+  'Fiscal data from the QR': 'Datos fiscales del QR',
+  'These values come from the ARCA QR code.': 'Estos valores provienen del código QR de ARCA.',
+  'ARCA QR': 'QR de ARCA',
+  'Invoice number': 'Número de factura',
+  'Invoice date': 'Fecha de factura',
+  'Fiscal document type': 'Tipo de comprobante fiscal',
+  'Issuer CUIT': 'CUIT emisor',
+  'Customer document': 'Documento del cliente',
+  'Currency': 'Moneda',
+  'ARCA verification link': 'Enlace de constatación de ARCA',
+  'Import options': 'Opciones de importación',
+  'Choose the customer and confirm the CAE expiry date.':
+    'Elegí el cliente y confirmá la fecha de vencimiento del CAE.',
+  'Select a customer': 'Seleccioná un cliente',
+  'The QR customer document is {number}.': 'El documento del cliente en el QR es {number}.',
+  'CAE': 'CAE',
+  'CAE expiry date': 'Fecha de vencimiento del CAE',
+  'Defaults to the invoice date. Adjust it only if ARCA shows a different expiry date.':
+    'Se completa con la fecha de la factura. Ajustala solo si ARCA muestra una fecha de vencimiento distinta.',
+  'A draft invoice will be created without line items. Add them from the invoice edit page before sending it.':
+    'Se creará una factura borrador sin líneas. Agregalas desde la edición de la factura antes de enviarla.',
+  'The draft invoice total will not be changed. A total mismatch is shown as a warning.':
+    'No se modificará el total de la factura borrador. Si el total no coincide, se muestra una advertencia.',
+  'Update draft invoice': 'Actualizar factura borrador',
+  'Create draft invoice': 'Crear factura borrador',
+  'Sales invoice not found.': 'No se encontró la factura de venta.',
+  'Only draft sales invoices can receive ARCA data.':
+    'Solo las facturas de venta borrador pueden recibir datos de ARCA.',
+  'Only PES invoices are supported.': 'Solo se admiten facturas en pesos (PES).',
+  'The fiscal document type {code} is not configured in the ERP.':
+    'El tipo de comprobante fiscal {code} no está configurado en el ERP.',
+  'The fiscal document type {name} is inactive.': 'El tipo de comprobante fiscal {name} está inactivo.',
+  'The company tax ID is not configured. The issuer CUIT could not be validated.':
+    'El CUIT de la empresa no está configurado. No se pudo validar el CUIT emisor.',
+  'The issuer CUIT ({issuer}) does not match the company tax ID ({company}).':
+    'El CUIT emisor ({issuer}) no coincide con el CUIT de la empresa ({company}).',
+  'No customer matches CUIT {cuit}. Select one manually.':
+    'Ningún cliente coincide con el CUIT {cuit}. Seleccioná uno manualmente.',
+  'The selected customer does not match the CUIT in the QR code ({cuit}).':
+    'El cliente seleccionado no coincide con el CUIT del código QR ({cuit}).',
+  'The customer document type in the QR code is not CUIT.':
+    'El tipo de documento del cliente en el QR no es CUIT.',
+  'The authorization type in the QR code is {type}, not CAE.':
+    'El tipo de autorización del QR es {type}, no CAE.',
+  'The QR total ({qr}) does not match the current invoice total ({invoice}).':
+    'El total del QR ({qr}) no coincide con el total actual de la factura ({invoice}).',
+  'The invoice number will change from {old} to {new}.':
+    'El número de factura cambiará de {old} a {new}.',
+  'The customer on the draft invoice will be replaced.':
+    'Se reemplazará el cliente de la factura borrador.',
+  'The fiscal document type on the draft invoice will be replaced.':
+    'Se reemplazará el tipo de comprobante fiscal de la factura borrador.',
+  'The existing CAE on the draft invoice will be replaced.':
+    'Se reemplazará el CAE existente en la factura borrador.',
+  'An invoice with number {number} already exists (ID {id}).':
+    'Ya existe una factura con el número {number} (ID {id}).',
+  'Select the customer for this invoice.': 'Seleccioná el cliente para esta factura.',
+  'The ARCA QR data is missing. Scan the PDF again.':
+    'Faltan los datos del QR de ARCA. Escaneá el PDF nuevamente.',
+  'Draft invoice created from ARCA QR with {count} warning(s). Add the line items before sending it.':
+    'Factura borrador creada desde el QR de ARCA con {count} advertencia(s). Agregá las líneas antes de enviarla.',
+  'ARCA data imported with {count} warning(s). Review the invoice.':
+    'Datos de ARCA importados con {count} advertencia(s). Revisá la factura.',
+  'Draft invoice created from ARCA QR. Add the line items before sending it.':
+    'Factura borrador creada desde el QR de ARCA. Agregá las líneas antes de enviarla.',
+  'ARCA data imported into the draft invoice.':
+    'Datos de ARCA importados en la factura borrador.',
+  'ARCA data can only be imported into a draft sales invoice.':
+    'Los datos de ARCA solo se pueden importar en una factura de venta borrador.',
+  'Select a PDF or paste an ARCA QR link.': 'Seleccioná un PDF o pegá un enlace QR de ARCA.',
+  'The QR payload is empty.': 'El payload del QR está vacío.',
+  'The QR code does not contain valid ARCA data.': 'El código QR no contiene datos válidos de ARCA.',
+  'The QR link is not valid.': 'El enlace del QR no es válido.',
+  'The QR link does not contain invoice data.': 'El enlace del QR no contiene datos de la factura.',
+  'This QR version is not supported.': 'Esta versión de QR no es compatible.',
+  'The invoice date in the QR code is invalid.': 'La fecha de la factura en el QR no es válida.',
+  'The QR code does not contain the issuer CUIT.': 'El código QR no contiene el CUIT emisor.',
+  'The QR code contains an invalid number.': 'El código QR contiene un número inválido.',
+  'The invoice total in the QR code is invalid.': 'El total de la factura en el QR no es válido.',
+  'The invoice currency in the QR code is invalid.': 'La moneda de la factura en el QR no es válida.',
+  'The exchange rate in the QR code is invalid.': 'El tipo de cambio en el QR no es válido.',
+  'The QR code does not contain the customer document number.':
+    'El código QR no contiene el número de documento del cliente.',
+  'The QR code does not contain a valid authorization type.':
+    'El código QR no contiene un tipo de autorización válido.',
+  'The QR code does not contain a valid CAE number.':
+    'El código QR no contiene un número de CAE válido.',
 };
 
 function normalizeLocale(value) {

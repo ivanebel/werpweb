@@ -661,6 +661,31 @@ CREATE TABLE IF NOT EXISTS sales_invoice_relations (
     REFERENCES sales_invoices (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS sales_invoice_imports (
+  id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  invoice_id          INT UNSIGNED NULL,
+  source              ENUM('pdf_qr','manual_qr') NOT NULL DEFAULT 'manual_qr',
+  issuer_cuit         VARCHAR(20) NULL,
+  receiver_doc_type   SMALLINT UNSIGNED NULL,
+  receiver_doc_number VARCHAR(20) NULL,
+  currency            CHAR(3) NULL,
+  exchange_rate       DECIMAL(14,6) NULL,
+  raw_payload         JSON NULL,
+  qr_url              TEXT NULL,
+  warnings            JSON NULL,
+  pdf_filename        VARCHAR(255) NULL,
+  pdf_sha256          CHAR(64) NULL,
+  imported_by         INT UNSIGNED NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_sales_invoice_imports_invoice (invoice_id),
+  KEY idx_sales_invoice_imports_created (created_at),
+  CONSTRAINT fk_sales_invoice_imports_invoice FOREIGN KEY (invoice_id)
+    REFERENCES sales_invoices (id) ON DELETE SET NULL,
+  CONSTRAINT fk_sales_invoice_imports_user FOREIGN KEY (imported_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS sales_invoice_items (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   invoice_id  INT UNSIGNED NOT NULL,
