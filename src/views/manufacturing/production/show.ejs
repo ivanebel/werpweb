@@ -37,7 +37,7 @@
               <% const confirmText = a.value === 'completed'
                 ? t('Complete this production order? Material stock will be consumed and finished goods added.')
                 : t('Change this production order status?'); %>
-              <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/status" class="inline" <%= a.confirm ? `data-confirm="${confirmText}"` : '' %>>
+              <form method="POST" action="/manufacturing/production-orders/<%= order.id %>/status" class="inline"<% if (a.confirm) { %> data-confirm="<%= confirmText %>"<% } %>>
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="status" value="<%= a.value %>">
                 <button type="submit" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></button>

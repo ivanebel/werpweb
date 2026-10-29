@@ -44,7 +44,14 @@
             <% if (a.href) { %>
               <a href="<%= a.href %>" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></a>
             <% } else { %>
-              <form method="POST" action="<%= a.action === 'production' ? `${doc.basePath}/${row.id}/production` : `${doc.basePath}/${row.id}/status` %>" class="inline" <%= a.confirm ? `data-confirm="${a.action === 'production' ? 'Generate production orders for manufactured products?' : 'Are you sure you want to continue?'}"` : '' %>>
+              <%
+                const confirmText = a.action === 'production'
+                  ? t('Generate production orders for manufactured products?')
+                  : (doc.kind === 'purchase_invoice' && a.value === 'received'
+                    ? t('Receive stock for this purchase invoice? Stock will be posted for its lines.')
+                    : t('Are you sure you want to continue?'));
+              %>
+              <form method="POST" action="<%= a.action === 'production' ? `${doc.basePath}/${row.id}/production` : `${doc.basePath}/${row.id}/status` %>" class="inline"<% if (a.confirm) { %> data-confirm="<%= confirmText %>"<% } %>>
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <% if (a.action === 'status') { %><input type="hidden" name="status" value="<%= a.value %>"><% } %>
                 <button type="submit" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></button>

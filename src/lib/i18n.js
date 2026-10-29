@@ -540,6 +540,8 @@ const ES = {
   'Delete {number}? This cannot be undone.': '¿Eliminar {number}? Esta acción no se puede deshacer.',
   'Are you sure you want to continue?': '¿Seguro que querés continuar?',
   'Generate production orders for manufactured products?': '¿Generar órdenes de producción para los productos fabricados?',
+  'Receive stock for this purchase invoice? Stock will be posted for its lines.':
+    '¿Recibir stock para esta factura de compra? Se contabilizará el stock de sus líneas.',
   'Bill to': 'Facturar a',
   'Vendor': 'Proveedor',
   'Tax ID:': 'ID fiscal:',
