@@ -469,6 +469,7 @@ const ES = {
   'Old ID': 'ID anterior',
   'Optional ID from the previous database, used for product data migration.':
     'ID opcional de la base de datos anterior, usado para migrar los datos de productos.',
+  'No products found': 'No se encontraron productos',
   'Used as the quantity label, e.g. pcs, pack, kg or m.': 'Se usa como etiqueta de cantidad, p. ej. pcs, paquete, kg o m.',
   '13 digits, optional': '13 dígitos, opcional',
   '14 digits, optional': '14 dígitos, opcional',

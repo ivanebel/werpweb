@@ -240,12 +240,12 @@
                     <tr data-line class="align-top">
                       <td class="table-td pt-5 text-xs text-gray-400"><span data-line-number><%= i + 1 %></span></td>
                       <td class="table-td">
-                        <select name="item_product_id[<%= i %>]" data-product-select class="form-select w-full">
-                          <option value="">Select product…</option>
-                          <% productOptions.forEach(opt => { %>
-                            <option value="<%= opt.value %>" data-price="<%= opt.price %>" data-unit="<%= opt.unit %>" data-name="<%= opt.label %>" data-tax-rate="<%= opt.taxRate %>" data-weighted="<%= opt.weighted ? 1 : 0 %>" <%= String(item.product_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
-                          <% }) %>
-                        </select>
+                        <%- include('/partials/product-combobox', {
+                          fieldName: 'item_product_id[' + i + ']',
+                          inputId: 'product_search_' + i,
+                          selectedId: item.product_id || '',
+                          selectedLabel: p ? p.label : ''
+                        }) %>
                         <span class="mt-1 block text-[11px] text-gray-400" data-unit><%= item.unit || p?.unit || '' %></span>
                         <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
                       </td>
@@ -279,12 +279,12 @@
               <tr data-line class="align-top">
                 <td class="table-td pt-5 text-xs text-gray-400"><span data-line-number></span></td>
                 <td class="table-td">
-                  <select name="item_product_id[__INDEX__]" data-product-select class="form-select w-full">
-                    <option value="">Select product…</option>
-                    <% productOptions.forEach(opt => { %>
-                      <option value="<%= opt.value %>" data-price="<%= opt.price %>" data-unit="<%= opt.unit %>" data-name="<%= opt.label %>" data-tax-rate="<%= opt.taxRate %>" data-weighted="<%= opt.weighted ? 1 : 0 %>"><%= opt.label %></option>
-                    <% }) %>
-                  </select>
+                  <%- include('/partials/product-combobox', {
+                    fieldName: 'item_product_id[__INDEX__]',
+                    inputId: 'product_search___INDEX__',
+                    selectedId: '',
+                    selectedLabel: ''
+                  }) %>
                   <span class="mt-1 block text-[11px] text-gray-400" data-unit></span>
                   <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
                 </td>

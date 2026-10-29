@@ -80,6 +80,7 @@ async function webLocals(req, res, next) {
       tickets: req.t('Tickets'),
       sales90: req.t('90-day sales'),
       noData: req.t('No data'),
+      noProducts: req.t('No products found'),
     };
     res.locals.title = req.t('Dashboard');
     res.locals.active = '';

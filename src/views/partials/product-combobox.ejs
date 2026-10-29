@@ -1,0 +1,37 @@
+<div class="relative" data-product-combobox>
+  <input
+    id="<%= inputId %>"
+    type="text"
+    data-product-search
+    class="form-input w-full"
+    autocomplete="off"
+    role="combobox"
+    aria-autocomplete="list"
+    aria-expanded="false"
+    placeholder="<%= t('Search product or SKU') %>"
+    value="<%= selectedLabel || '' %>">
+  <select
+    name="<%= fieldName %>"
+    data-product-select
+    class="hidden"
+    tabindex="-1"
+    aria-hidden="true">
+    <option value=""> <%= t('Select product.') %></option>
+    <% productOptions.forEach((opt) => { %>
+      <option
+        value="<%= opt.value %>"
+        data-price="<%= opt.price %>"
+        data-product-unit="<%= opt.unit %>"
+        data-name="<%= opt.name %>"
+        data-sku="<%= opt.sku %>"
+        data-search="<%= `${opt.label} ${opt.sku}` %>"
+        data-tax-rate="<%= opt.taxRate %>"
+        data-weighted="<%= opt.weighted ? 1 : 0 %>"
+        <%= String(selectedId || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+    <% }) %>
+  </select>
+  <div
+    data-product-menu
+    class="fixed z-[60] hidden max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-theme-lg dark:border-gray-700 dark:bg-gray-900"
+    role="listbox"></div>
+</div>

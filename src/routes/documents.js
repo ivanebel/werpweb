@@ -419,12 +419,19 @@ async function loadPartyOptions(config) {
 
 async function loadProductOptions(config) {
   const rows = await query(
-    `SELECT id, sku, name, unit, sale_price, cost_price, sale_vat_rate, cost_vat_rate, sold_by_weight
-       FROM products WHERE ${config.productWhere} ORDER BY name ASC`,
+    `SELECT p.id, p.sku, p.name, p.unit, p.sale_price, p.cost_price,
+            p.sale_vat_rate, p.cost_vat_rate, p.sold_by_weight,
+            b.name AS brand_name
+       FROM products p
+       LEFT JOIN brands b ON b.id = p.brand_id
+      WHERE ${config.productWhere}
+      ORDER BY COALESCE(b.name, ''), p.name ASC`,
   );
   return rows.map((p) => ({
     value: String(p.id),
-    label: `${p.sku} — ${p.name}`,
+    label: p.brand_name ? `${p.brand_name} - ${p.name}` : p.name,
+    name: p.name,
+    brand: p.brand_name || '',
     sku: p.sku,
     unit: p.unit,
     price: config.priceField === 'cost_price' ? Number(p.cost_price) : Number(p.sale_price),
