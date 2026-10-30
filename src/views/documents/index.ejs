@@ -116,7 +116,14 @@
                   </td>
                   <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(row[doc.dateField]) %></td>
                   <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(row[doc.dueField]) %></td>
-                  <td class="table-td"><%- statusBadge(row.status) %></td>
+                  <td class="table-td">
+                    <div class="flex flex-wrap items-center gap-1">
+                      <%- statusBadge(row.status) %>
+                      <% if (doc.kind === 'purchase_invoice' && Number(row.stock_skipped) === 1) { %>
+                        <span class="badge bg-gray-100 text-gray-600 ring-gray-500/20 dark:bg-gray-800 dark:text-gray-300"><%= t('Stock not posted') %></span>
+                      <% } %>
+                    </div>
+                  </td>
                   <td class="table-td text-right font-medium"><%= money(row.total) %></td>
                   <% if (doc.hasAmountPaid) { %>
                     <td class="table-td text-right <%= Number(row.total) - Number(row.amount_paid) > 0 ? 'text-warning-600 dark:text-warning-400' : 'text-success-600 dark:text-success-400' %>"><%= money(Number(row.total) - Number(row.amount_paid)) %></td>

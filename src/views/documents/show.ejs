@@ -28,6 +28,9 @@
             <% if (caePending) { %>
               <span class="badge bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-500/15 dark:text-warning-400"><%= t('CAE pending') %></span>
             <% } %>
+            <% if (doc.kind === 'purchase_invoice' && Number(row.stock_skipped) === 1) { %>
+              <span class="badge bg-gray-100 text-gray-600 ring-gray-500/20 dark:bg-gray-800 dark:text-gray-300"><%= t('Stock not posted') %></span>
+            <% } %>
           </div>
           <p class="page-subtitle"><%= doc.singular %> · <%= row.party_name %> · <%= h.formatDate(row[doc.dateField]) %></p>
         </div>
@@ -53,13 +56,16 @@
               <%
                 const confirmText = a.action === 'production'
                   ? t('Generate production orders for manufactured products?')
-                  : (doc.kind === 'purchase_invoice' && a.value === 'received'
-                    ? t('Receive stock for this purchase invoice? Stock will be posted for its lines.')
-                    : t('Are you sure you want to continue?'));
+                  : (a.skipStock
+                    ? t('Mark this purchase invoice as received without posting stock? Use this for historical invoices.')
+                    : (doc.kind === 'purchase_invoice' && a.value === 'received'
+                      ? t('Receive stock for this purchase invoice? Stock will be posted for its lines.')
+                      : t('Are you sure you want to continue?')));
               %>
               <form method="POST" action="<%= a.action === 'production' ? `${doc.basePath}/${row.id}/production` : `${doc.basePath}/${row.id}/status` %>" class="inline"<% if (a.confirm) { %> data-confirm="<%= confirmText %>"<% } %>>
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <% if (a.action === 'status') { %><input type="hidden" name="status" value="<%= a.value %>"><% } %>
+                <% if (a.skipStock) { %><input type="hidden" name="skip_stock" value="1"><% } %>
                 <button type="submit" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></button>
               </form>
             <% } %>
@@ -203,6 +209,9 @@
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Number</dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= row[doc.numberField] %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= doc.dateLabel %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(row[doc.dateField]) %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= doc.dueLabel %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(row[doc.dueField]) %></dd></div>
+              <% if (doc.kind === 'purchase_invoice') { %>
+                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Stock posted') %></dt><dd class="font-medium <%= Number(row.stock_posted) === 1 ? 'text-success-600 dark:text-success-400' : 'text-gray-700 dark:text-gray-300' %>"><%= Number(row.stock_posted) === 1 ? t('Yes') : t('No') %></dd></div>
+              <% } %>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Created by') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= row.created_by ? t('User #') + row.created_by : t('System') %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Last updated</dt><dd class="text-gray-700 dark:text-gray-300"><%= h.formatDate(row.updated_at) %></dd></div>
             </dl>

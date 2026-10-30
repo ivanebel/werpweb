@@ -10,6 +10,7 @@
         const errorList = Object.values(errors || {});
         const allErrors = errorList.concat(itemErrors || []);
         const backUrl = mode === 'edit' ? `${doc.basePath}/${row.id}` : doc.basePath;
+        const skipStockChecked = Boolean(row.skip_stock) || Number(row.stock_skipped) === 1;
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -105,6 +106,17 @@
               <label for="doc-due" class="form-label"><%= doc.dueLabel %></label>
               <input id="doc-due" type="date" name="<%= doc.dueField %>" value="<%= String(row[doc.dueField] || '').slice(0,10) %>" class="form-input">
             </div>
+            <% if (doc.kind === 'purchase_invoice') { %>
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50 md:col-span-4">
+                <label class="flex items-start gap-3">
+                  <input id="skip_stock" name="skip_stock" type="checkbox" value="1" class="form-checkbox mt-0.5" <%= skipStockChecked ? 'checked' : '' %>>
+                  <span>
+                    <span class="block text-sm font-medium text-gray-700 dark:text-gray-300"><%= t('Do not update stock') %></span>
+                    <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400"><%= t('Use this for historical invoices. Only applies when the status is Received or Paid.') %></span>
+                  </span>
+                </label>
+              </div>
+            <% } %>
             <% if (doc.kind === 'sales_invoice') { %>
               <div>
                 <label for="cae" class="form-label"><%= t('CAE number') %></label>

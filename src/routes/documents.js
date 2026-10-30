@@ -590,8 +590,8 @@ function actionsFor(config, row, locale) {
   const t = translator(locale);
   const base = `${config.basePath}/${row.id}`;
   const actions = [];
-  const add = (action, value, label, tone = 'secondary', confirm = false) =>
-    actions.push({ action, value, label: t(label), tone, confirm });
+  const add = (action, value, label, tone = 'secondary', confirm = false, extra = null) =>
+    actions.push({ action, value, label: t(label), tone, confirm, ...(extra || {}) });
   const link = (href, label, tone) => actions.push({ href, label: t(label), tone });
 
   if (config.kind === 'sales_order') {
@@ -627,7 +627,10 @@ function actionsFor(config, row, locale) {
   }
 
   if (config.kind === 'purchase_invoice') {
-    if (row.status === 'draft') add('status', 'received', 'Receive stock', 'primary', true);
+    if (row.status === 'draft') {
+      add('status', 'received', 'Receive stock', 'primary', true);
+      add('status', 'received', 'Mark as received (no stock)', 'secondary', true, { skipStock: true });
+    }
     if (['draft', 'received', 'overdue'].includes(row.status)) add('status', 'paid', 'Mark as paid', 'success');
     if (['received', 'overdue'].includes(row.status) && Number(row.total) - Number(row.amount_paid) > 0.005) {
       link(`/payments/new?type=supplier&party_id=${row.supplier_id}&invoice_id=${row.id}`, 'Record payment', 'primary');
@@ -697,15 +700,28 @@ function makeDocumentRouter(config) {
     }
   }
 
-  async function handleStatusChange(conn, id, fromStatus, toStatus, req) {
+  async function handleStatusChange(conn, id, fromStatus, toStatus, req, { skipStock = false } = {}) {
     if (config.hasStockPosting) {
-      const [rows] = await conn.query('SELECT stock_posted FROM purchase_invoices WHERE id = ? FOR UPDATE', [id]);
+      const [rows] = await conn.query(
+        'SELECT stock_posted, stock_skipped FROM purchase_invoices WHERE id = ? FOR UPDATE',
+        [id],
+      );
       const posted = Boolean(rows[0] && rows[0].stock_posted);
+      const skipped = Boolean(rows[0] && rows[0].stock_skipped);
       const receiving = ['received', 'paid'].includes(toStatus);
-      if (receiving && !posted) {
-        await applyPurchaseStock(conn, id, 1, `Received via ${config.numberPrefix}-${id}`);
-        await conn.query('UPDATE purchase_invoices SET stock_posted = 1 WHERE id = ?', [id]);
-      } else if (!receiving && posted) {
+      if (receiving) {
+        if (skipStock || skipped) {
+          if (!skipped) {
+            await conn.query(
+              'UPDATE purchase_invoices SET stock_skipped = 1, stock_posted = 0 WHERE id = ?',
+              [id],
+            );
+          }
+        } else if (!posted) {
+          await applyPurchaseStock(conn, id, 1, `Received via ${config.numberPrefix}-${id}`);
+          await conn.query('UPDATE purchase_invoices SET stock_posted = 1, stock_skipped = 0 WHERE id = ?', [id]);
+        }
+      } else if (posted) {
         await applyPurchaseStock(conn, id, -1, `Stock reversal for ${config.numberPrefix}-${id}`);
         await conn.query('UPDATE purchase_invoices SET stock_posted = 0 WHERE id = ?', [id]);
       }
@@ -935,6 +951,7 @@ function makeDocumentRouter(config) {
       const appSettings = await require('../lib/settings').getSettings();
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
+      const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
       const items = parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
@@ -1123,8 +1140,15 @@ function makeDocumentRouter(config) {
         });
 
         if (config.hasStockPosting && ['received', 'paid'].includes(status)) {
-          await applyPurchaseStock(conn, id, 1, `Received via ${number}`);
-          await conn.query('UPDATE purchase_invoices SET stock_posted = 1 WHERE id = ?', [id]);
+          if (skipStock) {
+            await conn.query(
+              'UPDATE purchase_invoices SET stock_skipped = 1, stock_posted = 0 WHERE id = ?',
+              [id],
+            );
+          } else {
+            await applyPurchaseStock(conn, id, 1, `Received via ${number}`);
+            await conn.query('UPDATE purchase_invoices SET stock_posted = 1, stock_skipped = 0 WHERE id = ?', [id]);
+          }
         }
 
         if (typeof config.afterCreate === 'function') await config.afterCreate(conn, id, req);
@@ -1338,6 +1362,7 @@ function makeDocumentRouter(config) {
       const appSettings = await require('../lib/settings').getSettings();
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
+      const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
       const items = parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
@@ -1528,7 +1553,7 @@ function makeDocumentRouter(config) {
         });
 
         if (existing.status !== req.body.status) {
-          await handleStatusChange(conn, existing.id, existing.status, req.body.status, req);
+          await handleStatusChange(conn, existing.id, existing.status, req.body.status, req, { skipStock });
         }
         if (typeof config.afterUpdate === 'function') await config.afterUpdate(conn, existing, req);
       });
@@ -1553,6 +1578,7 @@ function makeDocumentRouter(config) {
         return next(Object.assign(new Error(req.t('{item} not found.', { item: lc.singular })), { status: 404 }));
       }
       const target = req.body.status;
+      const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
       if (!config.statuses.includes(target)) {
         req.flash('error', 'Unknown status.');
         return res.redirect(`${basePath}/${row.id}`);
@@ -1579,7 +1605,7 @@ function makeDocumentRouter(config) {
 
       await withTransaction(async (conn) => {
         await conn.query('UPDATE `' + config.table + '` SET status = ? WHERE id = ?', [target, row.id]);
-        await handleStatusChange(conn, row.id, row.status, target, req);
+        await handleStatusChange(conn, row.id, row.status, target, req, { skipStock });
         if (config.kind === 'sales_order' && target === 'delivered') {
           await conn.query('UPDATE sales_order_items SET delivered_qty = quantity WHERE order_id = ?', [row.id]);
         }

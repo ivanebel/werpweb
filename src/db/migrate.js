@@ -281,6 +281,7 @@ async function upgradeSchema(conn, dbName) {
 
   await addColumn(conn, dbName, 'purchase_invoices', 'document_type_code', 'SMALLINT UNSIGNED NULL AFTER bill_no');
   await addColumn(conn, dbName, 'purchase_invoices', 'packing_slip_no', 'VARCHAR(30) NULL AFTER document_type_code');
+  await addColumn(conn, dbName, 'purchase_invoices', 'stock_skipped', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER stock_posted');
   await addIndex(conn, dbName, 'purchase_invoices', 'idx_purchase_invoices_fiscal_type', 'KEY `idx_purchase_invoices_fiscal_type` (`document_type_code`)');
   await addConstraint(conn, dbName, 'purchase_invoices', 'fk_purchase_invoices_fiscal_type',
     'FOREIGN KEY (`document_type_code`) REFERENCES `fiscal_document_types` (`code`) ON DELETE SET NULL');

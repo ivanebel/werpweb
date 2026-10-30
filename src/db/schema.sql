@@ -719,6 +719,7 @@ CREATE TABLE IF NOT EXISTS purchase_invoices (
   total             DECIMAL(14,2) NOT NULL DEFAULT 0,
   amount_paid       DECIMAL(14,2) NOT NULL DEFAULT 0,
   stock_posted      TINYINT(1) NOT NULL DEFAULT 0,
+  stock_skipped     TINYINT(1) NOT NULL DEFAULT 0,
   notes             TEXT NULL,
   created_by        INT UNSIGNED NULL,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -539,6 +539,13 @@ const ES = {
   'Mark as sent': 'Marcar como enviada',
   'Mark as paid': 'Marcar como pagada',
   'Receive stock': 'Recibir stock',
+  'Mark as received (no stock)': 'Marcar como recibida (sin stock)',
+  'Mark this purchase invoice as received without posting stock? Use this for historical invoices.':
+    '¿Marcar esta factura de compra como recibida sin contabilizar stock? Usá esta opción para facturas históricas.',
+  'Do not update stock': 'No actualizar stock',
+  'Use this for historical invoices. Only applies when the status is Received or Paid.':
+    'Usá esta opción para facturas históricas. Solo se aplica cuando el estado es Recibida o Pagada.',
+  'Stock not posted': 'Stock no contabilizado',
   'Print / PDF': 'Imprimir / PDF',
   'Print / Save PDF': 'Imprimir / Guardar PDF',
   'Delete {number}? This cannot be undone.': '¿Eliminar {number}? Esta acción no se puede deshacer.',

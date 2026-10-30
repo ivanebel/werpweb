@@ -330,6 +330,8 @@ npm run test:telegram
 1. Create a **purchase order** for raw materials.
 2. Create a **purchase invoice** (bill), either directly or prefilled from the order.
 3. When the bill is set to **received** or **paid**, stock is posted in. Reverting the status reverses the stock movement.
+4. For historical bills whose stock was already handled outside the ERP, use **Mark as received (no stock)** on the bill, or tick **Do not update stock** on the form before setting the status to Received or Paid. The invoice is marked as received but no stock movement is created, and the bill shows a **Stock not posted** badge. This flag is permanent for that invoice; later status changes do not post stock.
+5. Sales invoices never post stock directly. Sales stock is reduced when a **delivery** is marked as shipped.
 
 ### Customer receipts and supplier payments
 
