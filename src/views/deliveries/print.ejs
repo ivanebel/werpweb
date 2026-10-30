@@ -114,7 +114,7 @@
           <tr class="border-b border-gray-100">
             <td class="py-3 pl-3 pr-2 text-gray-400"><%= index + 1 %></td>
             <td class="px-2 py-3 font-medium text-gray-800"><%= item.name %></td>
-            <td class="px-2 py-3 font-mono text-xs text-gray-500"><%= item.sku %></td>
+            <td class="px-2 py-3 font-mono text-xs text-gray-500"><%= item.sku || '—' %></td>
             <td class="px-2 py-3 font-mono text-xs text-gray-500"><%= item.customer_code || '—' %></td>
             <td class="px-2 py-3 text-right whitespace-nowrap"><%= h.formatQty(item.slip_pallets || 0) %></td>
             <td class="px-2 py-3 text-right whitespace-nowrap"><%= h.formatQty(item.slip_boxes || 0) %></td>

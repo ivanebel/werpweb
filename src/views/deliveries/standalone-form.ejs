@@ -1,0 +1,335 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1300px]">
+      <%
+        const formErrors = errors._form || [];
+        const formItems = items && items.length ? items : [{}];
+        const pageNumber = mode === 'edit' ? (delivery.packing_slip_no || delivery.delivery_no) : null;
+        const packingSlipValue = mode === 'edit'
+          ? (delivery.packing_slip_no || t('Not assigned'))
+          : (nextPackingSlip || t('Not assigned'));
+        const assignedCai = mode === 'edit' ? delivery.cai_number : (activeCai ? activeCai.cai_number : null);
+        const legacyCarrierValue = row.legacy_carrier || (!row.carrier_id && row.carrier ? row.carrier : '');
+        const backUrl = mode === 'edit' ? `/deliveries/${delivery.id}` : '/deliveries';
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New standalone packing slip') : t('Edit {number}', { number: pageNumber }) %></h1>
+          <p class="page-subtitle">
+            <%= t('Packing slip without a sales order. Use it for repairs, samples, or other movements that are not a sale.') %>
+          </p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+        </a>
+      </div>
+
+      <% if (formErrors.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the packing slip:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% formErrors.forEach(message => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (mode === 'create' && !activeCai) { %>
+        <div class="mb-5 flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 shrink-0"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <p><%= t('No active CAI authorization with available packing slips. Ask an administrator to add or activate one before creating a packing slip.') %></p>
+          </div>
+          <% if (currentUser && currentUser.role === 'admin') { %>
+            <a href="/deliveries/cai" class="btn btn-secondary btn-sm shrink-0"><%= t('Manage CAI') %></a>
+          <% } %>
+        </div>
+      <% } %>
+
+      <div class="mb-5 flex items-start gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+        <p><%= t('This packing slip is not linked to a sales order. Stock is not updated when it is shipped.') %></p>
+      </div>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><%= t('Packing slip details') %></h2>
+            <span class="font-mono text-xs text-gray-400"><%= packingSlipValue %></span>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div class="md:col-span-2">
+              <label for="delivery_date" class="form-label"><%= t('Delivery date') %> <span class="text-error-500">*</span></label>
+              <input id="delivery_date" type="date" name="delivery_date" value="<%= String(row.delivery_date || '').slice(0, 10) %>" class="form-input" required>
+            </div>
+            <div class="md:col-span-2">
+              <label for="recipient" class="form-label"><%= t('Recipient') %> <span class="text-error-500">*</span></label>
+              <select id="recipient" name="recipient" class="form-select" required>
+                <option value=""><%= t('Select a customer or supplier') %></option>
+                <optgroup label="<%= t('Customers') %>">
+                  <% recipients.customers.forEach(customer => { %>
+                    <option value="customer:<%= customer.id %>" <%= String(row.recipient || '') === `customer:${customer.id}` ? 'selected' : '' %>>
+                      <%= customer.company_name %><%= customer.status !== 'active' ? ` (${t('Inactive')})` : '' %>
+                    </option>
+                  <% }) %>
+                </optgroup>
+                <optgroup label="<%= t('Suppliers') %>">
+                  <% recipients.suppliers.forEach(supplier => { %>
+                    <option value="supplier:<%= supplier.id %>" <%= String(row.recipient || '') === `supplier:${supplier.id}` ? 'selected' : '' %>>
+                      <%= supplier.company_name %><%= supplier.status !== 'active' ? ` (${t('Inactive')})` : '' %>
+                    </option>
+                  <% }) %>
+                </optgroup>
+              </select>
+              <p class="form-help"><%= t('The recipient can be a customer or a supplier.') %></p>
+            </div>
+            <div class="md:col-span-2">
+              <label for="carrier_id" class="form-label"><%= t('Carrier / transport') %></label>
+              <select id="carrier_id" name="carrier_id" class="form-select">
+                <option value=""><%= t('Select carrier') %></option>
+                <% carriers.forEach(carrier => { %>
+                  <option value="<%= carrier.id %>"
+                          data-driver-name="<%= carrier.driver_name || '' %>"
+                          data-driver-id="<%= carrier.driver_id || '' %>"
+                          data-license-plate="<%= carrier.license_plate || '' %>"
+                          <%= String(row.carrier_id || '') === String(carrier.id) ? 'selected' : '' %>>
+                    <%= carrier.company_name %><%= carrier.status !== 'active' ? ` (${t('Inactive')})` : '' %>
+                  </option>
+                <% }) %>
+              </select>
+              <input type="hidden" name="legacy_carrier" value="<%= legacyCarrierValue %>">
+              <p class="form-help">
+                <% if (currentUser && ['admin', 'manager'].includes(currentUser.role)) { %>
+                  <a href="/carriers" class="link"><%= t('Manage carriers') %></a>
+                <% } %>
+              </p>
+            </div>
+            <div class="md:col-span-2">
+              <label for="tracking_number" class="form-label">Tracking number</label>
+              <input id="tracking_number" name="tracking_number" type="text" value="<%= row.tracking_number || '' %>" class="form-input" placeholder="Optional">
+            </div>
+            <div class="md:col-span-2">
+              <label for="carrier_driver_name" class="form-label"><%= t('Driver name') %></label>
+              <input id="carrier_driver_name" name="carrier_driver_name" type="text" maxlength="120" value="<%= row.carrier_driver_name || '' %>" class="form-input">
+            </div>
+            <div>
+              <label for="carrier_driver_id" class="form-label"><%= t('Driver ID / DNI') %></label>
+              <input id="carrier_driver_id" name="carrier_driver_id" type="text" maxlength="40" value="<%= row.carrier_driver_id || '' %>" class="form-input" placeholder="DNI">
+            </div>
+            <div>
+              <label for="carrier_license_plate" class="form-label"><%= t('License plate') %></label>
+              <input id="carrier_license_plate" name="carrier_license_plate" type="text" maxlength="20" value="<%= row.carrier_license_plate || '' %>" class="form-input" placeholder="AB123CD">
+            </div>
+            <div>
+              <label for="cot" class="form-label"><%= t('COT') %></label>
+              <input id="cot" name="cot" type="text" maxlength="80" value="<%= row.cot || '' %>" class="form-input" placeholder="<%= t('Optional merchandise code') %>">
+            </div>
+            <div>
+              <label class="form-label"><%= t('Packing slip number') %></label>
+              <div class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm dark:border-gray-700 dark:bg-gray-800">
+                <span class="font-mono <%= packingSlipValue === t('Not assigned') ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300' %>"><%= packingSlipValue %></span>
+              </div>
+              <p class="form-help">
+                <% if (assignedCai) { %>
+                  CAI: <span class="font-mono"><%= assignedCai %></span>
+                <% } else { %>
+                  <%= t('Not assigned') %>
+                <% } %>
+              </p>
+            </div>
+            <div class="md:col-span-4">
+              <label for="notes" class="form-label">Notes</label>
+              <input id="notes" name="notes" type="text" value="<%= row.notes || '' %>" class="form-input" placeholder="<%= t('Reason for the movement, reference…') %>">
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Items') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Describe the items being moved. They do not need to be products in the catalog.') %></p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-add-standalone-line>
+              <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+              <%= t('Add line') %>
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[1250px]">
+              <thead>
+                <tr>
+                  <th class="table-th min-w-[260px]"><%= t('Description') %></th>
+                  <th class="table-th w-28 text-right"><%= t('Quantity') %></th>
+                  <th class="table-th w-24"><%= t('Unit') %></th>
+                  <th class="table-th w-24 text-right"><%= t('Pallets') %></th>
+                  <th class="table-th w-24 text-right"><%= t('Boxes') %></th>
+                  <th class="table-th w-24 text-right"><%= t('Units') %></th>
+                  <th class="table-th w-28 text-right"><%= t('Weight (kg)') %></th>
+                  <th class="table-th w-28"><%= t('Lot') %></th>
+                  <th class="table-th w-36"><%= t('Expiry') %></th>
+                  <th class="table-th w-12"></th>
+                </tr>
+              </thead>
+              <tbody data-standalone-lines>
+                <% formItems.forEach(item => { %>
+                  <tr>
+                    <td class="table-td">
+                      <input name="item_description" type="text" maxlength="255" value="<%= item.description || item.name || '' %>" class="form-input" placeholder="<%= t('Machine, sample, repair item…') %>">
+                    </td>
+                    <td class="table-td">
+                      <input name="item_quantity" type="number" min="0" step="0.001" value="<%= item.quantity ?? '' %>" class="form-input text-right" data-standalone-quantity>
+                    </td>
+                    <td class="table-td">
+                      <input name="item_unit" type="text" maxlength="20" value="<%= item.unit || 'unit' %>" class="form-input">
+                    </td>
+                    <td class="table-td">
+                      <input name="slip_pallets" type="number" min="0" step="0.001" value="<%= item.slip_pallets ?? '' %>" class="form-input text-right">
+                    </td>
+                    <td class="table-td">
+                      <input name="slip_boxes" type="number" min="0" step="0.001" value="<%= item.slip_boxes ?? '' %>" class="form-input text-right">
+                    </td>
+                    <td class="table-td">
+                      <input name="slip_units" type="number" min="0" step="0.001" value="<%= item.slip_units ?? '' %>" class="form-input text-right" data-standalone-units>
+                    </td>
+                    <td class="table-td">
+                      <input name="slip_weight_kg" type="number" min="0" step="0.001" value="<%= item.slip_weight_kg ?? '' %>" class="form-input text-right">
+                    </td>
+                    <td class="table-td">
+                      <input name="lot_number" type="text" maxlength="60" value="<%= item.lot_number || '' %>" class="form-input">
+                    </td>
+                    <td class="table-td">
+                      <input name="expiry_date" type="date" value="<%= String(item.expiry_date || '').slice(0, 10) %>" class="form-input">
+                    </td>
+                    <td class="table-td">
+                      <button type="button" class="btn btn-ghost btn-sm" data-remove-standalone-line aria-label="<%= t('Remove') %>" title="<%= t('Remove') %>">
+                        <%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %>
+                      </button>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+            <a href="<%= backUrl %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              <%= mode === 'create' ? t('Create packing slip') : t('Save changes') %>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <template id="standalone-line-template">
+        <tr>
+          <td class="table-td">
+            <input name="item_description" type="text" maxlength="255" class="form-input" placeholder="<%= t('Machine, sample, repair item…') %>">
+          </td>
+          <td class="table-td">
+            <input name="item_quantity" type="number" min="0" step="0.001" class="form-input text-right" data-standalone-quantity>
+          </td>
+          <td class="table-td">
+            <input name="item_unit" type="text" maxlength="20" value="unit" class="form-input">
+          </td>
+          <td class="table-td">
+            <input name="slip_pallets" type="number" min="0" step="0.001" class="form-input text-right">
+          </td>
+          <td class="table-td">
+            <input name="slip_boxes" type="number" min="0" step="0.001" class="form-input text-right">
+          </td>
+          <td class="table-td">
+            <input name="slip_units" type="number" min="0" step="0.001" class="form-input text-right" data-standalone-units>
+          </td>
+          <td class="table-td">
+            <input name="slip_weight_kg" type="number" min="0" step="0.001" class="form-input text-right">
+          </td>
+          <td class="table-td">
+            <input name="lot_number" type="text" maxlength="60" class="form-input">
+          </td>
+          <td class="table-td">
+            <input name="expiry_date" type="date" class="form-input">
+          </td>
+          <td class="table-td">
+            <button type="button" class="btn btn-ghost btn-sm" data-remove-standalone-line aria-label="<%= t('Remove') %>" title="<%= t('Remove') %>">
+              <%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %>
+            </button>
+          </td>
+        </tr>
+      </template>
+
+      <script>
+        (function () {
+          const body = document.querySelector('[data-standalone-lines]');
+          const template = document.getElementById('standalone-line-template');
+          const addButton = document.querySelector('[data-add-standalone-line]');
+          if (!body || !template || !addButton) return;
+
+          const bindQuantity = (row) => {
+            const quantity = row.querySelector('[data-standalone-quantity]');
+            const units = row.querySelector('[data-standalone-units]');
+            if (!quantity || !units) return;
+            quantity.addEventListener('input', () => {
+              if (!units.value) units.value = quantity.value;
+            });
+          };
+
+          body.querySelectorAll('tr').forEach(bindQuantity);
+          addButton.addEventListener('click', () => {
+            const row = template.content.firstElementChild.cloneNode(true);
+            body.appendChild(row);
+            bindQuantity(row);
+            row.querySelector('input')?.focus();
+          });
+          body.addEventListener('click', (event) => {
+            const remove = event.target.closest('[data-remove-standalone-line]');
+            if (!remove) return;
+            const rows = body.querySelectorAll('tr');
+            if (rows.length <= 1) {
+              rows[0].querySelectorAll('input').forEach((input) => { input.value = ''; });
+              return;
+            }
+            remove.closest('tr')?.remove();
+          });
+        })();
+      </script>
+
+      <script>
+        (function () {
+          const select = document.getElementById('carrier_id');
+          if (!select) return;
+          const driverName = document.getElementById('carrier_driver_name');
+          const driverId = document.getElementById('carrier_driver_id');
+          const licensePlate = document.getElementById('carrier_license_plate');
+          const setValue = (input, value) => {
+            if (input) input.value = value || '';
+          };
+          const fillFromSelection = () => {
+            const option = select.options[select.selectedIndex];
+            setValue(driverName, option && option.dataset.driverName);
+            setValue(driverId, option && option.dataset.driverId);
+            setValue(licensePlate, option && option.dataset.licensePlate);
+          };
+          select.addEventListener('change', fillFromSelection);
+          if (select.value) {
+            const option = select.options[select.selectedIndex];
+            if (driverName && !driverName.value) driverName.value = option.dataset.driverName || '';
+            if (driverId && !driverId.value) driverId.value = option.dataset.driverId || '';
+            if (licensePlate && !licensePlate.value) licensePlate.value = option.dataset.licensePlate || '';
+          }
+        })();
+      </script>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

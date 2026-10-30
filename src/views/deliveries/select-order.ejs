@@ -10,9 +10,15 @@
           <h1 class="page-title">New delivery</h1>
           <p class="page-subtitle">Choose a confirmed sales order with open quantities to deliver.</p>
         </div>
-        <a href="/deliveries" class="btn btn-secondary btn-sm">
-          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
-        </a>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/deliveries/standalone/new" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'barcode', className: 'h-4 w-4' }) %>
+            <%= t('Standalone packing slip') %>
+          </a>
+          <a href="/deliveries" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> Back
+          </a>
+        </div>
       </div>
 
       <% if (!activeCai) { %>

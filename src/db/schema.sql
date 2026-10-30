@@ -546,7 +546,8 @@ CREATE TABLE IF NOT EXISTS deliveries (
   cai_number            VARCHAR(60) NULL,
   cot                   VARCHAR(80) NULL,
   sales_order_id        INT UNSIGNED NULL,
-  customer_id           INT UNSIGNED NOT NULL,
+  customer_id           INT UNSIGNED NULL,
+  supplier_id           INT UNSIGNED NULL,
   delivery_date         DATE NOT NULL,
   carrier               VARCHAR(120) NULL,
   carrier_id            INT UNSIGNED NULL,
@@ -564,6 +565,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
   UNIQUE KEY uq_deliveries_packing_slip (packing_slip_no),
   KEY idx_deliveries_order (sales_order_id),
   KEY idx_deliveries_customer (customer_id),
+  KEY idx_deliveries_supplier (supplier_id),
   KEY idx_deliveries_status (status),
   KEY idx_deliveries_cai (cai_authorization_id),
   KEY idx_deliveries_carrier (carrier_id),
@@ -571,6 +573,8 @@ CREATE TABLE IF NOT EXISTS deliveries (
     REFERENCES sales_orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_deliveries_customer FOREIGN KEY (customer_id)
     REFERENCES customers (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_deliveries_supplier FOREIGN KEY (supplier_id)
+    REFERENCES suppliers (id) ON DELETE RESTRICT,
   CONSTRAINT fk_deliveries_cai FOREIGN KEY (cai_authorization_id)
     REFERENCES cai_authorizations (id) ON DELETE SET NULL,
   CONSTRAINT fk_deliveries_carrier FOREIGN KEY (carrier_id)
@@ -581,7 +585,9 @@ CREATE TABLE IF NOT EXISTS delivery_items (
   id                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
   delivery_id         INT UNSIGNED NOT NULL,
   sales_order_item_id INT UNSIGNED NULL,
-  product_id          INT UNSIGNED NOT NULL,
+  product_id          INT UNSIGNED NULL,
+  description         VARCHAR(255) NULL,
+  unit                VARCHAR(20) NULL,
   quantity            DECIMAL(14,3) NOT NULL DEFAULT 0,
   slip_pallets        DECIMAL(14,3) NOT NULL DEFAULT 0,
   slip_boxes          DECIMAL(14,3) NOT NULL DEFAULT 0,

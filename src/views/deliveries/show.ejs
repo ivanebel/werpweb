@@ -19,11 +19,15 @@
           <div class="flex flex-wrap items-center gap-2">
             <h1 class="page-title"><%= delivery.packing_slip_no || delivery.delivery_no %></h1>
             <%- statusBadge(delivery.status) %>
+            <% if (!delivery.sales_order_id) { %>
+              <span class="badge bg-gray-100 text-gray-600 ring-gray-500/20 dark:bg-gray-800 dark:text-gray-300"><%= t('Standalone') %></span>
+            <% } %>
           </div>
           <p class="page-subtitle">
             <% if (delivery.packing_slip_no) { %>Delivery ref <span class="font-mono"><%= delivery.delivery_no %></span> · <% } %>
             <%= delivery.customer_name %>
             <% if (delivery.order_no) { %>· <%= t('against') %> <a href="/sales-orders/<%= delivery.sales_order_id %>" class="link"><%= delivery.order_no %></a><% } %>
+            <% if (!delivery.sales_order_id) { %>· <%= t('Standalone packing slip') %><% } %>
             · <%= h.formatDate(delivery.delivery_date) %>
           </p>
         </div>
@@ -35,7 +39,7 @@
             <% if (a.href) { %>
               <a href="<%= a.href %>" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></a>
             <% } else { %>
-              <form method="POST" action="/deliveries/<%= delivery.id %>/status" class="inline" <%= a.confirm ? 'data-confirm="Change this delivery status? Stock movements will be posted or reversed."' : '' %>>
+              <form method="POST" action="/deliveries/<%= delivery.id %>/status" class="inline" <%= a.confirm ? `data-confirm="${delivery.sales_order_id ? t('Change this delivery status? Stock movements will be posted or reversed.') : t('Change this packing slip status? Stock will not be updated.')}"` : '' %>>
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="status" value="<%= a.value %>">
                 <button type="submit" class="btn <%= toneClass[a.tone] || 'btn-secondary' %> btn-sm"><%= a.label %></button>
@@ -143,7 +147,7 @@
                   <tr>
                     <td class="table-td">
                       <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
-                      <p class="text-xs text-gray-400"><%= item.sku %></p>
+                      <p class="text-xs text-gray-400"><%= item.sku || '—' %></p>
                     </td>
                     <td class="table-td font-mono text-xs text-gray-600 dark:text-gray-300"><%= item.customer_code || '—' %></td>
                     <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= item.ordered_qty !== null && item.ordered_qty !== undefined ? h.formatQty(item.ordered_qty) : '—' %></td>
@@ -192,7 +196,7 @@
               <% if (delivery.cot) { %><div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">COT</dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= delivery.cot %></dd></div><% } %>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Delivery reference') %></dt><dd class="font-mono text-xs text-gray-700 dark:text-gray-300"><%= delivery.delivery_no %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Delivery date</dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(delivery.delivery_date) %></dd></div>
-              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Stock posted</dt><dd class="font-medium <%= Number(delivery.stock_posted) === 1 ? 'text-success-600 dark:text-success-400' : 'text-gray-700 dark:text-gray-300' %>"><%= Number(delivery.stock_posted) === 1 ? t('Yes') : t('No') %></dd></div>
+              <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Stock posted</dt><dd class="font-medium <%= Number(delivery.stock_posted) === 1 ? 'text-success-600 dark:text-success-400' : 'text-gray-700 dark:text-gray-300' %>"><%= delivery.sales_order_id ? (Number(delivery.stock_posted) === 1 ? t('Yes') : t('No')) : t('Not tracked') %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Created</dt><dd class="text-gray-700 dark:text-gray-300"><%= h.formatDate(delivery.created_at) %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400">Updated</dt><dd class="text-gray-700 dark:text-gray-300"><%= h.formatDate(delivery.updated_at) %></dd></div>
             </dl>
@@ -230,12 +234,16 @@
           </div>
 
           <div class="card p-5 md:p-6">
-            <h2 class="card-title">Customer</h2>
+            <h2 class="card-title"><%= delivery.supplier_id ? t('Supplier') : t('Customer') %></h2>
             <p class="mt-3 text-sm font-semibold text-gray-800 dark:text-gray-200"><%= delivery.customer_name %></p>
             <% if (delivery.customer_contact) { %><p class="text-sm text-gray-500 dark:text-gray-400"><%= delivery.customer_contact %></p><% } %>
             <% if (delivery.customer_email) { %><p class="mt-1 text-sm"><a href="mailto:<%= delivery.customer_email %>" class="link"><%= delivery.customer_email %></a></p><% } %>
             <% if (delivery.customer_phone) { %><p class="text-sm text-gray-500 dark:text-gray-400"><%= delivery.customer_phone %></p><% } %>
-            <a href="/customers/<%= delivery.customer_id %>" class="btn btn-secondary btn-sm mt-4 w-full">Open customer</a>
+            <% if (delivery.recipient_id) { %>
+              <a href="<%= delivery.supplier_id ? `/suppliers/${delivery.recipient_id}` : `/customers/${delivery.recipient_id}` %>" class="btn btn-secondary btn-sm mt-4 w-full">
+                <%= delivery.supplier_id ? t('Open supplier') : t('Open customer') %>
+              </a>
+            <% } %>
           </div>
         </div>
       </div>

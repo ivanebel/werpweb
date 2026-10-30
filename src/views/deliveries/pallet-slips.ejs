@@ -252,7 +252,7 @@
         <% } %>
         <div class="product-name"><%= slip.item.name %></div>
         <div class="product-codes">
-          <span><span class="label"><%= t('Code') %>:</span> <span class="mono"><%= slip.item.customer_code || slip.item.sku %></span></span>
+          <span><span class="label"><%= t('Code') %>:</span> <span class="mono"><%= slip.item.customer_code || slip.item.sku || '—' %></span></span>
           <span><span class="label">EAN:</span> <span class="mono"><%= slip.ean13 || '—' %></span></span>
         </div>
         <% if (delivery.warehouse_name || delivery.warehouse_code) { %>

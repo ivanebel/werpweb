@@ -649,6 +649,36 @@ const ES = {
   'Mark as delivered': 'Marcar como entregada',
   'Cancel & restock': 'Cancelar y reponer stock',
   'Packing slip {number}': 'Remito {number}',
+  'Standalone': 'Independiente',
+  'Standalone packing slip': 'Remito independiente',
+  'New standalone packing slip': 'Nuevo remito independiente',
+  'Packing slip details': 'Datos del remito',
+  'Create packing slip': 'Crear remito',
+  'Packing slip without a sales order. Use it for repairs, samples, or other movements that are not a sale.':
+    'Remito sin orden de venta. Usalo para reparaciones, muestras u otros movimientos que no son una venta.',
+  'This packing slip is not linked to a sales order. Stock is not updated when it is shipped.':
+    'Este remito no está vinculado a una orden de venta. El stock no se actualiza al despacharlo.',
+  'Please review the packing slip:': 'Revisá el remito:',
+  'Select a customer or supplier': 'Seleccioná un cliente o proveedor',
+  'Select a customer or supplier recipient.': 'Seleccioná un cliente o proveedor como destinatario.',
+  'The recipient can be a customer or a supplier.': 'El destinatario puede ser un cliente o un proveedor.',
+  'The selected recipient was not found.': 'No se encontró el destinatario seleccionado.',
+  'Reason for the movement, reference…': 'Motivo del movimiento, referencia…',
+  'Describe the items being moved. They do not need to be products in the catalog.':
+    'Describí los artículos que se trasladan. No es necesario que sean productos del catálogo.',
+  'Machine, sample, repair item…': 'Máquina, muestra, artículo para reparación…',
+  'Description is required for every line.': 'La descripción es obligatoria en cada línea.',
+  'Quantity must be greater than zero for every line.': 'La cantidad debe ser mayor que cero en cada línea.',
+  'Add at least one item with a description and a quantity greater than zero.':
+    'Agregá al menos un artículo con descripción y cantidad mayor que cero.',
+  'No active CAI authorization with available packing slips. Ask an administrator to add or activate one before creating a packing slip.':
+    'No hay una autorización CAI activa con remitos disponibles. Pedile a un administrador que agregue o active una antes de crear un remito.',
+  'Change this packing slip status? Stock will not be updated.':
+    '¿Cambiar el estado de este remito? El stock no se actualizará.',
+  'Change this delivery status? Stock movements will be posted or reversed.':
+    '¿Cambiar el estado de esta entrega? Se contabilizarán o revertirán movimientos de stock.',
+  'COT': 'COT',
+  'Open supplier': 'Abrir proveedor',
   'Shipment': 'Envío',
   'Delete this delivery? This cannot be undone.': '¿Eliminar esta entrega? Esta acción no se puede deshacer.',
   'CAI authorizations': 'Autorizaciones CAI',

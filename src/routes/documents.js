@@ -124,6 +124,7 @@ async function loadDeliveryOptions(config) {
        FROM deliveries d
        JOIN customers c ON c.id = d.customer_id
       WHERE d.status <> 'cancelled'
+        AND d.sales_order_id IS NOT NULL
       ORDER BY d.delivery_date DESC, d.id DESC
       LIMIT 500`,
   );
@@ -325,6 +326,7 @@ async function validateDeliveryIds(ids, customerId) {
     `SELECT id FROM deliveries
       WHERE id IN (${placeholders})
         AND customer_id = ?
+        AND sales_order_id IS NOT NULL
         AND status <> 'cancelled'`,
     [...ids, customerId],
   );

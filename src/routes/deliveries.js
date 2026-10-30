@@ -154,10 +154,18 @@ function withCurrentPacking(items, deliveredRows) {
 
 async function loadDelivery(id) {
   return one(
-    `SELECT d.*, c.company_name AS customer_name, c.contact_name AS customer_contact,
-            c.email AS customer_email, c.phone AS customer_phone,
-            c.address_line1 AS customer_address, c.city AS customer_city,
-            c.state AS customer_state, c.postal_code AS customer_postal, c.country AS customer_country,
+    `SELECT d.*,
+            CASE WHEN d.supplier_id IS NOT NULL THEN 'supplier' ELSE 'customer' END AS recipient_type,
+            COALESCE(d.supplier_id, d.customer_id) AS recipient_id,
+            COALESCE(c.company_name, s.company_name) AS customer_name,
+            COALESCE(c.contact_name, s.contact_name) AS customer_contact,
+            COALESCE(c.email, s.email) AS customer_email,
+            COALESCE(c.phone, s.phone) AS customer_phone,
+            COALESCE(c.address_line1, s.address_line1) AS customer_address,
+            COALESCE(c.city, s.city) AS customer_city,
+            COALESCE(c.state, s.state) AS customer_state,
+            COALESCE(c.postal_code, s.postal_code) AS customer_postal,
+            COALESCE(c.country, s.country) AS customer_country,
             so.order_no, so.customer_order_no, so.docking_station, so.reception_at,
             cw.id AS warehouse_id, cw.name AS warehouse_name, cw.code AS warehouse_code,
             cw.contact_name AS warehouse_contact, cw.phone AS warehouse_phone,
@@ -165,7 +173,8 @@ async function loadDelivery(id) {
             cw.city AS warehouse_city, cw.state AS warehouse_state,
             cw.postal_code AS warehouse_postal, cw.country AS warehouse_country
        FROM deliveries d
-       JOIN customers c ON c.id = d.customer_id
+       LEFT JOIN customers c ON c.id = d.customer_id
+       LEFT JOIN suppliers s ON s.id = d.supplier_id
        LEFT JOIN sales_orders so ON so.id = d.sales_order_id
        LEFT JOIN customer_warehouses cw ON cw.id = so.customer_warehouse_id
       WHERE d.id = ? LIMIT 1`,
@@ -179,15 +188,16 @@ async function loadDeliveryItems(delivery, withOrderedQty = false) {
     ? 'LEFT JOIN sales_order_items si ON si.id = di.sales_order_item_id'
     : '';
   return query(
-    `SELECT di.*, p.sku, p.name, p.unit, p.ean13, p.dun14,
+    `SELECT di.*, p.sku, COALESCE(di.description, p.name) AS name,
+            COALESCE(di.unit, p.unit) AS unit, p.ean13, p.dun14,
             b.name AS brand_name, cpc.code AS customer_code${orderedSelect}
        FROM delivery_items di
-       JOIN products p ON p.id = di.product_id
+       LEFT JOIN products p ON p.id = di.product_id
        LEFT JOIN brands b ON b.id = p.brand_id
        ${orderedJoin}
        LEFT JOIN customer_product_codes cpc ON cpc.customer_id = ? AND cpc.product_id = di.product_id
       WHERE di.delivery_id = ? ORDER BY di.id`,
-    [delivery.customer_id, delivery.id],
+    [delivery.customer_id || 0, delivery.id],
   );
 }
 
@@ -271,11 +281,11 @@ router.get('/', async (req, res, next) => {
     const where = [];
     const params = [];
     if (search) {
-      where.push('(d.delivery_no LIKE ? OR d.packing_slip_no LIKE ? OR d.cai_number LIKE ? OR d.cot LIKE ? OR d.carrier LIKE ? OR d.carrier_driver_name LIKE ? OR d.carrier_driver_id LIKE ? OR d.carrier_license_plate LIKE ? OR c.company_name LIKE ? OR so.order_no LIKE ? OR so.customer_order_no LIKE ? OR cw.name LIKE ? OR d.tracking_number LIKE ?)');
+      where.push('(d.delivery_no LIKE ? OR d.packing_slip_no LIKE ? OR d.cai_number LIKE ? OR d.cot LIKE ? OR d.carrier LIKE ? OR d.carrier_driver_name LIKE ? OR d.carrier_driver_id LIKE ? OR d.carrier_license_plate LIKE ? OR c.company_name LIKE ? OR s.company_name LIKE ? OR so.order_no LIKE ? OR so.customer_order_no LIKE ? OR cw.name LIKE ? OR d.tracking_number LIKE ?)');
       params.push(
         `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
         `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
-        `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
+        `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`,
       );
     }
     if (status) {
@@ -288,7 +298,8 @@ router.get('/', async (req, res, next) => {
     const total = Number(
       (await scalar(
         `SELECT COUNT(*) FROM deliveries d
-           JOIN customers c ON c.id = d.customer_id
+           LEFT JOIN customers c ON c.id = d.customer_id
+           LEFT JOIN suppliers s ON s.id = d.supplier_id
            LEFT JOIN sales_orders so ON so.id = d.sales_order_id
            LEFT JOIN customer_warehouses cw ON cw.id = so.customer_warehouse_id
           ${whereSql}`,
@@ -297,11 +308,15 @@ router.get('/', async (req, res, next) => {
     );
     const pag = pagination(total, page, perPage);
     const rows = await query(
-      `SELECT d.*, c.company_name AS customer_name, so.order_no, so.customer_order_no,
+      `SELECT d.*,
+              CASE WHEN d.supplier_id IS NOT NULL THEN 'supplier' ELSE 'customer' END AS recipient_type,
+              COALESCE(c.company_name, s.company_name) AS customer_name,
+              so.order_no, so.customer_order_no,
               cw.name AS warehouse_name, cw.code AS warehouse_code,
               (SELECT COUNT(*) FROM delivery_items di WHERE di.delivery_id = d.id) AS item_count
          FROM deliveries d
-         JOIN customers c ON c.id = d.customer_id
+         LEFT JOIN customers c ON c.id = d.customer_id
+         LEFT JOIN suppliers s ON s.id = d.supplier_id
          LEFT JOIN sales_orders so ON so.id = d.sales_order_id
          LEFT JOIN customer_warehouses cw ON cw.id = so.customer_warehouse_id
          ${whereSql}
@@ -456,6 +471,187 @@ async function collectItems(body, orderId, excludeDeliveryId = 0, t = (value) =>
   return { items, errors };
 }
 
+function asList(value) {
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function parseRecipientValue(value) {
+  const match = String(value || '').match(/^(customer|supplier):(\d+)$/);
+  if (!match) return null;
+  return { type: match[1], id: Number(match[2]) };
+}
+
+function recipientValue(record) {
+  if (!record) return '';
+  if (record.supplier_id) return `supplier:${record.supplier_id}`;
+  if (record.customer_id) return `customer:${record.customer_id}`;
+  return '';
+}
+
+async function resolveRecipient(value, t) {
+  const parsed = parseRecipientValue(value);
+  if (!parsed) return { error: t('Select a customer or supplier recipient.') };
+  const table = parsed.type === 'supplier' ? 'suppliers' : 'customers';
+  const row = await one(`SELECT id FROM \`${table}\` WHERE id = ? LIMIT 1`, [parsed.id]);
+  if (!row) return { error: t('The selected recipient was not found.') };
+  return {
+    customerId: parsed.type === 'customer' ? parsed.id : null,
+    supplierId: parsed.type === 'supplier' ? parsed.id : null,
+  };
+}
+
+async function recipientOptions() {
+  const [customers, suppliers] = await Promise.all([
+    query('SELECT id, company_name, status FROM customers ORDER BY company_name'),
+    query('SELECT id, company_name, status FROM suppliers ORDER BY company_name'),
+  ]);
+  return { customers, suppliers };
+}
+
+function standaloneItemsFromBody(body, t) {
+  const descriptions = asList(body.item_description);
+  const quantities = asList(body.item_quantity);
+  const units = asList(body.item_unit);
+  const pallets = asList(body.slip_pallets);
+  const boxes = asList(body.slip_boxes);
+  const slipUnits = asList(body.slip_units);
+  const weights = asList(body.slip_weight_kg);
+  const lots = asList(body.lot_number);
+  const expiries = asList(body.expiry_date);
+  const count = Math.max(
+    descriptions.length, quantities.length, units.length, pallets.length,
+    boxes.length, slipUnits.length, weights.length, lots.length, expiries.length,
+  );
+  const items = [];
+  const errors = [];
+  const numberAt = (values, index, fallback = 0) => {
+    const raw = values[index];
+    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+    return round3(Math.max(0, toNumber(raw, fallback)));
+  };
+
+  for (let i = 0; i < count; i++) {
+    const description = String(descriptions[i] || '').trim().slice(0, 255);
+    const quantity = toNumber(quantities[i], 0);
+    const hasPacking = [pallets[i], boxes[i], slipUnits[i], weights[i]].some(
+      (value) => value !== undefined && value !== null && String(value).trim() !== '',
+    );
+    if (!description && quantity <= 0 && !hasPacking) continue;
+    if (!description) {
+      errors.push(t('Description is required for every line.'));
+      continue;
+    }
+    if (quantity <= 0) {
+      errors.push(t('Quantity must be greater than zero for every line.'));
+      continue;
+    }
+    const rawSlipUnits = slipUnits[i];
+    items.push({
+      description,
+      unit: String(units[i] || 'unit').trim().slice(0, 20) || 'unit',
+      quantity,
+      slip_pallets: numberAt(pallets, i),
+      slip_boxes: numberAt(boxes, i),
+      slip_units: rawSlipUnits === undefined || rawSlipUnits === null || String(rawSlipUnits).trim() === ''
+        ? quantity
+        : numberAt(slipUnits, i, quantity),
+      slip_weight_kg: numberAt(weights, i),
+      lot_number: normalizeLot(lots[i]),
+      expiry_date: dateOnly(expiries[i]),
+    });
+  }
+
+  if (!items.length && !errors.length) {
+    errors.push(t('Add at least one item with a description and a quantity greater than zero.'));
+  }
+  return { items, errors };
+}
+
+async function loadStandaloneFormData({ delivery = null, posted = null } = {}) {
+  const [recipients, carriers, currentCai] = await Promise.all([
+    recipientOptions(),
+    carrierOptions(delivery ? delivery.carrier_id : null),
+    activeCai(),
+  ]);
+  const row = posted
+    ? { ...posted }
+    : {
+        delivery_date: delivery ? delivery.delivery_date : todayISO(),
+        recipient: recipientValue(delivery),
+        carrier_id: delivery ? delivery.carrier_id : '',
+        legacy_carrier: delivery ? delivery.carrier : '',
+        carrier_driver_name: delivery ? delivery.carrier_driver_name : '',
+        carrier_driver_id: delivery ? delivery.carrier_driver_id : '',
+        carrier_license_plate: delivery ? delivery.carrier_license_plate : '',
+        tracking_number: delivery ? delivery.tracking_number : '',
+        cot: delivery ? delivery.cot : '',
+        notes: delivery ? delivery.notes : '',
+      };
+  return {
+    recipients,
+    carriers,
+    activeCai: currentCai,
+    row,
+    nextPackingSlip: currentCai ? formatPackingSlipNo(currentCai.prefix, currentCai.next_number) : null,
+  };
+}
+
+function standaloneItemsFromPosted(body) {
+  const descriptions = asList(body.item_description);
+  const quantities = asList(body.item_quantity);
+  const units = asList(body.item_unit);
+  const pallets = asList(body.slip_pallets);
+  const boxes = asList(body.slip_boxes);
+  const slipUnits = asList(body.slip_units);
+  const weights = asList(body.slip_weight_kg);
+  const lots = asList(body.lot_number);
+  const expiries = asList(body.expiry_date);
+  const count = Math.max(
+    descriptions.length, quantities.length, units.length, pallets.length,
+    boxes.length, slipUnits.length, weights.length, lots.length, expiries.length,
+  );
+  const items = [];
+  for (let i = 0; i < count; i++) {
+    items.push({
+      description: descriptions[i] || '',
+      quantity: quantities[i] || '',
+      unit: units[i] || '',
+      slip_pallets: pallets[i] || '',
+      slip_boxes: boxes[i] || '',
+      slip_units: slipUnits[i] || '',
+      slip_weight_kg: weights[i] || '',
+      lot_number: lots[i] || '',
+      expiry_date: expiries[i] || '',
+    });
+  }
+  return items;
+}
+
+async function saveStandaloneItems(conn, deliveryId, items) {
+  await conn.query('DELETE FROM delivery_items WHERE delivery_id = ?', [deliveryId]);
+  for (const item of items) {
+    await conn.query(
+      `INSERT INTO delivery_items
+         (delivery_id, sales_order_item_id, product_id, description, unit, quantity,
+          slip_pallets, slip_boxes, slip_units, slip_weight_kg, lot_number, expiry_date)
+       VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        deliveryId,
+        item.description,
+        item.unit,
+        item.quantity,
+        item.slip_pallets,
+        item.slip_boxes,
+        item.slip_units,
+        item.slip_weight_kg,
+        item.lot_number || null,
+        item.expiry_date || null,
+      ],
+    );
+  }
+}
+
 router.post('/', async (req, res, next) => {
   try {
     const orderId = Number.parseInt(req.body.sales_order_id, 10);
@@ -571,6 +767,113 @@ router.post('/', async (req, res, next) => {
     }
 
     req.flash('success', 'Delivery created. Mark it as shipped to update stock.');
+    res.redirect(`${basePath}/${deliveryId}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------------------------------- standalone packing slips
+router.get('/standalone/new', async (req, res, next) => {
+  try {
+    const data = await loadStandaloneFormData();
+    res.render('deliveries/standalone-form', {
+      title: req.t('New standalone packing slip'),
+      active: 'deliveries',
+      breadcrumbs: [
+        { label: req.t('Deliveries'), href: basePath },
+        { label: req.t('New standalone packing slip') },
+      ],
+      delivery: null,
+      items: [],
+      mode: 'create',
+      action: `${basePath}/standalone`,
+      errors: {},
+      ...data,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/standalone', async (req, res, next) => {
+  const renderError = async (messages) => {
+    const data = await loadStandaloneFormData({ posted: req.body });
+    return res.status(422).render('deliveries/standalone-form', {
+      title: req.t('New standalone packing slip'),
+      active: 'deliveries',
+      breadcrumbs: [
+        { label: req.t('Deliveries'), href: basePath },
+        { label: req.t('New standalone packing slip') },
+      ],
+      delivery: null,
+      items: standaloneItemsFromPosted(req.body),
+      mode: 'create',
+      action: `${basePath}/standalone`,
+      errors: { _form: messages },
+      ...data,
+    });
+  };
+
+  try {
+    const { items, errors } = standaloneItemsFromBody(req.body, req.t);
+    const deliveryDate = String(req.body.delivery_date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+      errors.push(req.t('A valid delivery date is required.'));
+    }
+    const recipient = await resolveRecipient(req.body.recipient, req.t);
+    if (recipient.error) errors.push(recipient.error);
+    if (errors.length) return renderError(errors);
+
+    const carrier = await resolveCarrier(req.body);
+    let deliveryId;
+    try {
+      deliveryId = await withTransaction(async (conn) => {
+        const slip = await allocatePackingSlip(conn);
+        const deliveryNo = await nextNumber({
+          prefix: 'DLV',
+          table: 'deliveries',
+          column: 'delivery_no',
+          date: deliveryDate,
+          conn,
+        });
+        const [result] = await conn.query(
+          `INSERT INTO deliveries
+             (delivery_no, packing_slip_no, cai_authorization_id, cai_number, cot,
+              carrier_id, carrier, carrier_driver_name, carrier_driver_id, carrier_license_plate,
+              sales_order_id, customer_id, supplier_id, delivery_date, tracking_number, status, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'pending', ?)`,
+          [
+            deliveryNo,
+            slip.packingSlipNo,
+            slip.id,
+            slip.caiNumber,
+            (req.body.cot || '').slice(0, 80) || null,
+            carrier.carrierId,
+            carrier.company,
+            carrier.driverName,
+            carrier.driverId,
+            carrier.licensePlate,
+            recipient.customerId,
+            recipient.supplierId,
+            deliveryDate,
+            (req.body.tracking_number || '').slice(0, 120) || null,
+            (req.body.notes || '').slice(0, 5000) || null,
+          ],
+        );
+        await saveStandaloneItems(conn, result.insertId, items);
+        return result.insertId;
+      });
+    } catch (err) {
+      if (err.code === 'NO_ACTIVE_CAI') {
+        return renderError([
+          req.t('No active CAI authorization with available packing slips. Ask an administrator to add or activate one before creating a packing slip.'),
+        ]);
+      }
+      throw err;
+    }
+
+    req.flash('success', 'Standalone packing slip created. Stock was not updated.');
     res.redirect(`${basePath}/${deliveryId}`);
   } catch (err) {
     next(err);
@@ -854,6 +1157,7 @@ router.get('/:id(\\d+)', async (req, res, next) => {
     const delivery = await loadDelivery(req.params.id);
     if (!delivery) { return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 })); }
     const items = await loadDeliveryItems(delivery, true);
+    const standalone = !delivery.sales_order_id;
     const actions = [];
     if (delivery.status === 'pending') {
       actions.push({ action: 'status', value: 'shipped', label: req.t('Mark as shipped'), tone: 'primary', confirm: true });
@@ -861,7 +1165,13 @@ router.get('/:id(\\d+)', async (req, res, next) => {
       actions.push({ action: 'status', value: 'cancelled', label: req.t('Cancel'), tone: 'danger', confirm: true });
     } else if (delivery.status === 'shipped') {
       actions.push({ action: 'status', value: 'delivered', label: req.t('Mark as delivered'), tone: 'success' });
-      actions.push({ action: 'status', value: 'cancelled', label: req.t('Cancel & restock'), tone: 'danger', confirm: true });
+      actions.push({
+        action: 'status',
+        value: 'cancelled',
+        label: req.t(standalone ? 'Cancel' : 'Cancel & restock'),
+        tone: 'danger',
+        confirm: true,
+      });
     }
     if (delivery.packing_slip_no) {
       actions.push({ href: `${basePath}/${delivery.id}/print`, label: req.t('Print packing slip'), tone: 'secondary' });
@@ -945,9 +1255,10 @@ router.get('/:id(\\d+)/packing', async (req, res, next) => {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Delivery') })), { status: 404 }));
     }
     const items = await query(
-      `SELECT di.*, p.sku, p.name, p.unit, p.units_per_pack, p.packs_per_pallet, p.weight_kg
+      `SELECT di.*, p.sku, COALESCE(di.description, p.name) AS name, COALESCE(di.unit, p.unit) AS unit,
+              p.units_per_pack, p.packs_per_pallet, p.weight_kg
          FROM delivery_items di
-         JOIN products p ON p.id = di.product_id
+         LEFT JOIN products p ON p.id = di.product_id
         WHERE di.delivery_id = ?
         ORDER BY di.id`,
       [delivery.id],
@@ -1039,6 +1350,25 @@ router.get('/:id(\\d+)/edit', async (req, res, next) => {
       req.flash('error', 'Only pending deliveries can be edited.');
       return res.redirect(`${basePath}/${delivery.id}`);
     }
+    if (!delivery.sales_order_id) {
+      const items = await loadDeliveryItems(delivery, false);
+      const data = await loadStandaloneFormData({ delivery });
+      return res.render('deliveries/standalone-form', {
+        title: req.t('Edit {number}', { number: delivery.packing_slip_no || delivery.delivery_no }),
+        active: 'deliveries',
+        breadcrumbs: [
+          { label: req.t('Deliveries'), href: basePath },
+          { label: delivery.packing_slip_no || delivery.delivery_no, href: `${basePath}/${delivery.id}` },
+          { label: req.t('Edit') },
+        ],
+        delivery,
+        items,
+        mode: 'edit',
+        action: `${basePath}/${delivery.id}`,
+        errors: {},
+        ...data,
+      });
+    }
     const order = await loadOrderWithWarehouse(delivery.sales_order_id);
     const currentItems = await loadOrderItems(delivery.sales_order_id, delivery.id);
     const delivered = await query('SELECT * FROM delivery_items WHERE delivery_id = ?', [delivery.id]);
@@ -1080,6 +1410,68 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       req.flash('error', 'Only pending deliveries can be edited.');
       return res.redirect(`${basePath}/${delivery.id}`);
     }
+
+    if (!delivery.sales_order_id) {
+      const renderError = async (messages) => {
+        const data = await loadStandaloneFormData({ posted: req.body });
+        return res.status(422).render('deliveries/standalone-form', {
+          title: req.t('Edit {number}', { number: delivery.packing_slip_no || delivery.delivery_no }),
+          active: 'deliveries',
+          breadcrumbs: [
+            { label: req.t('Deliveries'), href: basePath },
+            { label: delivery.packing_slip_no || delivery.delivery_no, href: `${basePath}/${delivery.id}` },
+            { label: req.t('Edit') },
+          ],
+          delivery,
+          items: standaloneItemsFromPosted(req.body),
+          mode: 'edit',
+          action: `${basePath}/${delivery.id}`,
+          errors: { _form: messages },
+          ...data,
+        });
+      };
+      try {
+        const { items, errors } = standaloneItemsFromBody(req.body, req.t);
+        const deliveryDate = String(req.body.delivery_date || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+          errors.push(req.t('A valid delivery date is required.'));
+        }
+        const recipient = await resolveRecipient(req.body.recipient, req.t);
+        if (recipient.error) errors.push(recipient.error);
+        if (errors.length) return renderError(errors);
+
+        const carrier = await resolveCarrier(req.body, delivery);
+        await withTransaction(async (conn) => {
+          await conn.query(
+            `UPDATE deliveries
+                SET customer_id = ?, supplier_id = ?, delivery_date = ?, cot = ?,
+                    carrier_id = ?, carrier = ?, carrier_driver_name = ?, carrier_driver_id = ?,
+                    carrier_license_plate = ?, tracking_number = ?, notes = ?
+              WHERE id = ?`,
+            [
+              recipient.customerId,
+              recipient.supplierId,
+              deliveryDate,
+              (req.body.cot || '').slice(0, 80) || null,
+              carrier.carrierId,
+              carrier.company,
+              carrier.driverName,
+              carrier.driverId,
+              carrier.licensePlate,
+              (req.body.tracking_number || '').slice(0, 120) || null,
+              (req.body.notes || '').slice(0, 5000) || null,
+              delivery.id,
+            ],
+          );
+          await saveStandaloneItems(conn, delivery.id, items);
+        });
+        req.flash('success', 'Standalone packing slip updated. Stock was not changed.');
+        return res.redirect(`${basePath}/${delivery.id}`);
+      } catch (err) {
+        return next(err);
+      }
+    }
+
     const { items, errors } = await collectItems(req.body, delivery.sales_order_id, delivery.id, req.t);
     const lotDefaults = await loadProductionLotDefaults(delivery);
     const existingLotRows = await query(
@@ -1229,6 +1621,7 @@ router.post('/:id(\\d+)/status', async (req, res, next) => {
       return res.redirect(`${basePath}/${id}`);
     }
 
+    const standalone = !delivery.sales_order_id;
     await withTransaction(async (conn) => {
       const [items] = await conn.query(
         `SELECT di.*, p.sku, p.name, p.track_stock, p.stock_qty, p.cost_price
@@ -1237,7 +1630,9 @@ router.post('/:id(\\d+)/status', async (req, res, next) => {
         [id],
       );
 
-      if (target === 'shipped') {
+      if (standalone) {
+        await conn.query('UPDATE deliveries SET status = ?, stock_posted = 0 WHERE id = ?', [target, id]);
+      } else if (target === 'shipped') {
         const shipments = new Map();
         for (const it of items) {
           if (!it.track_stock) continue;
@@ -1411,9 +1806,9 @@ router.get('/:id(\\d+)/pallet-slips', async (req, res, next) => {
       for (let pallet = 1; pallet <= palletCount; pallet += 1) {
         const qrLines = [
           `${item.brand_name ? `${item.brand_name} - ` : ''}${item.name}`,
-          `${req.t('Code')}: ${item.customer_code || item.sku}`,
+          `${req.t('Code')}: ${item.customer_code || item.sku || '—'}`,
           `EAN: ${barcodes.ean13 || '—'}`,
-          `${req.t('Customer')}: ${delivery.customer_name}`,
+          `${req.t(delivery.supplier_id ? 'Supplier' : 'Customer')}: ${delivery.customer_name}`,
           `${req.t('Customer order no.')}: ${delivery.customer_order_no || '—'}`,
           `${req.t('Units')}: ${round3(totals.units)}`,
           `${req.t('Boxes')}: ${round3(totals.boxes)}`,

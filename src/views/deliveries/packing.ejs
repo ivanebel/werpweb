@@ -70,7 +70,7 @@
                     <td class="table-td">
                       <input type="hidden" name="delivery_item_id" value="<%= item.id %>">
                       <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
-                      <p class="text-xs text-gray-400"><%= item.sku %> · <%= h.formatQty(item.quantity) %> <%= item.unit %></p>
+                      <p class="text-xs text-gray-400"><%= item.sku || '—' %> · <%= h.formatQty(item.quantity) %> <%= item.unit %></p>
                       <p class="mt-0.5 text-[11px] text-gray-400">
                         <%= t('Units per pack') %>: <%= item.units_per_pack || '—' %>
                         · <%= t('Packs per pallet') %>: <%= item.packs_per_pallet || '—' %>

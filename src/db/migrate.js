@@ -191,6 +191,14 @@ async function upgradeSchema(conn, dbName) {
   );
 
   // ------------------------------------------------- packing slips and CAI
+  await makeNullable(conn, dbName, 'deliveries', 'customer_id', 'INT UNSIGNED NULL');
+  await addColumn(conn, dbName, 'deliveries', 'supplier_id', 'INT UNSIGNED NULL AFTER customer_id');
+  await addIndex(conn, dbName, 'deliveries', 'idx_deliveries_supplier', 'KEY `idx_deliveries_supplier` (`supplier_id`)');
+  await addConstraint(conn, dbName, 'deliveries', 'fk_deliveries_supplier',
+    'FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT');
+  await makeNullable(conn, dbName, 'delivery_items', 'product_id', 'INT UNSIGNED NULL');
+  await addColumn(conn, dbName, 'delivery_items', 'description', 'VARCHAR(255) NULL AFTER product_id');
+  await addColumn(conn, dbName, 'delivery_items', 'unit', 'VARCHAR(20) NULL AFTER description');
   await addColumn(conn, dbName, 'deliveries', 'packing_slip_no', 'VARCHAR(14) NULL AFTER delivery_no');
   await addColumn(conn, dbName, 'deliveries', 'cai_authorization_id', 'INT UNSIGNED NULL AFTER packing_slip_no');
   await addColumn(conn, dbName, 'deliveries', 'cai_number', 'VARCHAR(60) NULL AFTER cai_authorization_id');

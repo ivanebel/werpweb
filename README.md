@@ -239,6 +239,15 @@ npm run test:telegram
 4. The delivery stays **pending** until you mark it **shipped**. Shipping reduces product stock, records stock movements and updates the sales order's fulfilment status.
 5. Mark it **delivered** once the customer receives it. The delivery detail page and packing slip show the customer order number, destination warehouse, docking station and reception date/time resolved from the sales order.
 
+### Standalone packing slips
+
+1. Open **Deliveries** and choose **Standalone packing slip**. Use this for repairs, samples, or any movement that is not linked to a sales order.
+2. Choose a **customer or supplier** as the recipient, the delivery date and the carrier details.
+3. Add one or more manual lines with an editable **description**, quantity, unit, packing quantities, lot and expiry. The lines do not need to reference products in the catalog.
+4. The packing slip number comes from the same active **CAI** authorization as regular deliveries. These slips can be printed, emailed and given pallet slips like any other packing slip.
+5. Standalone slips do not update stock. They move through **pending → shipped → delivered** or can be cancelled, and their status changes never create stock movements.
+6. While a standalone slip is pending, edit it to change the recipient, carrier, notes or lines. Regular sales-order deliveries keep their existing stock and fulfilment behavior.
+
 ### Pallet slips
 
 1. Open a delivery and choose **Print pallet slips**, or use the same link from the packing slip or **Edit packing quantities** pages.
