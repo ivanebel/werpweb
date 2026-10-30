@@ -8,7 +8,8 @@
   const docTitle = labels[doc.kind] || t('Document');
   const isInvoice = doc.kind.includes('invoice');
   const isSalesInvoice = doc.kind === 'sales_invoice';
-  const caePending = isSalesInvoice && !row.cae;
+  const isNonFiscal = Number(row.document_type_code) === 999;
+  const caePending = isSalesInvoice && !row.cae && !isNonFiscal;
   const documentTitle = isInvoice && row.document_type_name ? row.document_type_name : docTitle;
   const showCustomerCode = doc.party.table === 'customers';
   const balance = Number(row.total) - Number(row.amount_paid || 0);
@@ -74,7 +75,7 @@
         <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-xs text-gray-600 sm:grid-cols-4">
           <div><span class="font-medium text-gray-700"><%= t('Fiscal document type') %>:</span> <%= row.document_type_name || t('Not set') %></div>
           <% if (isSalesInvoice) { %>
-            <div><span class="font-medium text-gray-700"><%= t('CAE number') %>:</span> <span class="font-mono"><%= row.cae || t('Pending') %></span></div>
+            <div><span class="font-medium text-gray-700"><%= t('CAE number') %>:</span> <span class="font-mono"><%= row.cae || (isNonFiscal ? '—' : t('Pending')) %></span></div>
             <div><span class="font-medium text-gray-700"><%= t('CAE expiry date') %>:</span> <%= h.formatDate(row.cae_expiry_date) %></div>
             <% if (row.transfer_option) { %><div><span class="font-medium text-gray-700"><%= t('Transfer option') %>:</span> <%= row.transfer_option %></div><% } %>
             <% if (row.cbu) { %><div class="sm:col-span-2"><span class="font-medium text-gray-700"><%= t('CBU number') %>:</span> <span class="font-mono"><%= row.cbu %></span></div><% } %>

@@ -483,5 +483,10 @@
     "code": 998,
     "name": "Remito Electrónico para Azúcar, Alcohol y Subproductos -Exportación-",
     "active": false
+  },
+  {
+    "code": 999,
+    "name": "DOCUMENTO NO FISCAL",
+    "active": true
   }
 ]

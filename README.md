@@ -360,7 +360,7 @@ npm run test:telegram
 ### ARCA invoices
 
 1. When creating or editing a sales or purchase invoice, enter the invoice number as `point of sale-document`, for example `10-1450`. It is normalized and stored as `00010-00001450`. Existing historical numbers are preserved until you choose to renumber them.
-2. Choose a **Fiscal document type** from the active ARCA types imported from `TABLACOMPROBANTES.xlsx`. The code is stored with the invoice; inactive types are hidden from new documents.
+2. Choose a **Fiscal document type** from the active ARCA types imported from `TABLACOMPROBANTES.xlsx`. The code is stored with the invoice; inactive types are hidden from new documents. Use **999 — DOCUMENTO NO FISCAL** for internal sales or purchase records that have no actual fiscal document; no CAE is required for that type.
 3. Sales invoices have **CAE number** and **CAE expiry date** fields. The CAE is optional until the ARCA connection is implemented, but when present it must contain exactly 14 digits. A **CAE pending** badge is shown when it is missing.
 4. The collapsible **MiPyME credit invoice options** section at the bottom of the sales-invoice form stores the CBU, transfer option (`ADC`/`SCA`) and payment expiry date used by certain FCE document types.
 5. Sales invoices can link one or more **packing slips (remitos)** from the selected customer. Purchase invoices store an optional supplier remito number.
