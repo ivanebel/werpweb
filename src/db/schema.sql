@@ -365,6 +365,21 @@ CREATE TABLE IF NOT EXISTS material_class_members (
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS machines (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name          VARCHAR(80) NOT NULL,
+  full_name     VARCHAR(255) NOT NULL,
+  serial_number VARCHAR(120) NULL,
+  machine_type  ENUM('portioning','thermoforming','weighing_labeling','other') NOT NULL DEFAULT 'other',
+  status        ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_machines_name (name),
+  KEY idx_machines_type (machine_type),
+  KEY idx_machines_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS boms (
   id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   product_id INT UNSIGNED NOT NULL,

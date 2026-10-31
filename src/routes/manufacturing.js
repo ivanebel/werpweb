@@ -13,6 +13,93 @@ const round3 = materials.round3;
 const router = express.Router();
 const manageMaterials = requireRole('admin', 'manager');
 
+const MACHINE_TYPES = [
+  {
+    value: 'portioning',
+    label: 'Portioning machine',
+    hint: 'Automatic or semi-automatic slicers, portioning machines and similar equipment.',
+  },
+  {
+    value: 'thermoforming',
+    label: 'Thermoforming machine',
+    hint: 'Thermoforming, sealing and packaging equipment.',
+  },
+  {
+    value: 'weighing_labeling',
+    label: 'Weighing and labeling machine',
+    hint: 'Scales, weigh-price labelers and inline weighing equipment.',
+  },
+  {
+    value: 'other',
+    label: 'Other',
+    hint: 'Any other machine type.',
+  },
+];
+
+function machineTypeLabel(value, t = (text) => text) {
+  const type = MACHINE_TYPES.find((item) => item.value === value);
+  return type ? t(type.label) : t('Other');
+}
+
+function machineFormValues(body = {}) {
+  return {
+    name: String(body.name || '').trim().slice(0, 80),
+    full_name: String(body.full_name || '').trim().slice(0, 255),
+    serial_number: String(body.serial_number || '').trim().slice(0, 120) || null,
+    machine_type: MACHINE_TYPES.some((type) => type.value === body.machine_type) ? body.machine_type : '',
+    status: ['active', 'inactive'].includes(body.status) ? body.status : 'active',
+  };
+}
+
+function machineDefaults() {
+  return {
+    name: '',
+    full_name: '',
+    serial_number: '',
+    machine_type: '',
+    status: 'active',
+  };
+}
+
+async function validateMachine(values, t, existingId = 0) {
+  const errors = {};
+  if (!values.name) errors.name = t('Short name is required.');
+  if (!values.full_name) errors.full_name = t('Complete name, brand and model are required.');
+  if (values.serial_number && values.serial_number.length > 120) {
+    errors.serial_number = t('Serial number is too long.');
+  }
+  if (!values.machine_type) errors.machine_type = t('Select a machine type.');
+  if (!errors.name) {
+    const duplicate = await one(
+      'SELECT id FROM machines WHERE name = ? AND id <> ? LIMIT 1',
+      [values.name, existingId],
+    );
+    if (duplicate) errors.name = t('A machine with this short name already exists.');
+  }
+  return errors;
+}
+
+function renderMachineForm(req, res, { row, errors = {}, mode = 'create', status = 200 }) {
+  return res.status(status).render('manufacturing/machines/form', {
+    title: mode === 'create' ? req.t('New machine') : req.t('Edit machine'),
+    active: 'manufacturing-machines',
+    breadcrumbs: [
+      { label: req.t('Manufacturing') },
+      { label: req.t('Machines'), href: '/manufacturing/machines' },
+      { label: mode === 'create' ? req.t('New machine') : (row.name || req.t('Edit')) },
+    ],
+    mode,
+    action: mode === 'create' ? '/manufacturing/machines' : `/manufacturing/machines/${row.id}`,
+    row,
+    errors,
+    machineTypes: MACHINE_TYPES.map((type) => ({
+      value: type.value,
+      label: req.t(type.label),
+      hint: req.t(type.hint),
+    })),
+  });
+}
+
 function arr(value) {
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value : [value];
@@ -1788,6 +1875,147 @@ router.post('/production-orders/:id(\\d+)/delete', async (req, res, next) => {
   }
 });
 
+
+// ------------------------------------------------------------------ machines
+router.get('/machines', async (req, res, next) => {
+  try {
+    const search = String(req.query.q || '').trim();
+    const status = ['active', 'inactive'].includes(String(req.query.status || ''))
+      ? String(req.query.status)
+      : '';
+    const type = MACHINE_TYPES.some((item) => item.value === req.query.type)
+      ? String(req.query.type)
+      : '';
+    const where = [];
+    const params = [];
+    if (search) {
+      where.push('(name LIKE ? OR full_name LIKE ? OR serial_number LIKE ?)');
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (status) {
+      where.push('status = ?');
+      params.push(status);
+    }
+    if (type) {
+      where.push('machine_type = ?');
+      params.push(type);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const rows = await query(
+      `SELECT * FROM machines ${whereSql}
+        ORDER BY status = 'active' DESC, name ASC`,
+      params,
+    );
+    const counts = await one(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(status = 'active'), 0) AS active,
+              COALESCE(SUM(status = 'inactive'), 0) AS inactive
+         FROM machines`,
+    );
+
+    res.render('manufacturing/machines/index', {
+      title: req.t('Machines'),
+      active: 'manufacturing-machines',
+      breadcrumbs: [{ label: req.t('Manufacturing') }, { label: req.t('Machines') }],
+      rows,
+      search,
+      statusFilter: status,
+      typeFilter: type,
+      counts: {
+        total: Number(counts.total || 0),
+        active: Number(counts.active || 0),
+        inactive: Number(counts.inactive || 0),
+      },
+      machineTypes: MACHINE_TYPES.map((item) => ({ value: item.value, label: req.t(item.label) })),
+      machineTypeLabel: (value) => machineTypeLabel(value, req.t),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/machines/new', manageMaterials, (req, res) => {
+  renderMachineForm(req, res, { row: machineDefaults(), mode: 'create' });
+});
+
+router.post('/machines', manageMaterials, async (req, res, next) => {
+  try {
+    const values = machineFormValues(req.body);
+    const errors = await validateMachine(values, req.t);
+    if (Object.keys(errors).length) {
+      return renderMachineForm(req, res, { row: values, errors, mode: 'create', status: 422 });
+    }
+    const [result] = await getPool().query(
+      `INSERT INTO machines (name, full_name, serial_number, machine_type, status)
+       VALUES (?, ?, ?, ?, ?)`,
+      [values.name, values.full_name, values.serial_number, values.machine_type, values.status],
+    );
+    req.flash('success', 'Machine created.');
+    return res.redirect(`/manufacturing/machines/${result.insertId}/edit`);
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'A machine with this short name already exists.');
+      return res.redirect('/manufacturing/machines/new');
+    }
+    next(err);
+  }
+});
+
+router.get('/machines/:id(\\d+)/edit', manageMaterials, async (req, res, next) => {
+  try {
+    const row = await one('SELECT * FROM machines WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!row) return next(Object.assign(new Error(req.t('Machine not found.')), { status: 404 }));
+    return renderMachineForm(req, res, { row, mode: 'edit' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/machines/:id(\\d+)', manageMaterials, async (req, res, next) => {
+  try {
+    const existing = await one('SELECT * FROM machines WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) return next(Object.assign(new Error(req.t('Machine not found.')), { status: 404 }));
+    const values = machineFormValues(req.body);
+    const errors = await validateMachine(values, req.t, existing.id);
+    if (Object.keys(errors).length) {
+      return renderMachineForm(req, res, {
+        row: { ...existing, ...values },
+        errors,
+        mode: 'edit',
+        status: 422,
+      });
+    }
+    await getPool().query(
+      `UPDATE machines
+          SET name = ?, full_name = ?, serial_number = ?, machine_type = ?, status = ?
+        WHERE id = ?`,
+      [values.name, values.full_name, values.serial_number, values.machine_type, values.status, existing.id],
+    );
+    req.flash('success', 'Machine updated.');
+    return res.redirect('/manufacturing/machines');
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'A machine with this short name already exists.');
+      return res.redirect(`/manufacturing/machines/${req.params.id}/edit`);
+    }
+    next(err);
+  }
+});
+
+router.post('/machines/:id(\\d+)/status', manageMaterials, async (req, res, next) => {
+  try {
+    const row = await one('SELECT * FROM machines WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!row) return next(Object.assign(new Error(req.t('Machine not found.')), { status: 404 }));
+    const status = row.status === 'active' ? 'inactive' : 'active';
+    await getPool().query('UPDATE machines SET status = ? WHERE id = ?', [status, row.id]);
+    req.flash('success', 'Machine marked as {status}.', {
+      status: status === 'active' ? req.t('Active') : req.t('Inactive'),
+    });
+    return res.redirect('/manufacturing/machines');
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ------------------------------------------------------------- scale records
 router.get('/scale-records', async (req, res, next) => {

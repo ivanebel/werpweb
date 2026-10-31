@@ -1,0 +1,102 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const backUrl = '/manufacturing/machines';
+  const errorList = [...new Set(Object.values(errors || {}))];
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= mode === 'create' ? t('New machine') : t('Edit machine') %></h1>
+          <p class="page-subtitle"><%= t('Register a machine used in production and classify it by type.') %></p>
+        </div>
+        <a href="<%= backUrl %>" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Machines') %>
+        </a>
+      </div>
+
+      <% if (errorList.length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 text-error-500"><%- include('/partials/icon', { name: 'exclamation-triangle', className: 'h-5 w-5' }) %></span>
+            <div>
+              <p class="text-sm font-semibold text-error-700 dark:text-error-400"><%= t('Please review the machine:') %></p>
+              <ul class="mt-1 list-inside list-disc text-sm text-error-600 dark:text-error-400">
+                <% errorList.forEach((message) => { %><li><%= message %></li><% }) %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= action %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Machine details') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The short name is used to identify the machine in lists and reports.') %></p>
+            </div>
+            <% if (mode === 'edit' && row.id) { %>
+              <span class="font-mono text-xs text-gray-400">M-<%= String(row.id).padStart(4, '0') %></span>
+            <% } %>
+          </div>
+          <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
+            <div>
+              <label for="machine-name" class="form-label"><%= t('Short name') %> <span class="text-error-500">*</span></label>
+              <input id="machine-name" name="name" type="text" maxlength="80" required value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. SLICER-1') %>">
+              <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+              <p class="form-help"><%= t('Short and unique, for quick identification.') %></p>
+            </div>
+            <div class="md:col-span-3">
+              <label for="machine-full-name" class="form-label"><%= t('Complete name / brand / model') %> <span class="text-error-500">*</span></label>
+              <input id="machine-full-name" name="full_name" type="text" maxlength="255" required value="<%= row.full_name || '' %>" class="form-input <%= errors.full_name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Grasselli Slicer GS-350') %>">
+              <% if (errors.full_name) { %><p class="form-error"><%= errors.full_name %></p><% } %>
+            </div>
+            <div class="md:col-span-2">
+              <label for="machine-serial" class="form-label"><%= t('Serial number') %></label>
+              <input id="machine-serial" name="serial_number" type="text" maxlength="120" value="<%= row.serial_number || '' %>" class="form-input font-mono <%= errors.serial_number ? 'form-input-error' : '' %>" placeholder="<%= t('Optional') %>">
+              <% if (errors.serial_number) { %><p class="form-error"><%= errors.serial_number %></p><% } %>
+            </div>
+            <div>
+              <label for="machine-status" class="form-label"><%= t('Status') %></label>
+              <select id="machine-status" name="status" class="form-select">
+                <option value="active" <%= row.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+                <option value="inactive" <%= row.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+              </select>
+            </div>
+            <div class="md:col-span-4">
+              <label class="form-label"><%= t('Machine type') %> <span class="text-error-500">*</span></label>
+              <% if (errors.machine_type) { %><p class="form-error mb-2"><%= errors.machine_type %></p><% } %>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <% machineTypes.forEach((type) => { %>
+                  <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4 transition hover:border-brand-300 hover:bg-brand-50 dark:border-gray-700 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/5">
+                    <input type="radio" name="machine_type" value="<%= type.value %>" class="form-checkbox mt-0.5" <%= row.machine_type === type.value ? 'checked' : '' %> required>
+                    <span>
+                      <span class="block text-sm font-medium text-gray-800 dark:text-gray-200"><%= type.label %></span>
+                      <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400"><%= type.hint %></span>
+                    </span>
+                  </label>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col-reverse justify-end gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800 sm:flex-row md:px-6">
+            <a href="<%= backUrl %>" class="btn btn-secondary"><%= t('Cancel') %></a>
+            <button type="submit" class="btn btn-primary">
+              <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
+              <%= mode === 'create' ? t('Create machine') : t('Save changes') %>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>
