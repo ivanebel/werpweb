@@ -216,7 +216,7 @@ async function loadEmailDocument(type, id, locale) {
     const config = DOCUMENT_TYPES[def.configKey];
     const loaded = await loadDocumentData(config, id);
     if (!loaded) return null;
-    const { row, items, linkedOrder } = loaded;
+    const { row, items, levies, linkedOrder } = loaded;
     const doc = localizeDocConfig(config, locale);
     const number = String(row[config.numberField]);
     const email = {
@@ -241,6 +241,7 @@ async function loadEmailDocument(type, id, locale) {
         doc,
         row,
         items,
+        levies,
         linkedOrder,
         title: label,
         number,

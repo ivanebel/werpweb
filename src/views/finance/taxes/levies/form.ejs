@@ -1,0 +1,86 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[760px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= row.id ? t('Edit levy or withholding') : t('New levy or withholding') %></h1>
+          <p class="page-subtitle"><%= t('Define the code, default percentage and validity of this tax concept.') %></p>
+        </div>
+        <a href="/finance/taxes/levies" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+        </a>
+      </div>
+
+      <% if (Object.keys(errors || {}).length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <%= t('Please review the highlighted fields.') %>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= row.id ? `/finance/taxes/levies/${row.id}` : '/finance/taxes/levies' %>" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Tax concept') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Levies are used on purchase invoices. Withholdings will be used on customer payments.') %></p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <div>
+            <label for="levy-code" class="form-label"><%= t('Code') %> <span class="text-error-500">*</span></label>
+            <input id="levy-code" name="code" type="text" maxlength="20" value="<%= row.code || '' %>" class="form-input font-mono uppercase <%= errors.code ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. 212') %>" required>
+            <% if (errors.code) { %><p class="form-error"><%= errors.code %></p><% } %>
+            <p class="form-help"><%= t('Usually the three-digit code used by the tax authority.') %></p>
+          </div>
+          <div>
+            <label for="levy-name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+            <input id="levy-name" name="name" type="text" maxlength="150" value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. IIBB perception CABA') %>" required>
+            <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+          </div>
+          <div>
+            <label for="levy-type" class="form-label"><%= t('Type') %></label>
+            <select id="levy-type" name="levy_type" class="form-select">
+              <option value="levy" <%= row.levy_type !== 'withholding' ? 'selected' : '' %>><%= t('Levy') %></option>
+              <option value="withholding" <%= row.levy_type === 'withholding' ? 'selected' : '' %>><%= t('Withholding') %></option>
+            </select>
+            <p class="form-help"><%= t('Levies can be selected on purchase invoices.') %></p>
+          </div>
+          <div>
+            <label for="levy-percentage" class="form-label"><%= t('Default percentage') %></label>
+            <div class="relative">
+              <input id="levy-percentage" name="default_percentage" type="number" min="0" max="100" step="0.0001" value="<%= Number(row.default_percentage) || 0 %>" class="form-input pr-8 text-right <%= errors.default_percentage ? 'form-input-error' : '' %>">
+              <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">%</span>
+            </div>
+            <% if (errors.default_percentage) { %><p class="form-error"><%= errors.default_percentage %></p><% } %>
+            <p class="form-help"><%= t('Loaded automatically on purchase invoices, and editable there.') %></p>
+          </div>
+          <div>
+            <label for="levy-expiry" class="form-label"><%= t('Expiry date') %></label>
+            <input id="levy-expiry" name="expiry_date" type="date" value="<%= row.expiry_date ? String(row.expiry_date).slice(0, 10) : '' %>" class="form-input <%= errors.expiry_date ? 'form-input-error' : '' %>">
+            <% if (errors.expiry_date) { %><p class="form-error"><%= errors.expiry_date %></p><% } %>
+            <p class="form-help"><%= t('Optional. The date from which this concept is no longer valid.') %></p>
+          </div>
+          <div>
+            <label for="levy-status" class="form-label"><%= t('Status') %></label>
+            <select id="levy-status" name="status" class="form-select">
+              <option value="active" <%= row.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+              <option value="inactive" <%= row.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label for="levy-notes" class="form-label"><%= t('Notes') %></label>
+            <textarea id="levy-notes" name="notes" rows="3" maxlength="500" class="form-input" placeholder="<%= t('Optional notes or legal reference') %>"><%= row.notes || '' %></textarea>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">
+          <a href="/finance/taxes/levies" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary"><%= row.id ? t('Save changes') : t('Create') %></button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

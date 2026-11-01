@@ -745,6 +745,23 @@ CREATE TABLE IF NOT EXISTS sales_invoice_items (
     REFERENCES products (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS tax_levies (
+  id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code               VARCHAR(20) NOT NULL,
+  name               VARCHAR(150) NOT NULL,
+  levy_type          ENUM('levy','withholding') NOT NULL DEFAULT 'levy',
+  default_percentage DECIMAL(7,4) NOT NULL DEFAULT 0,
+  notes              VARCHAR(500) NULL,
+  expiry_date        DATE NULL,
+  status             ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tax_levies_code (code),
+  KEY idx_tax_levies_type (levy_type),
+  KEY idx_tax_levies_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS purchase_invoices (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   bill_no           VARCHAR(30) NOT NULL,
@@ -758,6 +775,7 @@ CREATE TABLE IF NOT EXISTS purchase_invoices (
   subtotal          DECIMAL(14,2) NOT NULL DEFAULT 0,
   discount_total    DECIMAL(14,2) NOT NULL DEFAULT 0,
   tax_total         DECIMAL(14,2) NOT NULL DEFAULT 0,
+  levy_total        DECIMAL(14,2) NOT NULL DEFAULT 0,
   total             DECIMAL(14,2) NOT NULL DEFAULT 0,
   amount_paid       DECIMAL(14,2) NOT NULL DEFAULT 0,
   stock_posted      TINYINT(1) NOT NULL DEFAULT 0,
@@ -808,6 +826,26 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_items (
     REFERENCES purchase_invoices (id) ON DELETE CASCADE,
   CONSTRAINT fk_pii_product FOREIGN KEY (product_id)
     REFERENCES products (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS purchase_invoice_levies (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  invoice_id  INT UNSIGNED NOT NULL,
+  levy_id     INT UNSIGNED NOT NULL,
+  code        VARCHAR(20) NOT NULL,
+  name        VARCHAR(150) NOT NULL,
+  percentage  DECIMAL(7,4) NOT NULL DEFAULT 0,
+  base_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+  amount      DECIMAL(14,2) NOT NULL DEFAULT 0,
+  sort_order  INT NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_purchase_invoice_levies_invoice (invoice_id),
+  KEY idx_purchase_invoice_levies_levy (levy_id),
+  CONSTRAINT fk_purchase_invoice_levies_invoice FOREIGN KEY (invoice_id)
+    REFERENCES purchase_invoices (id) ON DELETE CASCADE,
+  CONSTRAINT fk_purchase_invoice_levies_levy FOREIGN KEY (levy_id)
+    REFERENCES tax_levies (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

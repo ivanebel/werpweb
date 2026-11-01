@@ -23,6 +23,7 @@
     "test:cashflow": "node tests/cashflow-test.mjs",
     "test:prices": "node tests/price-analysis-test.mjs",
     "test:taxes": "node tests/taxes-test.mjs",
+    "test:levies": "node tests/levies-test.mjs",
     "test:fiscal-types": "node tests/fiscal-types-test.mjs",
     "test:standalone-packing-slip": "node tests/standalone-packing-slip-test.mjs",
     "test:purchase-stock": "node tests/purchase-invoice-stock-test.mjs",

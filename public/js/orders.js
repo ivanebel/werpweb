@@ -14,6 +14,8 @@
 
   const container = document.getElementById('line-items');
   const template = document.getElementById('line-template');
+  const levyContainer = document.getElementById('levy-items');
+  const levyTemplate = document.getElementById('levy-template');
   const currency = form.getAttribute('data-currency') || 'USD';
   const defaultTax = Number(form.getAttribute('data-default-tax') || 0);
   const partySelect = document.getElementById('party_id');
@@ -282,7 +284,24 @@
       recalcRow(row);
     });
     const discount = Math.min(Number(document.getElementById('discount_total')?.value || 0), subtotal);
-    const total = subtotal - discount;
+    const levyBase = Math.max(0, subtotal - taxTotal - discount);
+    let levyTotal = 0;
+    if (levyContainer) {
+      levyContainer.querySelectorAll('[data-levy]').forEach((row) => {
+        const select = row.querySelector('[data-levy-select]');
+        const percentage = Number(row.querySelector('[data-levy-percentage]')?.value || 0);
+        const amount = select && select.value ? levyBase * percentage / 100 : 0;
+        const baseCell = row.querySelector('[data-levy-base]');
+        const amountCell = row.querySelector('[data-levy-amount]');
+        if (baseCell) baseCell.textContent = select && select.value ? fmt(levyBase) : '—';
+        if (amountCell) amountCell.textContent = select && select.value ? fmt(amount) : '—';
+        levyTotal += amount;
+      });
+      setText('levy-base-display', fmt(levyBase));
+      setText('levy-total-display', fmt(levyTotal));
+      setText('levy-display', fmt(levyTotal));
+    }
+    const total = subtotal - discount + levyTotal;
     setText('subtotal-display', fmt(subtotal));
     setText('tax-display', fmt(taxTotal));
     setText('discount-display', `- ${fmt(discount)}`);
@@ -495,6 +514,43 @@
   if (documentDate && paymentExpiry) {
     documentDate.addEventListener('change', () => {
       if (!paymentExpiry.value) paymentExpiry.value = addDays(documentDate.value, 7);
+    });
+  }
+
+  if (levyContainer) {
+    const applyDefaultPercentage = (row) => {
+      const select = row.querySelector('[data-levy-select]');
+      const percentage = row.querySelector('[data-levy-percentage]');
+      if (!select || !percentage) return;
+      const option = select.selectedOptions[0];
+      if (option && option.value && option.dataset.percentage !== undefined) {
+        percentage.value = Number(option.dataset.percentage || 0).toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+      }
+    };
+    levyContainer.addEventListener('change', (event) => {
+      if (!event.target.matches('[data-levy-select]')) return;
+      applyDefaultPercentage(event.target.closest('[data-levy]'));
+      recalcAll();
+    });
+    levyContainer.addEventListener('input', (event) => {
+      if (event.target.matches('[data-levy-percentage]')) recalcAll();
+    });
+    levyContainer.addEventListener('click', (event) => {
+      const remove = event.target.closest('[data-remove-levy]');
+      if (!remove) return;
+      event.preventDefault();
+      remove.closest('[data-levy]')?.remove();
+      recalcAll();
+    });
+    document.getElementById('add-levy')?.addEventListener('click', () => {
+      if (!levyTemplate) return;
+      const wrapper = document.createElement('tbody');
+      wrapper.innerHTML = levyTemplate.innerHTML.trim();
+      const row = wrapper.querySelector('[data-levy]');
+      if (!row) return;
+      levyContainer.appendChild(row);
+      row.querySelector('[data-levy-select]')?.focus();
+      recalcAll();
     });
   }
 

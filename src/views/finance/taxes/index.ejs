@@ -14,8 +14,9 @@
   });
   const iibbCredits = Number(report.iibb.perceptions) + Number(report.iibb.withholdings);
   const vatCredits = Number(report.vat.input);
+  const purchaseLevies = Number(report.levies.total) || 0;
   const totalCalculated = Number(report.vat.output) + Number(report.iibb.calculated) + Number(report.municipal.amount);
-  const totalCredits = vatCredits + iibbCredits;
+  const totalCredits = vatCredits + iibbCredits + purchaseLevies;
 %>
 <div class="flex min-h-screen flex-col lg:pl-[290px]">
   <%- include('/layouts/header') %>
@@ -41,6 +42,10 @@
             <%= t('Tax withholdings') %>
           </a>
           <% if (canManageTaxes) { %>
+            <a href="/finance/taxes/levies" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'receipt', className: 'h-4 w-4' }) %>
+              <%= t('Levies and withholdings') %>
+            </a>
             <a href="/finance/taxes/settings" class="btn btn-secondary btn-sm">
               <%- include('/partials/icon', { name: 'cog', className: 'h-4 w-4' }) %>
               <%= t('Tax settings') %>
@@ -166,6 +171,13 @@
                   <td class="table-td text-right">—</td>
                   <td class="table-td text-right font-semibold <%= netTone(report.municipal.amount) %>"><%= signedMoney(report.municipal.amount) %></td>
                 </tr>
+                <tr class="table-row">
+                  <td class="table-td font-medium text-gray-800 dark:text-gray-200"><%= t('Purchase levies') %></td>
+                  <td class="table-td text-right">—</td>
+                  <td class="table-td text-right">—</td>
+                  <td class="table-td text-right"><%= money(purchaseLevies) %></td>
+                  <td class="table-td text-right font-semibold <%= netTone(-purchaseLevies) %>"><%= signedMoney(-purchaseLevies) %></td>
+                </tr>
               </tbody>
               <tfoot>
                 <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
@@ -179,7 +191,7 @@
             </table>
           </div>
           <p class="border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
-            <%= t('VAT credits are input VAT. IIBB credits are perceptions plus IIBB withholdings.') %>
+            <%= t('VAT credits are input VAT. IIBB credits are perceptions plus IIBB withholdings. Purchase levies are prepaid taxes recorded on purchase invoices.') %>
           </p>
         </div>
 
@@ -404,7 +416,7 @@
           <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} invoices', { count: report.purchases.count }) %></span>
         </div>
         <div class="table-wrap max-h-[480px] overflow-y-auto">
-          <table class="table-base min-w-[1100px]">
+          <table class="table-base min-w-[1200px]">
             <thead>
               <tr>
                 <th class="table-th"><%= t('Date') %></th>
@@ -415,6 +427,7 @@
                 <th class="table-th text-right"><%= t('VAT') %></th>
                 <th class="table-th text-right"><%= t('Gross') %></th>
                 <th class="table-th text-right"><%= t('Perceptions') %></th>
+                <th class="table-th text-right"><%= t('Levies') %></th>
               </tr>
             </thead>
             <tbody>
@@ -431,15 +444,62 @@
                   <td class="table-td text-right"><%= money(invoice.vat) %></td>
                   <td class="table-td text-right font-semibold"><%= money(invoice.gross) %></td>
                   <td class="table-td text-right"><%= perceptions ? money(perceptions) : '—' %></td>
+                  <td class="table-td text-right"><%= Number(invoice.levy) ? money(invoice.levy) : '—' %></td>
                 </tr>
               <% }) %>
               <% if (!report.purchases.invoices.length) { %>
-                <tr><td colspan="8" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No purchase invoices in this period.') %></td></tr>
+                <tr><td colspan="9" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No purchase invoices in this period.') %></td></tr>
               <% } %>
             </tbody>
           </table>
         </div>
       </div>
+
+      <% if (report.levies.rows.length) { %>
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Purchase levies') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Levies recorded on purchase invoices in this period. They are treated as prepaid taxes.') %></p>
+            </div>
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} entries', { count: report.levies.count }) %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[900px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Date') %></th>
+                  <th class="table-th"><%= t('Bill') %></th>
+                  <th class="table-th"><%= t('Supplier') %></th>
+                  <th class="table-th"><%= t('Levy') %></th>
+                  <th class="table-th text-right"><%= t('Percentage') %></th>
+                  <th class="table-th text-right"><%= t('Base') %></th>
+                  <th class="table-th text-right"><%= t('Amount') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% report.levies.rows.forEach((row) => { %>
+                  <tr class="table-row">
+                    <td class="table-td whitespace-nowrap"><%= h.formatDate(row.date, locale) %></td>
+                    <td class="table-td whitespace-nowrap"><a href="/purchases/<%= row.invoice_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.number %></a></td>
+                    <td class="table-td"><%= row.party_name %></td>
+                    <td class="table-td"><span class="font-mono text-xs text-gray-400"><%= row.code %></span> <%= row.name %></td>
+                    <td class="table-td text-right"><%= h.formatNumber(row.percentage, 4) %>%</td>
+                    <td class="table-td text-right"><%= money(row.base_amount) %></td>
+                    <td class="table-td text-right font-medium"><%= money(row.signed_amount) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                  <td colspan="6" class="px-5 py-3 text-sm"><%= t('Total purchase levies') %></td>
+                  <td class="px-3 py-3 text-right text-sm"><%= money(report.levies.total) %></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      <% } %>
 
       <div class="rounded-xl border border-gray-200 bg-white p-5 text-xs leading-relaxed text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
         <p class="font-semibold text-gray-700 dark:text-gray-300"><%= t('How these taxes are calculated') %></p>

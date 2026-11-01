@@ -11,6 +11,8 @@
         const allErrors = errorList.concat(itemErrors || []);
         const backUrl = mode === 'edit' ? `${doc.basePath}/${row.id}` : doc.basePath;
         const skipStockChecked = Boolean(row.skip_stock) || Number(row.stock_skipped) === 1;
+        const levyRows = typeof levies !== 'undefined' && levies ? levies : [];
+        const levyOptionList = typeof levyOptions !== 'undefined' && levyOptions ? levyOptions : [];
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -330,6 +332,12 @@
                   <label for="discount_total" class="text-gray-500 dark:text-gray-400">Discount</label>
                   <input id="discount_total" name="discount_total" type="number" min="0" step="0.01" value="<%= row.discount_total !== undefined ? Number(row.discount_total).toFixed(2) : '0.00' %>" class="form-input h-9 w-28 text-right">
                 </div>
+                <% if (doc.kind === 'purchase_invoice') { %>
+                  <div class="flex items-center justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">Levies</span>
+                    <span id="levy-display" class="font-medium text-gray-800 dark:text-gray-200">—</span>
+                  </div>
+                <% } %>
                 <div class="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-800">
                   <span class="text-base font-semibold text-gray-800 dark:text-gray-200">Total</span>
                   <span id="total-display" class="text-xl font-bold text-gray-900 dark:text-white">—</span>
@@ -361,6 +369,87 @@
             </div>
           </div>
         </div>
+
+        <% if (doc.kind === 'purchase_invoice') { %>
+          <div class="card mt-5" id="levy-card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title"><%= t('Levies and perceptions') %></h2>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Add the supplier levies that apply to this purchase invoice. They are calculated on the gross amount without VAT.') %></p>
+              </div>
+              <button type="button" id="add-levy" class="btn btn-secondary btn-sm">
+                <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('Add levy') %>
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table class="table-base min-w-[760px]">
+                <thead>
+                  <tr>
+                    <th class="table-th min-w-[280px]"><%= t('Levy') %></th>
+                    <th class="table-th w-32 text-right"><%= t('Percentage') %></th>
+                    <th class="table-th w-32 text-right"><%= t('Base') %></th>
+                    <th class="table-th w-32 text-right"><%= t('Amount') %></th>
+                    <th class="table-th w-12"></th>
+                  </tr>
+                </thead>
+                <tbody id="levy-items">
+                  <% levyRows.forEach((levy) => { %>
+                    <tr data-levy class="align-top">
+                      <td class="table-td">
+                        <select name="levy_id[]" data-levy-select class="form-select">
+                          <option value=""><%= t('Select a levy') %></option>
+                          <% levyOptionList.forEach((option) => { %>
+                            <option value="<%= option.id %>" data-percentage="<%= option.default_percentage %>" <%= Number(levy.levy_id) === Number(option.id) ? 'selected' : '' %>>
+                              <%= option.code %> — <%= option.name %><% if (option.expiry_date) { %> · <%= t('Expires') %> <%= h.formatDate(option.expiry_date) %><% } %>
+                            </option>
+                          <% }) %>
+                        </select>
+                      </td>
+                      <td class="table-td">
+                        <input name="levy_percentage[]" data-levy-percentage type="number" min="0" max="100" step="0.0001" value="<%= levy.percentage !== undefined ? levy.percentage : '' %>" class="form-input text-right">
+                      </td>
+                      <td class="table-td text-right pt-3 text-gray-600 dark:text-gray-300" data-levy-base>—</td>
+                      <td class="table-td text-right pt-3 font-medium text-gray-800 dark:text-gray-200" data-levy-amount>—</td>
+                      <td class="table-td pt-1 text-right">
+                        <button type="button" data-remove-levy class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove levy') %>">
+                          <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                        </button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <div class="flex flex-col gap-2 border-t border-gray-100 px-5 py-4 text-sm dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                <%= t('Levy base') %>: <span id="levy-base-display" class="font-medium text-gray-700 dark:text-gray-300">—</span>
+              </p>
+              <p class="text-gray-600 dark:text-gray-300">
+                <%= t('Total levies') %>: <span id="levy-total-display" class="font-semibold text-gray-900 dark:text-white">—</span>
+              </p>
+            </div>
+          </div>
+          <template id="levy-template">
+            <tr data-levy class="align-top">
+              <td class="table-td">
+                <select name="levy_id[]" data-levy-select class="form-select">
+                  <option value=""><%= t('Select a levy') %></option>
+                  <% levyOptionList.forEach((option) => { %>
+                    <option value="<%= option.id %>" data-percentage="<%= option.default_percentage %>"><%= option.code %> — <%= option.name %><% if (option.expiry_date) { %> · <%= t('Expires') %> <%= h.formatDate(option.expiry_date) %><% } %></option>
+                  <% }) %>
+                </select>
+              </td>
+              <td class="table-td"><input name="levy_percentage[]" data-levy-percentage type="number" min="0" max="100" step="0.0001" value="" class="form-input text-right"></td>
+              <td class="table-td text-right pt-3 text-gray-600 dark:text-gray-300" data-levy-base>—</td>
+              <td class="table-td text-right pt-3 font-medium text-gray-800 dark:text-gray-200" data-levy-amount>—</td>
+              <td class="table-td pt-1 text-right">
+                <button type="button" data-remove-levy class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="<%= t('Remove levy') %>">
+                  <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %>
+                </button>
+              </td>
+            </tr>
+          </template>
+        <% } %>
 
         <% if (doc.kind === 'sales_invoice') { %>
           <details class="card mt-5" <%= (errors.cbu || errors.transfer_option || errors.payment_expiry_date) ? 'open' : '' %>>

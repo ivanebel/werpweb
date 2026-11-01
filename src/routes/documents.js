@@ -92,6 +92,106 @@ function computeTotals(items, discount) {
   return { subtotal, tax_total, discount_total, total: round2(subtotal - discount_total) };
 }
 
+function levyBaseFor(totals) {
+  return round2(Math.max(0, Number(totals.subtotal) - Number(totals.tax_total) - Number(totals.discount_total)));
+}
+
+function parseLevySelections(body) {
+  const ids = arr(body.levy_id);
+  const percentages = arr(body.levy_percentage);
+  const rows = [];
+  const seen = new Set();
+  for (let i = 0; i < ids.length; i++) {
+    const levyId = Number.parseInt(ids[i], 10);
+    if (!levyId) continue;
+    if (seen.has(levyId)) {
+      return { rows: [], error: 'Each levy can only be selected once.' };
+    }
+    seen.add(levyId);
+    const raw = percentages[i];
+    rows.push({
+      levy_id: levyId,
+      percentage: raw === undefined || raw === null || String(raw).trim() === ''
+        ? null
+        : toNumber(raw, 0),
+    });
+  }
+  return { rows, error: null };
+}
+
+async function loadLevyOptions(includeIds = []) {
+  const ids = [...new Set(includeIds.map((id) => Number(id)).filter((id) => id > 0))];
+  const includeSql = ids.length ? ` OR id IN (${ids.map(() => '?').join(',')})` : '';
+  return query(
+    `SELECT * FROM tax_levies
+      WHERE levy_type = 'levy' AND (status = 'active'${includeSql})
+      ORDER BY code, name`,
+    ids,
+  );
+}
+
+async function loadPurchaseInvoiceLevies(invoiceId) {
+  return query(
+    `SELECT id, invoice_id, levy_id, code, name, percentage, base_amount, amount, sort_order
+       FROM purchase_invoice_levies
+      WHERE invoice_id = ?
+      ORDER BY sort_order, id`,
+    [invoiceId],
+  );
+}
+
+function calculateLevyLines(levies, base) {
+  return levies.map((levy, index) => ({
+    ...levy,
+    base_amount: round2(base),
+    amount: round2(base * (Number(levy.percentage) || 0) / 100),
+    sort_order: index,
+  }));
+}
+
+function withPurchaseLevies(totals, levyRows) {
+  if (!levyRows || !levyRows.length) {
+    return { ...totals, levy_base: levyBaseFor(totals), levy_total: 0, levy_lines: [] };
+  }
+  const levyBase = levyBaseFor(totals);
+  const levyLines = calculateLevyLines(levyRows, levyBase);
+  const levy_total = round2(levyLines.reduce((sum, line) => sum + line.amount, 0));
+  return {
+    ...totals,
+    levy_base: levyBase,
+    levy_total,
+    total: round2(totals.total + levy_total),
+    levy_lines: levyLines,
+  };
+}
+
+async function validatePurchaseLevies(body, req) {
+  const parsed = parseLevySelections(body);
+  if (parsed.error) return { rows: [], error: req.t(parsed.error) };
+  if (!parsed.rows.length) return { rows: [], error: null };
+  const ids = parsed.rows.map((row) => row.levy_id);
+  const rows = await query(
+    `SELECT * FROM tax_levies
+      WHERE id IN (${ids.map(() => '?').join(',')}) AND levy_type = 'levy'`,
+    ids,
+  );
+  const byId = new Map(rows.map((row) => [Number(row.id), row]));
+  for (const selection of parsed.rows) {
+    const levy = byId.get(selection.levy_id);
+    if (!levy) return { rows: [], error: req.t('Select valid purchase levies.') };
+    const percentage = selection.percentage === null
+      ? Number(levy.default_percentage) || 0
+      : selection.percentage;
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+      return { rows: [], error: req.t('Levy percentages must be between 0 and 100.') };
+    }
+    selection.percentage = percentage;
+    selection.code = levy.code;
+    selection.name = levy.name;
+  }
+  return { rows: parsed.rows, error: null };
+}
+
 function validDateValue(value) {
   const raw = String(value || '').slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(new Date(`${raw}T00:00:00Z`).getTime());
@@ -176,6 +276,8 @@ async function loadInvoiceFormOptions(config, { existing = null, posted = null }
       noteInvoiceOptions: [],
       selectedDeliveryIds: [],
       selectedNoteInvoiceIds: [],
+      levyOptions: [],
+      levies: [],
     };
   }
   const postedType = posted ? Number.parseInt(posted.document_type_code, 10) : null;
@@ -195,7 +297,48 @@ async function loadInvoiceFormOptions(config, { existing = null, posted = null }
     : existing
       ? await loadSelectedNoteInvoiceIds(config, existing.id)
       : [];
-  return { fiscalTypes, deliveryOptions, noteInvoiceOptions, selectedDeliveryIds, selectedNoteInvoiceIds };
+
+  let levyOptions = [];
+  let levies = [];
+  if (config.kind === 'purchase_invoice') {
+    const saved = existing ? await loadPurchaseInvoiceLevies(existing.id) : [];
+    const postedSelections = posted ? parseLevySelections(posted) : { rows: [] };
+    levyOptions = await loadLevyOptions([
+      ...saved.map((row) => row.levy_id),
+      ...postedSelections.rows.map((row) => row.levy_id),
+    ]);
+    if (posted) {
+      const byId = new Map(levyOptions.map((row) => [Number(row.id), row]));
+      levies = postedSelections.rows.map((row) => {
+        const levy = byId.get(row.levy_id);
+        return {
+          levy_id: row.levy_id,
+          percentage: row.percentage === null
+            ? Number(levy && levy.default_percentage) || 0
+            : row.percentage,
+          code: levy ? levy.code : '',
+          name: levy ? levy.name : '',
+        };
+      });
+    } else if (existing) {
+      levies = saved.map((row) => ({
+        levy_id: Number(row.levy_id),
+        percentage: Number(row.percentage) || 0,
+        code: row.code,
+        name: row.name,
+      }));
+    }
+  }
+
+  return {
+    fiscalTypes,
+    deliveryOptions,
+    noteInvoiceOptions,
+    selectedDeliveryIds,
+    selectedNoteInvoiceIds,
+    levyOptions,
+    levies,
+  };
 }
 
 async function validateInvoiceNumber(config, body, req, existing = null) {
@@ -563,6 +706,9 @@ async function loadDocumentData(config, id) {
   const row = await findDoc(config, id);
   if (!row) return null;
   const items = await loadItems(config, row.id, config.party.table === 'customers' ? row[config.party.field] : null);
+  const levies = config.kind === 'purchase_invoice'
+    ? await loadPurchaseInvoiceLevies(row.id)
+    : [];
 
   let linkedOrder = null;
   if (config.linkOrder && row[config.linkOrder.field]) {
@@ -585,7 +731,7 @@ async function loadDocumentData(config, id) {
     }
   }
 
-  return { row, items, linkedOrder };
+  return { row, items, levies, linkedOrder };
 }
 
 function actionsFor(config, row, locale) {
@@ -957,6 +1103,11 @@ function makeDocumentRouter(config) {
       const items = parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
+      let levyResult = { rows: [], error: null };
+      if (config.kind === 'purchase_invoice') {
+        levyResult = await validatePurchaseLevies(req.body, req);
+        if (levyResult.error) errors.levies = levyResult.error;
+      }
       const date = (req.body[config.dateField] || '').slice(0, 10);
       const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
 
@@ -1020,7 +1171,10 @@ function makeDocumentRouter(config) {
         }
       }
 
-      const totals = computeTotals(items, req.body.discount_total);
+      const baseTotals = computeTotals(items, req.body.discount_total);
+      const totals = config.kind === 'purchase_invoice'
+        ? withPurchaseLevies(baseTotals, levyResult.rows)
+        : baseTotals;
       let amountPaid = 0;
       if (config.hasAmountPaid) {
         amountPaid = Math.max(0, Math.min(toNumber(req.body.amount_paid, 0), totals.total));
@@ -1085,10 +1239,12 @@ function makeDocumentRouter(config) {
         const fiscalPlaceholders = config.isInvoice
           ? `, ?${config.kind === 'sales_invoice' ? ', ?, ?, ?, ?, ?' : ''}${config.kind === 'purchase_invoice' ? ', ?' : ''}`
           : '';
+        const levyColumns = config.kind === 'purchase_invoice' ? ', levy_total' : '';
+        const levyPlaceholders = config.kind === 'purchase_invoice' ? ', ?' : '';
 
         const [result] = await conn.query(
-          `INSERT INTO \`${config.table}\` (\`${config.numberField}\`, \`${config.party.field}\`, \`${config.dateField}\`, \`${config.dueField}\`, status, subtotal, discount_total, tax_total, total, notes, created_by${config.hasAmountPaid ? ', amount_paid' : ''}${config.linkOrder ? `, \`${config.linkOrder.field}\`` : ''}${customerOrderColumns}${fiscalColumns})
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${config.hasAmountPaid ? ', ?' : ''}${config.linkOrder ? ', ?' : ''}${customerOrderPlaceholders}${fiscalPlaceholders})`,
+          `INSERT INTO \`${config.table}\` (\`${config.numberField}\`, \`${config.party.field}\`, \`${config.dateField}\`, \`${config.dueField}\`, status, subtotal, discount_total, tax_total${levyColumns}, total, notes, created_by${config.hasAmountPaid ? ', amount_paid' : ''}${config.linkOrder ? `, \`${config.linkOrder.field}\`` : ''}${customerOrderColumns}${fiscalColumns})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?${levyPlaceholders}, ?, ?, ?${config.hasAmountPaid ? ', ?' : ''}${config.linkOrder ? ', ?' : ''}${customerOrderPlaceholders}${fiscalPlaceholders})`,
           [
             number,
             partyId,
@@ -1098,6 +1254,7 @@ function makeDocumentRouter(config) {
             totals.subtotal,
             totals.discount_total,
             totals.tax_total,
+            ...(config.kind === 'purchase_invoice' ? [totals.levy_total || 0] : []),
             totals.total,
             (req.body.notes || '').slice(0, 5000) || null,
             req.session.user.id,
@@ -1133,6 +1290,16 @@ function makeDocumentRouter(config) {
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [id, it.product_id, it.description, it.quantity, it.unit_price, it.tax_rate, it.line_total],
           );
+        }
+        if (config.kind === 'purchase_invoice' && totals.levy_lines.length) {
+          for (const levy of totals.levy_lines) {
+            await conn.query(
+              `INSERT INTO purchase_invoice_levies
+                 (invoice_id, levy_id, code, name, percentage, base_amount, amount, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [id, levy.levy_id, levy.code, levy.name, levy.percentage, levy.base_amount, levy.amount, levy.sort_order],
+            );
+          }
         }
 
         await saveInvoiceLinks(conn, config, id, {
@@ -1182,6 +1349,9 @@ function makeDocumentRouter(config) {
       }
       const items = await loadItems(config, row.id, usesCustomerCodes ? row[config.party.field] : null);
       const invoiceAssociations = await loadInvoiceAssociations(config, row);
+      const levies = config.kind === 'purchase_invoice'
+        ? await loadPurchaseInvoiceLevies(row.id)
+        : [];
 
       let linkedOrder = null;
       if (config.linkOrder && row[config.linkOrder.field]) {
@@ -1244,6 +1414,7 @@ function makeDocumentRouter(config) {
         doc: { ...lc, statuses: statusesFor(config) },
         row,
         items,
+        levies,
         linkedOrder,
         ...invoiceAssociations,
         deliveries,
@@ -1368,6 +1539,11 @@ function makeDocumentRouter(config) {
       const items = parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
+      let levyResult = { rows: [], error: null };
+      if (config.kind === 'purchase_invoice') {
+        levyResult = await validatePurchaseLevies(req.body, req);
+        if (levyResult.error) errors.levies = levyResult.error;
+      }
       const date = (req.body[config.dateField] || '').slice(0, 10);
       const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
 
@@ -1436,7 +1612,10 @@ function makeDocumentRouter(config) {
         }
       }
 
-      const totals = computeTotals(items, req.body.discount_total);
+      const baseTotals = computeTotals(items, req.body.discount_total);
+      const totals = config.kind === 'purchase_invoice'
+        ? withPurchaseLevies(baseTotals, levyResult.rows)
+        : baseTotals;
       if (lockedPaymentAmount !== null && totals.total < lockedPaymentAmount - 0.005) {
         req.flash('error', 'The invoice total cannot be less than the amount already paid.');
         return res.redirect(`${basePath}/${existing.id}`);
@@ -1494,8 +1673,9 @@ function makeDocumentRouter(config) {
         const fiscalSet = config.isInvoice
           ? `, document_type_code = ?${config.kind === 'sales_invoice' ? ', cae = ?, cae_expiry_date = ?, cbu = ?, transfer_option = ?, payment_expiry_date = ?' : ''}${config.kind === 'purchase_invoice' ? ', packing_slip_no = ?' : ''}`
           : '';
+        const levySet = config.kind === 'purchase_invoice' ? ', levy_total = ?' : '';
         await conn.query(
-          `UPDATE \`${config.table}\` SET \`${config.party.field}\` = ?, \`${config.dateField}\` = ?, \`${config.dueField}\` = ?, status = ?, subtotal = ?, discount_total = ?, tax_total = ?, total = ?, notes = ?${config.hasAmountPaid ? ', amount_paid = ?' : ''}${numberSet}${customerOrderSet}${fiscalSet} WHERE id = ?`,
+          `UPDATE \`${config.table}\` SET \`${config.party.field}\` = ?, \`${config.dateField}\` = ?, \`${config.dueField}\` = ?, status = ?, subtotal = ?, discount_total = ?, tax_total = ?${levySet}, total = ?, notes = ?${config.hasAmountPaid ? ', amount_paid = ?' : ''}${numberSet}${customerOrderSet}${fiscalSet} WHERE id = ?`,
           [
             partyId,
             date,
@@ -1504,6 +1684,7 @@ function makeDocumentRouter(config) {
             totals.subtotal,
             totals.discount_total,
             totals.tax_total,
+            ...(config.kind === 'purchase_invoice' ? [totals.levy_total || 0] : []),
             totals.total,
             (req.body.notes || '').slice(0, 5000) || null,
             ...(config.hasAmountPaid
@@ -1546,6 +1727,17 @@ function makeDocumentRouter(config) {
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [existing.id, it.product_id, it.description, it.quantity, it.unit_price, it.tax_rate, it.line_total],
           );
+        }
+        if (config.kind === 'purchase_invoice') {
+          await conn.query('DELETE FROM purchase_invoice_levies WHERE invoice_id = ?', [existing.id]);
+          for (const levy of totals.levy_lines) {
+            await conn.query(
+              `INSERT INTO purchase_invoice_levies
+                 (invoice_id, levy_id, code, name, percentage, base_amount, amount, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [existing.id, levy.levy_id, levy.code, levy.name, levy.percentage, levy.base_amount, levy.amount, levy.sort_order],
+            );
+          }
         }
 
         await saveInvoiceLinks(conn, config, existing.id, {
@@ -1681,12 +1873,16 @@ function makeDocumentRouter(config) {
       }
       const settings = await require('../lib/settings').getSettings();
       const invoiceAssociations = await loadInvoiceAssociations(config, row);
+      const levies = config.kind === 'purchase_invoice'
+        ? await loadPurchaseInvoiceLevies(row.id)
+        : [];
       res.render('documents/print', {
         layout: false,
         title: `${lc.singular} ${row[config.numberField]}`,
         doc: lc,
         row,
         items,
+        levies,
         linkedOrder,
         ...invoiceAssociations,
         settings,

@@ -152,6 +152,14 @@
                   <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('VAT included') %></td>
                   <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.tax_total) %></td>
                 </tr>
+                <% if (doc.kind === 'purchase_invoice' && levies && levies.length) { %>
+                  <% levies.forEach((levy) => { %>
+                    <tr>
+                      <td style="font-size:13px;color:#667085;padding:3px 0;"><%= levy.code %> · <%= levy.name %> (<%= h.formatNumber(levy.percentage, 2) %>%)</td>
+                      <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;"><%= money(levy.amount) %></td>
+                    </tr>
+                  <% }) %>
+                <% } %>
                 <tr>
                   <td style="font-size:15px;color:#1d2939;font-weight:bold;padding:9px 0 3px;border-top:1px solid #eaecf0;"><%= t('Total') %></td>
                   <td align="right" style="font-size:18px;color:#1d2939;font-weight:bold;padding:9px 0 3px 24px;border-top:1px solid #eaecf0;"><%= money(row.total) %></td>

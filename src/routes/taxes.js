@@ -8,6 +8,7 @@ const taxes = require('../lib/taxes');
 
 const router = express.Router();
 const adminOnly = requireRole('admin');
+const manageTaxes = requireRole('admin', 'manager');
 const basePath = '/finance/taxes';
 
 const withholdingTypeOptions = [
@@ -24,6 +25,49 @@ function currencyFor(res) {
 function moneyFor(req, res) {
   const currency = currencyFor(res);
   return (value) => formatMoney(value, currency, req.locale);
+}
+
+const LEVY_TYPES = ['levy', 'withholding'];
+const LEVY_STATUSES = ['active', 'inactive'];
+
+function levyDefaults() {
+  return {
+    code: '',
+    name: '',
+    levy_type: 'levy',
+    default_percentage: 0,
+    notes: '',
+    expiry_date: '',
+    status: 'active',
+  };
+}
+
+function normalizeLevy(body) {
+  return {
+    code: String(body.code || '').trim().toUpperCase().slice(0, 20),
+    name: String(body.name || '').trim().slice(0, 150),
+    levy_type: LEVY_TYPES.includes(body.levy_type) ? body.levy_type : 'levy',
+    default_percentage: Number(body.default_percentage) || 0,
+    notes: String(body.notes || '').trim().slice(0, 500) || null,
+    expiry_date: String(body.expiry_date || '').slice(0, 10) || null,
+    status: LEVY_STATUSES.includes(body.status) ? body.status : 'active',
+  };
+}
+
+function validateLevy(values, req) {
+  const errors = {};
+  if (!values.code) errors.code = req.t('Code is required.');
+  else if (!/^[A-Z0-9._-]{1,20}$/.test(values.code)) {
+    errors.code = req.t('Use up to 20 letters, numbers, dots, hyphens or underscores.');
+  }
+  if (!values.name) errors.name = req.t('Name is required.');
+  if (!Number.isFinite(Number(values.default_percentage)) || values.default_percentage < 0 || values.default_percentage > 100) {
+    errors.default_percentage = req.t('Enter a percentage between 0 and 100.');
+  }
+  if (values.expiry_date && (!/^\d{4}-\d{2}-\d{2}$/.test(values.expiry_date) || Number.isNaN(new Date(`${values.expiry_date}T00:00:00Z`).getTime()))) {
+    errors.expiry_date = req.t('Enter a valid expiry date.');
+  }
+  return errors;
 }
 
 function rangeFromQuery(req) {
@@ -485,6 +529,133 @@ router.post('/withholdings/:id(\\d+)', async (req, res, next) => {
     );
     req.flash('success', 'Withholding classification updated.');
     return res.redirect(`${basePath}/withholdings?${rangeQuery(range)}`);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ------------------------------------------------------------ levies registry
+async function renderLevyForm(req, res, { status = 200, row = null, errors = {} } = {}) {
+  return res.status(status).render('finance/taxes/levies/form', {
+    title: row && row.id ? req.t('Edit levy or withholding') : req.t('New levy or withholding'),
+    active: 'finance-taxes',
+    breadcrumbs: [
+      { label: req.t('Taxes'), href: basePath },
+      { label: req.t('Levies and withholdings'), href: `${basePath}/levies` },
+      { label: row && row.id ? req.t('Edit') : req.t('New') },
+    ],
+    row: { ...levyDefaults(), ...(row || {}) },
+    errors,
+  });
+}
+
+router.get('/levies', manageTaxes, async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT l.*,
+              (SELECT COUNT(*) FROM purchase_invoice_levies pil WHERE pil.levy_id = l.id) AS usage_count
+         FROM tax_levies l
+        ORDER BY l.levy_type, l.code, l.name`,
+    );
+    res.render('finance/taxes/levies/index', {
+      title: req.t('Levies and withholdings'),
+      active: 'finance-taxes',
+      breadcrumbs: [
+        { label: req.t('Taxes'), href: basePath },
+        { label: req.t('Levies and withholdings') },
+      ],
+      rows,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/levies/new', manageTaxes, async (req, res, next) => {
+  try {
+    return renderLevyForm(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/levies', manageTaxes, async (req, res, next) => {
+  try {
+    const values = normalizeLevy(req.body);
+    const errors = validateLevy(values, req);
+    const duplicate = await one('SELECT id FROM tax_levies WHERE code = ? LIMIT 1', [values.code]);
+    if (duplicate) errors.code = req.t('This code is already in use.');
+    if (Object.keys(errors).length) {
+      return renderLevyForm(req, res, { status: 422, row: values, errors });
+    }
+    await query(
+      `INSERT INTO tax_levies
+         (code, name, levy_type, default_percentage, notes, expiry_date, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [values.code, values.name, values.levy_type, values.default_percentage, values.notes, values.expiry_date, values.status],
+    );
+    req.flash('success', 'Levy or withholding created.');
+    return res.redirect(`${basePath}/levies`);
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'This code is already in use.');
+      return res.redirect(`${basePath}/levies/new`);
+    }
+    next(error);
+  }
+});
+
+router.get('/levies/:id(\\d+)/edit', manageTaxes, async (req, res, next) => {
+  try {
+    const row = await one('SELECT * FROM tax_levies WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!row) return next(Object.assign(new Error(req.t('Levy or withholding not found.')), { status: 404 }));
+    return renderLevyForm(req, res, { row });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/levies/:id(\\d+)', manageTaxes, async (req, res, next) => {
+  try {
+    const existing = await one('SELECT * FROM tax_levies WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) return next(Object.assign(new Error(req.t('Levy or withholding not found.')), { status: 404 }));
+    const values = normalizeLevy(req.body);
+    const errors = validateLevy(values, req);
+    const duplicate = await one('SELECT id FROM tax_levies WHERE code = ? AND id <> ? LIMIT 1', [values.code, existing.id]);
+    if (duplicate) errors.code = req.t('This code is already in use.');
+    if (Object.keys(errors).length) {
+      return renderLevyForm(req, res, { status: 422, row: { ...values, id: existing.id }, errors });
+    }
+    await query(
+      `UPDATE tax_levies
+          SET code = ?, name = ?, levy_type = ?, default_percentage = ?, notes = ?, expiry_date = ?, status = ?
+        WHERE id = ?`,
+      [values.code, values.name, values.levy_type, values.default_percentage, values.notes, values.expiry_date, values.status, existing.id],
+    );
+    req.flash('success', 'Levy or withholding updated.');
+    return res.redirect(`${basePath}/levies`);
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'This code is already in use.');
+      return res.redirect(`${basePath}/levies/${req.params.id}/edit`);
+    }
+    next(error);
+  }
+});
+
+router.post('/levies/:id(\\d+)/delete', manageTaxes, async (req, res, next) => {
+  try {
+    const used = await one(
+      'SELECT COUNT(*) AS total FROM purchase_invoice_levies WHERE levy_id = ?',
+      [req.params.id],
+    );
+    if (Number(used.total) > 0) {
+      req.flash('error', 'This levy is used by purchase invoices. Mark it inactive instead of deleting it.');
+      return res.redirect(`${basePath}/levies`);
+    }
+    await query('DELETE FROM tax_levies WHERE id = ?', [req.params.id]);
+    req.flash('success', 'Levy or withholding deleted.');
+    return res.redirect(`${basePath}/levies`);
   } catch (error) {
     next(error);
   }

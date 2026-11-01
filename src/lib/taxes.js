@@ -55,7 +55,9 @@ function includedStatus(kind, status) {
 function invoiceTax(invoice, items) {
   const subtotal = Math.max(0, Number(invoice.subtotal) || 0);
   const total = Math.max(0, Number(invoice.total) || 0);
-  const ratio = subtotal > 0 ? Math.min(1, Math.max(0, total / subtotal)) : 1;
+  const levyTotal = Math.max(0, Number(invoice.levy_total) || 0);
+  const totalBeforeLevies = Math.max(0, total - levyTotal);
+  const ratio = subtotal > 0 ? Math.min(1, Math.max(0, totalBeforeLevies / subtotal)) : 1;
   const sign = documentSign(invoice.document_type_name);
   const byRate = new Map();
   let vatRaw = 0;
@@ -79,7 +81,7 @@ function invoiceTax(invoice, items) {
     byRate.set(0, { rate: 0, base: total - vat, vat });
   }
 
-  const gross = round2(total * sign);
+  const gross = round2(totalBeforeLevies * sign);
   const vat = round2(vatRaw * sign);
   return {
     sign,
@@ -87,6 +89,7 @@ function invoiceTax(invoice, items) {
     gross,
     net: round2(gross - vat),
     vat,
+    levy: round2(levyTotal * sign),
     by_rate: [...byRate.values()]
       .map((entry) => ({
         rate: entry.rate,
@@ -283,7 +286,7 @@ async function loadSalesInvoices(from, to) {
 async function loadPurchaseInvoices(from, to) {
   return query(
     `SELECT i.id, i.bill_no AS number, i.invoice_date AS date, i.subtotal, i.discount_total,
-            i.tax_total, i.total, i.status, i.document_type_code,
+            i.tax_total, i.levy_total, i.total, i.status, i.document_type_code,
             fdt.name AS document_type_name, s.company_name AS party_name
        FROM purchase_invoices i
        JOIN suppliers s ON s.id = i.supplier_id
@@ -313,6 +316,22 @@ async function loadPerceptions(from, to) {
   );
 }
 
+async function loadPurchaseLevies(from, to) {
+  return query(
+    `SELECT l.id, l.invoice_id, l.levy_id, l.code, l.name, l.percentage, l.base_amount, l.amount,
+            i.bill_no AS number, i.invoice_date AS date,
+            fdt.name AS document_type_name, s.company_name AS party_name
+       FROM purchase_invoice_levies l
+       JOIN purchase_invoices i ON i.id = l.invoice_id
+       JOIN suppliers s ON s.id = i.supplier_id
+       LEFT JOIN fiscal_document_types fdt ON fdt.code = i.document_type_code
+      WHERE i.invoice_date BETWEEN ? AND ?
+        AND i.status IN (${PURCHASE_STATUSES.map(() => '?').join(',')})
+      ORDER BY i.invoice_date, i.id, l.sort_order, l.id`,
+    [from, to, ...PURCHASE_STATUSES],
+  );
+}
+
 async function loadWithholdings(from, to) {
   return query(
     `SELECT pa.id, pa.payment_id, pa.amount, pa.reference, pa.notes, pa.tax_type,
@@ -333,11 +352,12 @@ async function loadWithholdings(from, to) {
 async function buildTaxReport(from, to) {
   const range = normalizeRange(from, to);
   const fiscalYear = normalizeFiscalYear(String(range.from).slice(0, 4));
-  const [settings, jurisdictions, salesInvoices, purchaseInvoices, perceptions, withholdings, annualCoefficients] = await Promise.all([
+  const [settings, jurisdictions, salesInvoices, purchaseInvoices, purchaseLevies, perceptions, withholdings, annualCoefficients] = await Promise.all([
     loadTaxSettings(),
     loadJurisdictions(),
     loadSalesInvoices(range.from, range.to),
     loadPurchaseInvoices(range.from, range.to),
+    loadPurchaseLevies(range.from, range.to),
     loadPerceptions(range.from, range.to),
     loadWithholdings(range.from, range.to),
     loadJurisdictionCoefficients(fiscalYear),
@@ -356,6 +376,15 @@ async function buildTaxReport(from, to) {
     ...invoice,
     ...invoiceTax(invoice, purchaseItems.get(Number(invoice.id)) || []),
   }));
+  const levyRows = purchaseLevies.map((row) => {
+    const sign = documentSign(row.document_type_name);
+    return {
+      ...row,
+      sign,
+      signed_amount: round2(Number(row.amount) * sign),
+    };
+  });
+  const purchaseLevyTotal = round2(levyRows.reduce((sum, row) => sum + row.signed_amount, 0));
 
   const grossSales = round2(sales.reduce((sum, invoice) => sum + invoice.gross, 0));
   const netSales = round2(sales.reduce((sum, invoice) => sum + invoice.net, 0));
@@ -451,7 +480,7 @@ async function buildTaxReport(from, to) {
 
   const municipalRate = defaultJurisdiction ? Number(defaultJurisdiction.municipal_rate) || 0 : 0;
   const municipalTax = round2(grossSales * municipalRate / 100);
-  const totalPosition = round2(vatNet + iibbNet + municipalTax);
+  const totalPosition = round2(vatNet + iibbNet + municipalTax - purchaseLevyTotal);
 
   const alerts = [];
   if (!defaultJurisdiction) {
@@ -508,7 +537,13 @@ async function buildTaxReport(from, to) {
       gross: grossPurchases,
       net: netPurchases,
       vat: inputVat,
+      levies: purchaseLevyTotal,
       count: purchases.length,
+    },
+    levies: {
+      rows: levyRows,
+      total: purchaseLevyTotal,
+      count: levyRows.length,
     },
     vat: {
       output: outputVat,
