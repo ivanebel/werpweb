@@ -228,7 +228,7 @@ try {
     item_product_id: [String(productId)],
     item_description: ['Levy test line'],
     item_quantity: ['1'],
-    item_unit_price: ['121'],
+    item_unit_price: ['100'],
     item_tax_rate: ['21'],
     levy_id: [String(levyA), String(levyB)],
     levy_percentage: [String(percentA), String(percentB)],

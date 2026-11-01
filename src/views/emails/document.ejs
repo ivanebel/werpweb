@@ -112,21 +112,23 @@
                   <tr style="background:#f9fafb;">
                     <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Item') %></th>
                     <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Qty') %></th>
-                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Unit price') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= doc.isInvoice ? t('Unit price (net)') : t('Unit price') %></th>
                     <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('VAT') %></th>
+                    <% if (doc.isInvoice) { %><th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Net price') %></th><% } %>
                     <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Amount') %></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <% items.forEach((item) => { %>
+                  <% items.forEach((item) => { const itemTax = Number(item.tax_rate) || 0; const itemNetUnit = doc.isInvoice && itemTax > 0 ? Number(item.unit_price) / (1 + itemTax / 100) : Number(item.unit_price); const itemNetTotal = doc.isInvoice && itemTax > 0 ? Number(item.line_total) / (1 + itemTax / 100) : Number(item.line_total); %>
                     <tr>
                       <td style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;vertical-align:top;">
                         <div style="font-weight:bold;"><%= item.name %></div>
                         <div style="font-size:11px;color:#98a2b3;"><%= item.sku %><%= item.customer_code ? ' · ' + t('Customer code') + ': ' + item.customer_code : '' %><%= item.description ? ' · ' + item.description : '' %></div>
                       </td>
                       <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= h.formatQty(item.quantity) %> <span style="font-size:11px;color:#98a2b3;"><%= item.unit || '' %></span></td>
-                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= money(item.unit_price) %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= money(doc.isInvoice ? itemNetUnit : item.unit_price) %></td>
                       <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
+                      <% if (doc.isInvoice) { %><td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= money(itemNetTotal) %></td><% } %>
                       <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;vertical-align:top;"><%= money(item.line_total) %></td>
                     </tr>
                   <% }) %>

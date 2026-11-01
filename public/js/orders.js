@@ -18,6 +18,7 @@
   const levyTemplate = document.getElementById('levy-template');
   const currency = form.getAttribute('data-currency') || 'USD';
   const defaultTax = Number(form.getAttribute('data-default-tax') || 0);
+  const netPrices = form.getAttribute('data-net-prices') === '1';
   const partySelect = document.getElementById('party_id');
   const warehouseSelect = document.getElementById('customer_warehouse_id');
   const warehouseLink = document.getElementById('warehouse-manage-link');
@@ -253,11 +254,17 @@
     const qty = Number(row.querySelector('[data-qty]')?.value || 0);
     const price = Number(row.querySelector('input[data-price]')?.value || 0);
     const tax = Number(row.querySelector('[data-tax]')?.value || 0);
-    const base = qty * price;
+    const net = qty * price;
+    const grossUnit = netPrices && tax ? price * (1 + tax / 100) : price;
+    const gross = netPrices ? net * (1 + tax / 100) : net;
+    const grossInput = row.querySelector('[data-price-gross]');
+    if (grossInput) grossInput.value = grossUnit.toFixed(2);
+    const netCell = row.querySelector('[data-net-total]');
+    if (netCell) netCell.textContent = fmt(net);
     const line = row.querySelector('[data-line-total]');
-    if (line) line.textContent = fmt(base);
+    if (line) line.textContent = fmt(gross);
     const taxHint = row.querySelector('[data-tax-hint]');
-    if (taxHint) taxHint.textContent = tqty(base, tax);
+    if (taxHint) taxHint.textContent = tqty(net, tax, netPrices);
   }
 
   function includedTax(base, tax) {
@@ -265,10 +272,11 @@
     return base * (tax / (100 + tax));
   }
 
-  function tqty(base, tax) {
+  function tqty(base, tax, netBase = false) {
     if (!tax) return '';
     const template = messages.taxIncluded || 'incl. {amount} VAT';
-    return template.replace('{amount}', fmt(includedTax(base, tax)));
+    const vat = netBase ? base * (tax / 100) : includedTax(base, tax);
+    return template.replace('{amount}', fmt(vat));
   }
 
   function recalcAll() {
@@ -278,9 +286,10 @@
       const qty = Number(row.querySelector('[data-qty]')?.value || 0);
       const price = Number(row.querySelector('input[data-price]')?.value || 0);
       const tax = Number(row.querySelector('[data-tax]')?.value || 0);
-      const base = qty * price;
-      subtotal += base;
-      taxTotal += includedTax(base, tax);
+      const net = qty * price;
+      const gross = netPrices ? net * (1 + tax / 100) : net;
+      subtotal += gross;
+      taxTotal += netPrices ? net * (tax / 100) : includedTax(net, tax);
       recalcRow(row);
     });
     const discount = Math.min(Number(document.getElementById('discount_total')?.value || 0), subtotal);
@@ -419,16 +428,21 @@
     if (!select) return;
     const row = select.closest('[data-line]');
     const option = select.selectedOptions[0];
+    const tax = row.querySelector('[data-tax]');
+    const optionTax = option && option.dataset.taxRate !== undefined
+      ? Number(option.dataset.taxRate || 0)
+      : Number(tax?.value || 0);
+    if (option && option.dataset.taxRate !== undefined && tax) {
+      tax.value = optionTax.toFixed(2);
+    }
     if (option && option.dataset.price !== undefined) {
       const price = row.querySelector('input[data-price]');
-      if (price) price.value = Number(option.dataset.price || 0).toFixed(2);
+      const grossPrice = Number(option.dataset.price || 0);
+      const displayPrice = netPrices && optionTax ? grossPrice / (1 + optionTax / 100) : grossPrice;
+      if (price) price.value = displayPrice.toFixed(2);
     }
     const unit = row.querySelector('[data-unit]');
     if (unit) unit.textContent = option?.dataset.productUnit || '';
-    if (option && option.dataset.taxRate !== undefined) {
-      const tax = row.querySelector('[data-tax]');
-      if (tax) tax.value = Number(option.dataset.taxRate || 0).toFixed(2);
-    }
     const desc = row.querySelector('[data-description]');
     if (desc && !desc.value && option?.dataset.name) desc.value = option.dataset.name;
     updateCustomerCode(row);

@@ -56,6 +56,7 @@ function parseItems(body, config, defaultTaxRate) {
   const descriptions = arr(body.item_description);
   const quantities = arr(body.item_quantity);
   const prices = arr(body.item_unit_price);
+  const grossPrices = arr(body.item_unit_price_gross);
   const taxes = arr(body.item_tax_rate);
   const items = [];
 
@@ -63,16 +64,31 @@ function parseItems(body, config, defaultTaxRate) {
     const productId = Number.parseInt(ids[i], 10);
     if (!productId) continue;
     const quantity = toNumber(quantities[i], 0);
-    const unitPrice = toNumber(prices[i], 0);
+    const enteredPrice = toNumber(prices[i], 0);
     const taxRate = taxes[i] === undefined || taxes[i] === '' ? Number(defaultTaxRate || 0) : toNumber(taxes[i], 0);
     if (quantity <= 0) continue;
+    let grossUnitPrice = enteredPrice;
+    let netUnitPrice = enteredPrice;
+    if (config.isInvoice) {
+      const postedGross = grossPrices[i];
+      if (postedGross !== undefined && String(postedGross).trim() !== '') {
+        grossUnitPrice = toNumber(postedGross, 0);
+        netUnitPrice = taxRate > 0 ? grossUnitPrice / (1 + taxRate / 100) : grossUnitPrice;
+      } else {
+        netUnitPrice = enteredPrice;
+        grossUnitPrice = taxRate > 0 ? netUnitPrice * (1 + taxRate / 100) : netUnitPrice;
+      }
+    } else if (taxRate > 0) {
+      netUnitPrice = grossUnitPrice / (1 + taxRate / 100);
+    }
     items.push({
       product_id: productId,
       description: String(descriptions[i] || '').slice(0, 255) || null,
       quantity,
-      unit_price: round2(unitPrice),
+      unit_price: round2(grossUnitPrice),
+      net_unit_price: round2(netUnitPrice),
       tax_rate: taxRate,
-      line_total: round2(quantity * unitPrice),
+      line_total: round2(quantity * grossUnitPrice),
     });
   }
   return items;
