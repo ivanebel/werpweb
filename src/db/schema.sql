@@ -336,6 +336,9 @@ CREATE TABLE IF NOT EXISTS material_classes (
   allow_mix   TINYINT(1) NOT NULL DEFAULT 1,
   cost_method ENUM('priority','average','lowest','highest') NOT NULL DEFAULT 'priority',
   status      ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  is_bottom_film TINYINT(1) NOT NULL DEFAULT 0,
+  is_top_film    TINYINT(1) NOT NULL DEFAULT 0,
+  coil_quantity  DECIMAL(14,3) NOT NULL DEFAULT 0,
   notes       VARCHAR(500) NULL,
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -378,6 +381,24 @@ CREATE TABLE IF NOT EXISTS machines (
   UNIQUE KEY uq_machines_name (name),
   KEY idx_machines_type (machine_type),
   KEY idx_machines_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS production_lines (
+  id                        INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code                      VARCHAR(30) NOT NULL,
+  name                      VARCHAR(80) NOT NULL,
+  thermoformer_machine_id   INT UNSIGNED NULL,
+  status                    ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  sort_order                INT NOT NULL DEFAULT 0,
+  created_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_production_lines_code (code),
+  UNIQUE KEY uq_production_lines_name (name),
+  KEY idx_production_lines_thermoformer (thermoformer_machine_id),
+  KEY idx_production_lines_status (status),
+  CONSTRAINT fk_production_lines_thermoformer FOREIGN KEY (thermoformer_machine_id)
+    REFERENCES machines (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS boms (
@@ -1467,6 +1488,125 @@ CREATE TABLE IF NOT EXISTS production_order_materials (
     REFERENCES material_classes (id) ON DELETE SET NULL,
   CONSTRAINT fk_pom_component FOREIGN KEY (component_id)
     REFERENCES products (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS production_line_runs (
+  id                        INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  production_line_id        INT UNSIGNED NOT NULL,
+  production_order_id       INT UNSIGNED NOT NULL,
+  production_order_line_id  INT UNSIGNED NOT NULL,
+  status                    ENUM('setup','running','paused','closed') NOT NULL DEFAULT 'setup',
+  raw_material_class_id     INT UNSIGNED NULL,
+  raw_material_product_id   INT UNSIGNED NULL,
+  raw_lot_number            VARCHAR(60) NULL,
+  raw_expiry_date           DATE NULL,
+  portioning_machine_1_id   INT UNSIGNED NULL,
+  portioning_machine_2_id   INT UNSIGNED NULL,
+  started_at                DATETIME NULL,
+  paused_at                 DATETIME NULL,
+  ended_at                  DATETIME NULL,
+  created_by                INT UNSIGNED NULL,
+  created_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at                TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_plr_line_status (production_line_id, status),
+  KEY idx_plr_order (production_order_id),
+  KEY idx_plr_order_line (production_order_line_id),
+  KEY idx_plr_raw_class (raw_material_class_id),
+  KEY idx_plr_raw_product (raw_material_product_id),
+  KEY idx_plr_machine1 (portioning_machine_1_id),
+  KEY idx_plr_machine2 (portioning_machine_2_id),
+  CONSTRAINT fk_plr_line FOREIGN KEY (production_line_id)
+    REFERENCES production_lines (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_plr_order FOREIGN KEY (production_order_id)
+    REFERENCES production_orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_plr_order_line FOREIGN KEY (production_order_line_id)
+    REFERENCES production_order_lines (id) ON DELETE CASCADE,
+  CONSTRAINT fk_plr_raw_class FOREIGN KEY (raw_material_class_id)
+    REFERENCES material_classes (id) ON DELETE SET NULL,
+  CONSTRAINT fk_plr_raw_product FOREIGN KEY (raw_material_product_id)
+    REFERENCES products (id) ON DELETE SET NULL,
+  CONSTRAINT fk_plr_machine1 FOREIGN KEY (portioning_machine_1_id)
+    REFERENCES machines (id) ON DELETE SET NULL,
+  CONSTRAINT fk_plr_machine2 FOREIGN KEY (portioning_machine_2_id)
+    REFERENCES machines (id) ON DELETE SET NULL,
+  CONSTRAINT fk_plr_user FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS production_line_films (
+  id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  run_id             INT UNSIGNED NOT NULL,
+  side               ENUM('bottom','top') NOT NULL,
+  material_class_id  INT UNSIGNED NOT NULL,
+  product_id         INT UNSIGNED NOT NULL,
+  coil_quantity      DECIMAL(14,3) NOT NULL DEFAULT 0,
+  lot_number         VARCHAR(60) NULL,
+  expiry_date        DATE NULL,
+  loaded_at          DATETIME NULL,
+  removed_at         DATETIME NULL,
+  returned_quantity  DECIMAL(14,3) NULL,
+  created_by         INT UNSIGNED NULL,
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_plf_run (run_id),
+  KEY idx_plf_product (product_id),
+  CONSTRAINT fk_plf_run FOREIGN KEY (run_id)
+    REFERENCES production_line_runs (id) ON DELETE CASCADE,
+  CONSTRAINT fk_plf_class FOREIGN KEY (material_class_id)
+    REFERENCES material_classes (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_plf_product FOREIGN KEY (product_id)
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_plf_user FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS production_line_inputs (
+  id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  run_id             INT UNSIGNED NOT NULL,
+  production_line_id INT UNSIGNED NOT NULL,
+  input_type         ENUM('raw_material','film_bottom','film_top','film_return','adjustment') NOT NULL,
+  product_id         INT UNSIGNED NOT NULL,
+  material_class_id  INT UNSIGNED NULL,
+  requirement_id     INT UNSIGNED NULL,
+  film_id            INT UNSIGNED NULL,
+  reverses_input_id  INT UNSIGNED NULL,
+  quantity           DECIMAL(14,3) NOT NULL DEFAULT 0,
+  unit               VARCHAR(20) NOT NULL DEFAULT 'unit',
+  pack_units         DECIMAL(14,3) NULL,
+  conversion_factor  DECIMAL(18,6) NULL,
+  class_quantity     DECIMAL(14,3) NULL,
+  lot_number         VARCHAR(60) NULL,
+  expiry_date        DATE NULL,
+  stock_posted       TINYINT(1) NOT NULL DEFAULT 0,
+  stock_movement_id  INT UNSIGNED NULL,
+  notes              VARCHAR(500) NULL,
+  created_by         INT UNSIGNED NULL,
+  created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_pli_run (run_id),
+  KEY idx_pli_line (production_line_id),
+  KEY idx_pli_type (input_type),
+  KEY idx_pli_product (product_id),
+  KEY idx_pli_film (film_id),
+  KEY idx_pli_reverses (reverses_input_id),
+  CONSTRAINT fk_pli_run FOREIGN KEY (run_id)
+    REFERENCES production_line_runs (id) ON DELETE CASCADE,
+  CONSTRAINT fk_pli_line FOREIGN KEY (production_line_id)
+    REFERENCES production_lines (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pli_product FOREIGN KEY (product_id)
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pli_class FOREIGN KEY (material_class_id)
+    REFERENCES material_classes (id) ON DELETE SET NULL,
+  CONSTRAINT fk_pli_requirement FOREIGN KEY (requirement_id)
+    REFERENCES production_order_requirements (id) ON DELETE SET NULL,
+  CONSTRAINT fk_pli_film FOREIGN KEY (film_id)
+    REFERENCES production_line_films (id) ON DELETE SET NULL,
+  CONSTRAINT fk_pli_reverses FOREIGN KEY (reverses_input_id)
+    REFERENCES production_line_inputs (id) ON DELETE SET NULL,
+  CONSTRAINT fk_pli_user FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- One row per item that passed through the Bizerba GLM-e scale/labeler.

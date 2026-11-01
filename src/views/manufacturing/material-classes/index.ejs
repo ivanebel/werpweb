@@ -52,6 +52,13 @@
                   <td class="table-td">
                     <a href="/manufacturing/material-classes/<%= row.id %>/edit" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.name %></a>
                     <p class="font-mono text-xs text-gray-400"><%= row.code %></p>
+                    <% if (Number(row.is_bottom_film) === 1 || Number(row.is_top_film) === 1) { %>
+                      <div class="mt-1 flex flex-wrap gap-1">
+                        <% if (Number(row.is_bottom_film) === 1) { %><span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= t('Bottom film') %></span><% } %>
+                        <% if (Number(row.is_top_film) === 1) { %><span class="badge bg-purple-50 text-purple-700 ring-purple-600/20 dark:bg-purple-500/15 dark:text-purple-400"><%= t('Top film') %></span><% } %>
+                        <span class="text-xs text-gray-400"><%= t('Coil {qty}', { qty: h.formatQty(row.coil_quantity) }) %></span>
+                      </div>
+                    <% } %>
                   </td>
                   <td class="table-td"><%= row.unit %></td>
                   <td class="table-td text-right"><%= row.active_member_count %> / <%= row.member_count %></td>

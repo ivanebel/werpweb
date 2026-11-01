@@ -6,6 +6,10 @@ const STATUS = {
   // generic
   active: { label: 'Active', tone: 'success' },
   inactive: { label: 'Inactive', tone: 'gray' },
+  setup: { label: 'Setup', tone: 'info' },
+  running: { label: 'Running', tone: 'success' },
+  paused: { label: 'Paused', tone: 'warning' },
+  closed: { label: 'Closed', tone: 'gray' },
   archived: { label: 'Archived', tone: 'gray' },
   locked: { label: 'Locked', tone: 'warning' },
   // orders

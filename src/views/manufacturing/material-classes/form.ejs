@@ -89,6 +89,26 @@
               </select>
             </div>
             <div class="md:col-span-2">
+              <label class="form-label"><%= t('Film use') %></label>
+              <div class="flex flex-wrap items-center gap-5 pt-2">
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input name="is_bottom_film" type="checkbox" value="1" class="form-checkbox" <%= Number(row.is_bottom_film) === 1 ? 'checked' : '' %>>
+                  <%= t('Bottom film') %>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input name="is_top_film" type="checkbox" value="1" class="form-checkbox" <%= Number(row.is_top_film) === 1 ? 'checked' : '' %>>
+                  <%= t('Top film') %>
+                </label>
+              </div>
+              <p class="form-help"><%= t('Film classes supply the coils selected in the production floor.') %></p>
+            </div>
+            <div>
+              <label for="class-coil-quantity" class="form-label"><%= t('Standard coil quantity') %></label>
+              <input id="class-coil-quantity" name="coil_quantity" type="number" min="0" step="0.001" value="<%= Number(row.coil_quantity) || 0 %>" class="form-input text-right <%= errors.coil_quantity ? 'form-input-error' : '' %>">
+              <% if (errors.coil_quantity) { %><p class="form-error"><%= errors.coil_quantity %></p><% } %>
+              <p class="form-help"><%= t('One whole coil, in the class unit. Used only for film classes.') %></p>
+            </div>
+            <div class="md:col-span-2">
               <label for="class-notes" class="form-label"><%= t('Notes') %></label>
               <input id="class-notes" name="notes" type="text" maxlength="500" value="<%= row.notes || '' %>" class="form-input" placeholder="<%= t('Optional notes') %>">
             </div>

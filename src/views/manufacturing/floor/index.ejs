@@ -1,0 +1,509 @@
+<%- include('/layouts/head') %>
+<%
+  const order = data ? data.order : null;
+  const lines = data ? data.productionLines : [];
+  const orderLines = data ? data.orderLines : [];
+  const rawMaterials = data ? data.rawMaterials : {};
+  const filmOptions = data ? data.filmOptions : { bottom: [], top: [] };
+  const machines = data ? data.machines : { portioning: [] };
+  const runsByLine = data ? data.runsByLine : new Map();
+  const activeByLine = data ? data.activeByLine : new Map();
+  const typeLabels = {
+    raw_material: t('Raw material'),
+    film_bottom: t('Bottom film'),
+    film_top: t('Top film'),
+    film_return: t('Film return'),
+    adjustment: t('Adjustment'),
+  };
+  function optionLabel(product) {
+    return `${product.name}${product.sku ? ` · ${product.sku}` : ''} · ${t('stock')} ${h.formatQty(product.stock_qty)} ${product.unit || ''}`;
+  }
+%>
+<div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <header class="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+    <div class="flex flex-wrap items-center gap-3 px-4 py-3 md:px-6">
+      <a href="/manufacturing/production-orders" class="btn btn-secondary btn-sm">
+        <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+        <%= t('Exit production floor') %>
+      </a>
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+        <form method="GET" action="/manufacturing/floor" class="flex min-w-[260px] flex-1 items-center gap-2">
+          <label for="floor-order" class="sr-only"><%= t('Production order') %></label>
+          <select id="floor-order" name="order_id" class="form-select" onchange="this.form.submit()">
+            <option value=""><%= t('Select a production order') %></option>
+            <% orders.forEach((item) => { %>
+              <option value="<%= item.id %>" <%= Number(orderId) === Number(item.id) ? 'selected' : '' %>>
+                <%= item.production_no %> · <%= item.customer_name || item.order_no || t('No customer') %> · <%= item.status === 'in_progress' ? t('In progress') : t('Released') %>
+              </option>
+            <% }) %>
+          </select>
+        </form>
+        <% if (order) { %>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span class="font-semibold text-gray-900 dark:text-white"><%= order.production_no %></span>
+            <span class="text-gray-500 dark:text-gray-400"><%= order.customer_name || '—' %></span>
+            <% if (order.order_no) { %><span class="text-gray-400"><%= t('Sales order') %> <span class="font-mono"><%= order.order_no %></span></span><% } %>
+            <span class="text-gray-400"><%= t('Start') %> <%= h.formatDate(order.start_date) %></span>
+            <span class="text-gray-400"><%= t('Due') %> <%= h.formatDate(order.due_date) %></span>
+            <%- statusBadge(order.status) %>
+          </div>
+        <% } %>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="hidden text-xs font-medium uppercase tracking-wide text-gray-400 sm:block"><%= t('Order progress') %></span>
+        <div class="flex h-3 w-32 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800" title="<%= t('Progress will be read from the labeling machine in a later phase.') %>">
+          <span class="h-full w-0 bg-brand-500"></span>
+        </div>
+        <span class="text-sm font-semibold text-gray-400">—</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="p-4 md:p-6">
+    <div class="mx-auto max-w-[1700px]">
+      <% if (!order) { %>
+        <div class="card mx-auto mt-12 max-w-2xl p-8 text-center">
+          <span class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            <%- include('/partials/icon', { name: 'factory', className: 'h-7 w-7' }) %>
+          </span>
+          <h1 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white"><%= t('Select a production order to start') %></h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Choose a released or in-progress production order at the top of the page.') %></p>
+          <% if (!orders.length) { %>
+            <p class="mt-4 text-sm text-warning-600 dark:text-warning-400"><%= t('There are no released production orders yet.') %></p>
+          <% } %>
+        </div>
+      <% } else { %>
+        <% if (!lines.length) { %>
+          <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+            <%= t('No active production lines are configured. Ask an administrator to configure the production lines.') %>
+          </div>
+        <% } %>
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <% lines.forEach((line) => {
+            const run = runsByLine.get(line.id) || null;
+            const otherRun = activeByLine.get(line.id) || null;
+            const blockedByOtherOrder = otherRun && Number(otherRun.production_order_id) !== Number(order.id);
+            const locked = run && run.status !== 'setup';
+            const selectedOrderLine = run ? orderLines.find((item) => Number(item.id) === Number(run.production_order_line_id)) : null;
+            const rawClass = run && rawMaterials[String(run.production_order_line_id)]
+              ? rawMaterials[String(run.production_order_line_id)].find((item) => Number(item.id) === Number(run.raw_material_class_id))
+              : null;
+            const rawProduct = rawClass && rawClass.products.find((item) => Number(item.product_id) === Number(run.raw_material_product_id));
+            const bottomFilm = run ? run.films.find((film) => film.side === 'bottom') : null;
+            const topFilm = run ? run.films.find((film) => film.side === 'top') : null;
+            const actionUrl = `/manufacturing/floor/lines/${line.id}`;
+          %>
+            <section class="card overflow-hidden border-gray-300 dark:border-gray-700">
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-brand-500 px-5 py-4 dark:border-brand-400">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white"><%= line.name %></h2>
+                    <% if (run) { %><%- statusBadge(run.status) %><% } else { %><span class="badge bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"><%= t('Idle') %></span><% } %>
+                  </div>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <%= line.thermoformer_name ? `${t('Thermoformer')}: ${line.thermoformer_name}` : t('No thermoformer assigned') %>
+                  </p>
+                </div>
+                <% if (run) { %>
+                  <div class="text-right text-xs text-gray-500 dark:text-gray-400">
+                    <p class="font-medium text-gray-700 dark:text-gray-300"><%= run.product_name %></p>
+                    <p><%= run.product_sku %> · <%= h.formatQty(run.order_line_quantity) %> <%= run.product_unit %></p>
+                    <% if (run.product_lot) { %><p class="font-mono"><%= t('Lot') %> <%= run.product_lot %><% if (run.product_expiry) { %> · <%= t('Expiry') %> <%= h.formatDate(run.product_expiry) %><% } %></p><% } %>
+                  </div>
+                <% } %>
+              </div>
+
+              <% if (blockedByOtherOrder) { %>
+                <div class="m-5 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+                  <%= t('This line is running production order {number}. End that run before using it for this order.', { number: otherRun.production_no }) %>
+                  <a href="/manufacturing/floor?order_id=<%= otherRun.production_order_id %>" class="link ml-1"><%= t('Open that order') %></a>
+                </div>
+              <% } else if (!run || !locked) { %>
+                <form method="POST" action="<%= actionUrl %>/setup" class="p-5" data-floor-setup data-line="<%= line.id %>">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="order_id" value="<%= order.id %>">
+                  <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"><%= t('Line setup') %></h3>
+                    <% if (run) { %><span class="text-xs text-warning-600 dark:text-warning-400"><%= t('First input will lock this setup.') %></span><% } %>
+                  </div>
+                  <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div class="lg:col-span-2">
+                      <label class="form-label"><%= t('Product to produce') %> <span class="text-error-500">*</span></label>
+                      <select name="production_order_line_id" class="form-select" data-order-line-select required>
+                        <option value=""><%= t('Select a product') %></option>
+                        <% orderLines.forEach((item) => { %>
+                          <option value="<%= item.id %>" <%= run && Number(run.production_order_line_id) === Number(item.id) ? 'selected' : '' %>>
+                            <%= item.product_name %> · <%= item.sku %> · <%= h.formatQty(item.quantity) %> <%= item.unit %> · <%= item.bom_name %>
+                          </option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label"><%= t('Main raw material') %> <span class="text-error-500">*</span></label>
+                      <select name="raw_material" class="form-select" data-raw-select required>
+                        <option value=""><%= t('Select a raw material') %></option>
+                        <% Object.entries(rawMaterials).forEach(([orderLineId, classes]) => { %>
+                          <% classes.forEach((klass) => { klass.products.forEach((product) => { %>
+                            <option value="<%= klass.id %>:<%= product.product_id %>" data-order-line="<%= orderLineId %>" <%= run && Number(run.raw_material_class_id) === Number(klass.id) && Number(run.raw_material_product_id) === Number(product.product_id) ? 'selected' : '' %>>
+                              <%= klass.name %> — <%= optionLabel(product) %>
+                            </option>
+                          <% }); }); %>
+                        <% }); %>
+                      </select>
+                      <p class="form-help"><%= t('Only non-film material classes from the selected BOM are shown.') %></p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="form-label"><%= t('Raw lot') %></label>
+                        <input name="raw_lot_number" type="text" maxlength="60" value="<%= run ? (run.raw_lot_number || '') : '' %>" class="form-input font-mono text-xs">
+                      </div>
+                      <div>
+                        <label class="form-label"><%= t('Raw expiry') %></label>
+                        <input name="raw_expiry_date" type="date" value="<%= run && run.raw_expiry_date ? String(run.raw_expiry_date).slice(0, 10) : '' %>" class="form-input text-xs">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="form-label"><%= t('Portioning machine 1') %> <span class="text-error-500">*</span></label>
+                      <select name="portioning_machine_1_id" class="form-select" required>
+                        <option value=""><%= t('Select a machine') %></option>
+                        <% machines.portioning.forEach((machine) => { %>
+                          <option value="<%= machine.id %>" <%= run && Number(run.portioning_machine_1_id) === Number(machine.id) ? 'selected' : '' %>><%= machine.name %> — <%= machine.full_name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label"><%= t('Portioning machine 2 (optional)') %></label>
+                      <select name="portioning_machine_2_id" class="form-select">
+                        <option value=""><%= t('None') %></option>
+                        <% machines.portioning.forEach((machine) => { %>
+                          <option value="<%= machine.id %>" <%= run && Number(run.portioning_machine_2_id) === Number(machine.id) ? 'selected' : '' %>><%= machine.name %> — <%= machine.full_name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label"><%= t('Bottom film') %> <span class="text-error-500">*</span></label>
+                      <select name="bottom_film" class="form-select" required>
+                        <option value=""><%= t('Select the bottom film') %></option>
+                        <% filmOptions.bottom.forEach((film) => { %>
+                          <option value="<%= film.class_id %>:<%= film.product_id %>" <%= bottomFilm && Number(bottomFilm.material_class_id) === Number(film.class_id) && Number(bottomFilm.product_id) === Number(film.product_id) ? 'selected' : '' %>>
+                            <%= film.class_name %> — <%= film.product_name %> · <%= t('coil') %> <%= h.formatQty(film.coil_quantity) %> <%= film.class_unit %>
+                          </option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label"><%= t('Top film') %> <span class="text-error-500">*</span></label>
+                      <select name="top_film" class="form-select" required>
+                        <option value=""><%= t('Select the top film') %></option>
+                        <% filmOptions.top.forEach((film) => { %>
+                          <option value="<%= film.class_id %>:<%= film.product_id %>" <%= topFilm && Number(topFilm.material_class_id) === Number(film.class_id) && Number(topFilm.product_id) === Number(film.product_id) ? 'selected' : '' %>>
+                            <%= film.class_name %> — <%= film.product_name %> · <%= t('coil') %> <%= h.formatQty(film.coil_quantity) %> <%= film.class_unit %>
+                          </option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 lg:col-span-2">
+                      <div>
+                        <label class="form-label"><%= t('Bottom film lot') %></label>
+                        <input name="bottom_lot_number" type="text" maxlength="60" value="<%= bottomFilm ? (bottomFilm.lot_number || '') : '' %>" class="form-input font-mono text-xs">
+                      </div>
+                      <div>
+                        <label class="form-label"><%= t('Top film lot') %></label>
+                        <input name="top_lot_number" type="text" maxlength="60" value="<%= topFilm ? (topFilm.lot_number || '') : '' %>" class="form-input font-mono text-xs">
+                      </div>
+                      <div>
+                        <label class="form-label"><%= t('Bottom film expiry') %></label>
+                        <input name="bottom_expiry_date" type="date" value="<%= bottomFilm && bottomFilm.expiry_date ? String(bottomFilm.expiry_date).slice(0, 10) : '' %>" class="form-input text-xs">
+                      </div>
+                      <div>
+                        <label class="form-label"><%= t('Top film expiry') %></label>
+                        <input name="top_expiry_date" type="date" value="<%= topFilm && topFilm.expiry_date ? String(topFilm.expiry_date).slice(0, 10) : '' %>" class="form-input text-xs">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-4 flex justify-end">
+                    <button type="submit" class="btn btn-primary" <%= !line.thermoformer_machine_id ? 'disabled' : '' %>>
+                      <%= t('Save line setup') %>
+                    </button>
+                  </div>
+                  <% if (!line.thermoformer_machine_id) { %>
+                    <p class="mt-2 text-right text-xs text-warning-600 dark:text-warning-400"><%= t('Assign a fixed thermoformer to this line before starting.') %></p>
+                  <% } %>
+                </form>
+              <% } %>
+
+              <% if (run && (locked || run.status === 'setup')) { %>
+                <div class="border-t border-gray-100 p-5 dark:border-gray-800">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400"><%= t('Line setup') %></h3>
+                    <div class="flex flex-wrap gap-2">
+                      <% if (run.status === 'running') { %>
+                        <form method="POST" action="<%= actionUrl %>/status"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="order_id" value="<%= order.id %>"><input type="hidden" name="target" value="pause"><button class="btn btn-secondary btn-sm"><%= t('Pause line') %></button></form>
+                      <% } else if (run.status === 'paused') { %>
+                        <form method="POST" action="<%= actionUrl %>/status"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="order_id" value="<%= order.id %>"><input type="hidden" name="target" value="resume"><button class="btn btn-primary btn-sm"><%= t('Resume line') %></button></form>
+                      <% } %>
+                      <form method="POST" action="<%= actionUrl %>/status" data-confirm="<%= t('End this line run? Setup will remain locked and any loaded film will be closed.') %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="order_id" value="<%= order.id %>"><input type="hidden" name="target" value="end"><button class="btn btn-danger btn-sm"><%= t('End run') %></button></form>
+                    </div>
+                  </div>
+                  <dl class="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div><dt class="text-xs text-gray-400"><%= t('Product') %></dt><dd class="font-medium text-gray-800 dark:text-gray-200"><%= selectedOrderLine ? selectedOrderLine.product_name : '—' %></dd></div>
+                    <div><dt class="text-xs text-gray-400"><%= t('Raw material') %></dt><dd class="font-medium text-gray-800 dark:text-gray-200"><%= rawProduct ? `${rawProduct.name} · ${rawProduct.sku}` : '—' %></dd></div>
+                    <div><dt class="text-xs text-gray-400"><%= t('Portioning machines') %></dt><dd class="font-medium text-gray-800 dark:text-gray-200"><%= [run.machine1_name, run.machine2_name].filter(Boolean).join(' / ') || '—' %></dd></div>
+                    <div><dt class="text-xs text-gray-400"><%= t('Films') %></dt><dd class="font-medium text-gray-800 dark:text-gray-200"><%= [bottomFilm && bottomFilm.product_name, topFilm && topFilm.product_name].filter(Boolean).join(' / ') || '—' %></dd></div>
+                  </dl>
+                  <p class="mt-3 text-xs text-gray-500 dark:text-gray-400"><%= t('Setup is locked after the first input. Pause the line to stop inputs; end the run to change setup.') %></p>
+                </div>
+              <% } %>
+
+              <% if (run) { %>
+                <div class="grid grid-cols-1 gap-0 border-t border-gray-100 dark:border-gray-800 lg:grid-cols-3">
+                  <div class="border-b border-gray-100 p-5 dark:border-gray-800 lg:border-b-0 lg:border-r">
+                    <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= t('Main raw material') %></h3>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= rawProduct ? `${rawProduct.name} · ${rawProduct.sku}` : t('Not configured') %></p>
+                    <% if (rawProduct) { %>
+                      <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><%= t('Stock') %>: <span class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatQty(rawProduct.stock_qty) %> <%= rawProduct.unit %></span> · <%= t('Pack') %>: <span class="font-medium text-gray-700 dark:text-gray-300"><%= rawProduct.units_per_pack > 0 ? `${h.formatQty(rawProduct.units_per_pack)} ${rawProduct.unit}` : t('Not configured') %></span></p>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Lot') %>: <span class="font-mono"><%= run.raw_lot_number || '—' %></span> · <%= t('Expiry') %>: <span><%= run.raw_expiry_date ? h.formatDate(run.raw_expiry_date) : '—' %></span></p>
+                    <% } %>
+                    <div class="mt-4 grid grid-cols-2 gap-2">
+                      <button type="button" class="btn btn-primary btn-sm" data-open-raw="<%= line.id %>" data-mode="unit" data-product="<%= rawProduct ? `${rawProduct.name} · ${rawProduct.sku}` : '' %>" data-unit="<%= rawProduct ? rawProduct.unit : 'unit' %>" data-pack="<%= rawProduct ? rawProduct.units_per_pack : 0 %>" <%= run.status === 'paused' ? 'disabled' : '' %>>+1 <%= t('unit') %></button>
+                      <button type="button" class="btn btn-primary btn-sm" data-open-raw="<%= line.id %>" data-mode="two" data-product="<%= rawProduct ? `${rawProduct.name} · ${rawProduct.sku}` : '' %>" data-unit="<%= rawProduct ? rawProduct.unit : 'unit' %>" data-pack="<%= rawProduct ? rawProduct.units_per_pack : 0 %>" <%= run.status === 'paused' ? 'disabled' : '' %>>+2 <%= t('units') %></button>
+                      <button type="button" class="btn btn-primary btn-sm" data-open-raw="<%= line.id %>" data-mode="pack" data-product="<%= rawProduct ? `${rawProduct.name} · ${rawProduct.sku}` : '' %>" data-unit="<%= rawProduct ? rawProduct.unit : 'unit' %>" data-pack="<%= rawProduct ? rawProduct.units_per_pack : 0 %>" <%= run.status === 'paused' || !rawProduct || !rawProduct.units_per_pack ? 'disabled' : '' %>>+1 <%= t('pack') %></button>
+                      <button type="button" class="btn btn-secondary btn-sm" data-open-undo="<%= line.id %>" <%= run.inputs.some((input) => input.input_type === 'raw_material') ? '' : 'disabled' %>><%= t('Undo last') %></button>
+                    </div>
+                    <form id="raw-input-<%= line.id %>" method="POST" action="<%= actionUrl %>/input" class="hidden">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="order_id" value="<%= order.id %>">
+                      <input type="hidden" name="input_type" value="raw_material">
+                      <input type="hidden" name="quantity_mode" value="unit" data-raw-mode>
+                      <input type="hidden" name="lot_number" value="<%= run.raw_lot_number || '' %>" data-raw-lot>
+                      <input type="hidden" name="expiry_date" value="<%= run.raw_expiry_date ? String(run.raw_expiry_date).slice(0, 10) : '' %>" data-raw-expiry>
+                    </form>
+                    <form id="undo-input-<%= line.id %>" method="POST" action="<%= actionUrl %>/undo" class="hidden">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input type="hidden" name="order_id" value="<%= order.id %>">
+                    </form>
+                  </div>
+
+                  <div class="border-b border-gray-100 p-5 dark:border-gray-800 lg:border-b-0 lg:border-r">
+                    <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= t('Films') %></h3>
+                    <% [['bottom', bottomFilm, 'Bottom film', 'film_bottom'], ['top', topFilm, 'Top film', 'film_top']].forEach(([side, film, label, type]) => { %>
+                      <div class="mt-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                        <div class="flex items-start justify-between gap-2">
+                          <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><%= t(label) %></p>
+                            <p class="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200"><%= film ? film.product_name : t('Not configured') %></p>
+                            <% if (film) { %>
+                              <p class="text-xs text-gray-500 dark:text-gray-400"><%= t('Coil') %> <%= h.formatQty(film.coil_quantity) %> <%= film.product_unit %> · <%= film.loaded_at ? t('Loaded') : t('Not loaded') %></p>
+                              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Lot') %> <span class="font-mono"><%= film.lot_number || '—' %></span></p>
+                            <% } %>
+                          </div>
+                          <% if (film && !film.loaded_at) { %>
+                            <button type="button" class="btn btn-primary btn-sm" data-open-film="<%= line.id %>" data-side="<%= side %>" data-type="<%= type %>" <%= run.status === 'paused' ? 'disabled' : '' %>><%= t('Load coil') %></button>
+                          <% } else if (film && film.loaded_at) { %>
+                            <button type="button" class="btn btn-secondary btn-sm" data-open-return="<%= line.id %>" data-side="<%= side %>" data-max="<%= film.coil_quantity %>"><%= t('Remove coil') %></button>
+                          <% } %>
+                        </div>
+                        <form id="film-input-<%= line.id %>-<%= side %>" method="POST" action="<%= actionUrl %>/input" class="hidden">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <input type="hidden" name="order_id" value="<%= order.id %>">
+                          <input type="hidden" name="input_type" value="<%= type %>">
+                          <input type="hidden" name="lot_number" value="<%= film ? (film.lot_number || '') : '' %>" data-film-lot>
+                          <input type="hidden" name="expiry_date" value="<%= film && film.expiry_date ? String(film.expiry_date).slice(0, 10) : '' %>" data-film-expiry>
+                        </form>
+                        <form id="film-return-<%= line.id %>-<%= side %>" method="POST" action="<%= actionUrl %>/film-return" class="hidden">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <input type="hidden" name="order_id" value="<%= order.id %>">
+                          <input type="hidden" name="side" value="<%= side %>">
+                          <input type="hidden" name="returned_quantity" value="0" data-return-quantity>
+                        </form>
+                      </div>
+                    <% }) %>
+                  </div>
+
+                  <div class="p-5">
+                    <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= t('Recent inputs') %></h3>
+                    <div class="mt-2 space-y-2">
+                      <% run.inputs.slice(0, 8).forEach((input) => { %>
+                        <div class="flex items-start justify-between gap-2 border-b border-gray-100 pb-2 text-xs last:border-0 dark:border-gray-800">
+                          <div>
+                            <p class="font-medium text-gray-700 dark:text-gray-300"><%= typeLabels[input.input_type] || input.input_type %> · <%= input.product_name %></p>
+                            <p class="text-gray-400"><%= input.user_name || '—' %> · <%= h.formatDate(input.created_at) %><% if (input.lot_number) { %> · <span class="font-mono"><%= input.lot_number %></span><% } %></p>
+                          </div>
+                          <span class="shrink-0 font-mono font-semibold <%= Number(input.quantity) < 0 ? 'text-error-600 dark:text-error-400' : 'text-gray-700 dark:text-gray-300' %>"><%= Number(input.quantity) > 0 ? '+' : '' %><%= h.formatQty(input.quantity) %> <%= input.unit %></span>
+                        </div>
+                      <% }) %>
+                      <% if (!run.inputs.length) { %><p class="text-xs text-gray-400"><%= t('No inputs recorded yet.') %></p><% } %>
+                    </div>
+                  </div>
+                </div>
+              <% } %>
+            </section>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </main>
+
+<dialog id="raw-dialog" class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-gray-900/60 dark:border-gray-700 dark:bg-gray-900">
+  <form method="dialog" class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white"><%= t('Confirm raw material input') %></h2>
+      <button type="submit" class="btn-icon" aria-label="<%= t('Close') %>"><%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %></button>
+    </div>
+    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Review the quantity and lot before recording it.') %></p>
+    <div class="mt-4 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800/60">
+      <p class="font-medium text-gray-800 dark:text-gray-200" data-dialog-product>—</p>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Quantity') %>: <span class="font-semibold" data-dialog-quantity>—</span></p>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Stock will be updated in the next phase.') %></p>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-3">
+      <div><label class="form-label"><%= t('Lot number') %></label><input class="form-input font-mono text-xs" data-dialog-lot></div>
+      <div><label class="form-label"><%= t('Expiry date') %></label><input type="date" class="form-input text-xs" data-dialog-expiry></div>
+    </div>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="submit" class="btn btn-secondary"><%= t('Cancel') %></button>
+      <button type="button" class="btn btn-primary" data-confirm-raw><%= t('Confirm input') %></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="film-dialog" class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-gray-900/60 dark:border-gray-700 dark:bg-gray-900">
+  <form method="dialog" class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white"><%= t('Confirm film coil') %></h2>
+      <button type="submit" class="btn-icon" aria-label="<%= t('Close') %>"><%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %></button>
+    </div>
+    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400" data-film-dialog-text>—</p>
+    <div class="mt-4 grid grid-cols-2 gap-3">
+      <div><label class="form-label"><%= t('Lot number') %></label><input class="form-input font-mono text-xs" data-film-dialog-lot></div>
+      <div><label class="form-label"><%= t('Expiry date') %></label><input type="date" class="form-input text-xs" data-film-dialog-expiry></div>
+    </div>
+    <p class="mt-2 text-xs text-gray-400"><%= t('Stock will be updated in the next phase.') %></p>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="submit" class="btn btn-secondary"><%= t('Cancel') %></button>
+      <button type="button" class="btn btn-primary" data-confirm-film><%= t('Confirm coil') %></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="return-dialog" class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-gray-900/60 dark:border-gray-700 dark:bg-gray-900">
+  <form method="dialog" class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="text-base font-semibold text-gray-900 dark:text-white"><%= t('Remove film coil') %></h2>
+      <button type="submit" class="btn-icon" aria-label="<%= t('Close') %>"><%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %></button>
+    </div>
+    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Enter the unused quantity that returns to stock. Use zero if the coil is empty.') %></p>
+    <div class="mt-4"><label class="form-label"><%= t('Returned quantity') %></label><input type="number" min="0" step="0.001" class="form-input text-right" data-return-input></div>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="submit" class="btn btn-secondary"><%= t('Cancel') %></button>
+      <button type="button" class="btn btn-primary" data-confirm-return><%= t('Confirm removal') %></button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  (function () {
+    document.querySelectorAll('[data-floor-setup]').forEach((form) => {
+      const product = form.querySelector('[data-order-line-select]');
+      const raw = form.querySelector('[data-raw-select]');
+      if (!product || !raw) return;
+      const options = [...raw.options];
+      const filter = () => {
+        const selected = options.find((option) => option.selected && !option.disabled && option.value);
+        let hasSelected = false;
+        options.forEach((option) => {
+          if (!option.value) return;
+          const matches = option.dataset.orderLine === product.value;
+          option.hidden = !matches;
+          option.disabled = !matches;
+          if (matches && option === selected) hasSelected = true;
+        });
+        if (!hasSelected) {
+          const first = options.find((option) => option.dataset.orderLine === product.value && option.value);
+          raw.value = first ? first.value : '';
+        }
+      };
+      product.addEventListener('change', filter);
+      filter();
+    });
+
+    const rawDialog = document.getElementById('raw-dialog');
+    const filmDialog = document.getElementById('film-dialog');
+    const returnDialog = document.getElementById('return-dialog');
+    let activeRawLine = null;
+    let activeFilmLine = null;
+    let activeFilmSide = null;
+    let activeReturnLine = null;
+    let activeReturnSide = null;
+
+    document.querySelectorAll('[data-open-raw]').forEach((button) => {
+      button.addEventListener('click', () => {
+        activeRawLine = button.dataset.openRaw;
+        const form = document.getElementById('raw-input-' + activeRawLine);
+        const mode = button.dataset.mode;
+        const unit = button.dataset.unit || 'unit';
+        const pack = Number(button.dataset.pack) || 0;
+        const qty = mode === 'unit' ? 1 : (mode === 'two' ? 2 : pack);
+        rawDialog.querySelector('[data-dialog-quantity]').textContent = `${qty} ${unit}`;
+        rawDialog.querySelector('[data-dialog-product]').textContent = button.dataset.product || '—';
+        rawDialog.querySelector('[data-dialog-lot]').value = form.querySelector('[data-raw-lot]').value;
+        rawDialog.querySelector('[data-dialog-expiry]').value = form.querySelector('[data-raw-expiry]').value;
+        form.querySelector('[data-raw-mode]').value = mode;
+        rawDialog.showModal();
+      });
+    });
+    document.querySelector('[data-confirm-raw]')?.addEventListener('click', () => {
+      const form = document.getElementById('raw-input-' + activeRawLine);
+      form.querySelector('[data-raw-lot]').value = rawDialog.querySelector('[data-dialog-lot]').value;
+      form.querySelector('[data-raw-expiry]').value = rawDialog.querySelector('[data-dialog-expiry]').value;
+      rawDialog.close();
+      form.submit();
+    });
+    document.querySelectorAll('[data-open-undo]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (window.confirm('<%= t('Reverse the last raw material input for this line?') %>')) {
+          document.getElementById('undo-input-' + button.dataset.openUndo).submit();
+        }
+      });
+    });
+    document.querySelectorAll('[data-open-film]').forEach((button) => {
+      button.addEventListener('click', () => {
+        activeFilmLine = button.dataset.openFilm;
+        activeFilmSide = button.dataset.side;
+        const form = document.getElementById('film-input-' + activeFilmLine + '-' + activeFilmSide);
+        filmDialog.querySelector('[data-film-dialog-text]').textContent = button.dataset.side === 'bottom'
+          ? '<%= t('Confirm loading one whole bottom film coil.') %>'
+          : '<%= t('Confirm loading one whole top film coil.') %>';
+        filmDialog.querySelector('[data-film-dialog-lot]').value = form.querySelector('[data-film-lot]').value;
+        filmDialog.querySelector('[data-film-dialog-expiry]').value = form.querySelector('[data-film-expiry]').value;
+        filmDialog.showModal();
+      });
+    });
+    document.querySelector('[data-confirm-film]')?.addEventListener('click', () => {
+      const form = document.getElementById('film-input-' + activeFilmLine + '-' + activeFilmSide);
+      form.querySelector('[data-film-lot]').value = filmDialog.querySelector('[data-film-dialog-lot]').value;
+      form.querySelector('[data-film-expiry]').value = filmDialog.querySelector('[data-film-dialog-expiry]').value;
+      filmDialog.close();
+      form.submit();
+    });
+    document.querySelectorAll('[data-open-return]').forEach((button) => {
+      button.addEventListener('click', () => {
+        activeReturnLine = button.dataset.openReturn;
+        activeReturnSide = button.dataset.side;
+        const max = Number(button.dataset.max) || 0;
+        const input = returnDialog.querySelector('[data-return-input]');
+        input.max = max;
+        input.value = max;
+        returnDialog.showModal();
+      });
+    });
+    document.querySelector('[data-confirm-return]')?.addEventListener('click', () => {
+      const form = document.getElementById('film-return-' + activeReturnLine + '-' + activeReturnSide);
+      form.querySelector('[data-return-quantity]').value = returnDialog.querySelector('[data-return-input]').value || 0;
+      returnDialog.close();
+      form.submit();
+    });
+  })();
+</script>
+
+<%- include('/layouts/footer') %>

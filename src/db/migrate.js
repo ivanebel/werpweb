@@ -382,6 +382,14 @@ async function upgradeSchema(conn, dbName) {
     'CHECK ((`component_id` IS NULL) <> (`material_class_id` IS NULL))',
   );
 
+  await addColumn(conn, dbName, 'material_classes', 'is_bottom_film', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER status');
+  await addColumn(conn, dbName, 'material_classes', 'is_top_film', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER is_bottom_film');
+  await addColumn(conn, dbName, 'material_classes', 'coil_quantity', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER is_top_film');
+  await conn.query(
+    `INSERT IGNORE INTO production_lines (code, name, status, sort_order)
+     VALUES ('LINE-1', 'Line 1', 'active', 1), ('LINE-2', 'Line 2', 'active', 2)`,
+  );
+
   await addColumn(conn, dbName, 'production_order_materials', 'requirement_id', 'INT UNSIGNED NULL AFTER production_order_id');
   await addColumn(conn, dbName, 'production_order_materials', 'material_class_id', 'INT UNSIGNED NULL AFTER requirement_id');
   await addColumn(conn, dbName, 'production_order_materials', 'priority', 'INT NOT NULL DEFAULT 0 AFTER source_count');

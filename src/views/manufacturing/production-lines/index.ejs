@@ -1,0 +1,85 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1100px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Production lines') %></h1>
+          <p class="page-subtitle"><%= t('Assign the fixed thermoformer to each physical production line.') %></p>
+        </div>
+        <a href="/manufacturing/floor" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-right', className: 'h-4 w-4' }) %>
+          <%= t('Open production floor') %>
+        </a>
+      </div>
+
+      <% if (!thermoformers.length) { %>
+        <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+          <p class="font-semibold"><%= t('No thermoforming machines yet.') %></p>
+          <p class="mt-1"><%= t('Register the thermoformers under Manufacturing → Machines before assigning them to production lines.') %></p>
+          <a href="/manufacturing/machines" class="link mt-2 inline-block"><%= t('Open machines') %></a>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/manufacturing/production-lines" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Fixed line configuration') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Thermoformers are fixed to a line. Portioning machines are assigned while running an order.') %></p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[760px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Line') %></th>
+                <th class="table-th"><%= t('Thermoformer') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% lines.forEach((line) => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <input type="hidden" name="line_id" value="<%= line.id %>">
+                    <p class="font-medium text-gray-900 dark:text-white/90"><%= line.name %></p>
+                    <p class="font-mono text-xs text-gray-400"><%= line.code %></p>
+                  </td>
+                  <td class="table-td">
+                    <select name="thermoformer_machine_id" class="form-select">
+                      <option value=""><%= t('Not assigned') %></option>
+                      <% thermoformers.forEach((machine) => { %>
+                        <option value="<%= machine.id %>" <%= Number(line.thermoformer_machine_id) === Number(machine.id) ? 'selected' : '' %>>
+                          <%= machine.name %> — <%= machine.full_name %><%= machine.status !== 'active' ? ` (${t('Inactive')})` : '' %>
+                        </option>
+                      <% }) %>
+                    </select>
+                    <% if (line.thermoformer_name) { %>
+                      <p class="form-help"><%= t('Currently assigned to {name}.', { name: line.thermoformer_name }) %></p>
+                    <% } %>
+                  </td>
+                  <td class="table-td">
+                    <select name="line_status" class="form-select">
+                      <option value="active" <%= line.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+                      <option value="inactive" <%= line.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+                    </select>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!lines.length) { %>
+                <tr><td colspan="3" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No production lines configured.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex justify-end border-t border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">
+          <button type="submit" class="btn btn-primary"><%= t('Save changes') %></button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -6,6 +6,7 @@ const { nextNumber } = require('../lib/sequences');
 const { pagination, todayISO, addDaysISO, lotFromDate, toNumber, statusInfo, formatMoney } = require('../lib/helpers');
 const { snapshotMaterials, completeProductionOrder } = require('../lib/production');
 const materials = require('../lib/materials');
+const productionFloor = require('../lib/productionFloor');
 const { requireRole } = require('../middleware/web');
 
 const round3 = materials.round3;
@@ -228,6 +229,9 @@ function materialClassDefaults() {
     allow_mix: 1,
     cost_method: 'priority',
     status: 'active',
+    is_bottom_film: 0,
+    is_top_film: 0,
+    coil_quantity: 0,
     notes: '',
     members: [{ product_id: '', priority: 100, conversion_factor: 1, status: 'active', notes: '' }],
   };
@@ -290,6 +294,9 @@ function validateMaterialClass(body, req) {
     allow_mix: body.allow_mix === '1' || body.allow_mix === 'on' || body.allow_mix === 'true' ? 1 : 0,
     cost_method: ['priority', 'average', 'lowest', 'highest'].includes(body.cost_method) ? body.cost_method : 'priority',
     status: body.status === 'inactive' ? 'inactive' : 'active',
+    is_bottom_film: body.is_bottom_film === '1' || body.is_bottom_film === 'on' ? 1 : 0,
+    is_top_film: body.is_top_film === '1' || body.is_top_film === 'on' ? 1 : 0,
+    coil_quantity: toNumber(body.coil_quantity, 0),
     notes: String(body.notes || '').trim().slice(0, 500) || null,
   };
   const errors = {};
@@ -299,6 +306,9 @@ function validateMaterialClass(body, req) {
   if (!values.name) errors.name = req.t('Name is required.');
   else if (values.name.length > 150) errors.name = req.t('Name must be 150 characters or fewer.');
   if (!values.unit) errors.unit = req.t('Unit is required.');
+  if ((values.is_bottom_film || values.is_top_film) && values.coil_quantity <= 0) {
+    errors.coil_quantity = req.t('Enter a coil quantity greater than zero for a film material class.');
+  }
   return { values, errors };
 }
 
@@ -404,9 +414,13 @@ router.post('/material-classes', manageMaterials, async (req, res, next) => {
     }
     const id = await withTransaction(async (conn) => {
       const [result] = await conn.query(
-        `INSERT INTO material_classes (code, name, unit, allow_mix, cost_method, status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [values.code, values.name, values.unit, values.allow_mix, values.cost_method, values.status, values.notes],
+        `INSERT INTO material_classes
+           (code, name, unit, allow_mix, cost_method, status, is_bottom_film, is_top_film, coil_quantity, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          values.code, values.name, values.unit, values.allow_mix, values.cost_method, values.status,
+          values.is_bottom_film, values.is_top_film, values.coil_quantity, values.notes,
+        ],
       );
       for (const member of membersResult.rows) {
         await conn.query(
@@ -464,9 +478,13 @@ router.post('/material-classes/:id(\\d+)', manageMaterials, async (req, res, nex
     await withTransaction(async (conn) => {
       await conn.query(
         `UPDATE material_classes
-            SET code = ?, name = ?, unit = ?, allow_mix = ?, cost_method = ?, status = ?, notes = ?
+            SET code = ?, name = ?, unit = ?, allow_mix = ?, cost_method = ?, status = ?,
+                is_bottom_film = ?, is_top_film = ?, coil_quantity = ?, notes = ?
           WHERE id = ?`,
-        [values.code, values.name, values.unit, values.allow_mix, values.cost_method, values.status, values.notes, existing.id],
+        [
+          values.code, values.name, values.unit, values.allow_mix, values.cost_method, values.status,
+          values.is_bottom_film, values.is_top_film, values.coil_quantity, values.notes, existing.id,
+        ],
       );
       await conn.query('DELETE FROM material_class_members WHERE class_id = ?', [existing.id]);
       for (const member of membersResult.rows) {
@@ -1309,6 +1327,9 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
       ));
 
     const actions = [];
+    if (['released', 'in_progress'].includes(order.status)) {
+      actions.push({ href: `/manufacturing/floor?order_id=${order.id}`, label: req.t('Open production floor'), tone: 'primary' });
+    }
     if (order.status === 'planned') {
       actions.push({ action: 'status', value: 'released', label: req.t('Release to production'), tone: 'primary' });
       actions.push({ href: `/manufacturing/production-orders/${order.id}/edit`, label: req.t('Edit'), tone: 'secondary' });
@@ -1875,6 +1896,692 @@ router.post('/production-orders/:id(\\d+)/delete', async (req, res, next) => {
   }
 });
 
+
+// ------------------------------------------------------------ production lines
+router.get('/production-lines', manageMaterials, async (req, res, next) => {
+  try {
+    const [lines, thermoformers] = await Promise.all([
+      query(
+        `SELECT pl.*, m.name AS thermoformer_name, m.full_name AS thermoformer_full_name,
+                m.status AS thermoformer_status
+           FROM production_lines pl
+           LEFT JOIN machines m ON m.id = pl.thermoformer_machine_id
+          ORDER BY pl.sort_order, pl.id`,
+      ),
+      query(
+        `SELECT id, name, full_name, serial_number, status
+           FROM machines
+          WHERE machine_type = 'thermoforming'
+          ORDER BY status = 'active' DESC, name`,
+      ),
+    ]);
+    res.render('manufacturing/production-lines/index', {
+      title: req.t('Production lines'),
+      active: 'manufacturing-production-lines',
+      breadcrumbs: [{ label: req.t('Manufacturing') }, { label: req.t('Production lines') }],
+      lines,
+      thermoformers,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/production-lines', manageMaterials, async (req, res, next) => {
+  try {
+    const lineIds = arr(req.body.line_id);
+    const machineIds = arr(req.body.thermoformer_machine_id);
+    const statuses = arr(req.body.line_status);
+    const selectedMachines = new Map();
+    const errors = [];
+    for (let i = 0; i < lineIds.length; i += 1) {
+      const lineId = Number.parseInt(lineIds[i], 10);
+      if (!lineId) continue;
+      const machineId = Number.parseInt(machineIds[i], 10);
+      const status = statuses[i] === 'inactive' ? 'inactive' : 'active';
+      if (machineId) {
+        if (selectedMachines.has(machineId)) {
+          errors.push(req.t('The same thermoformer cannot be assigned to both production lines.'));
+        } else {
+          selectedMachines.set(machineId, lineId);
+        }
+      }
+      const line = await one('SELECT id FROM production_lines WHERE id = ? LIMIT 1', [lineId]);
+      if (!line) errors.push(req.t('Production line not found.'));
+    }
+    const machineList = [...selectedMachines.keys()];
+    if (machineList.length) {
+      const placeholders = machineList.map(() => '?').join(',');
+      const rows = await query(
+        `SELECT id FROM machines WHERE id IN (${placeholders}) AND machine_type = 'thermoforming'`,
+        machineList,
+      );
+      if (rows.length !== machineList.length) {
+        errors.push(req.t('Select only thermoforming machines for production lines.'));
+      }
+    }
+    if (errors.length) {
+      req.flash('error', errors[0]);
+      return res.redirect('/manufacturing/production-lines');
+    }
+    await withTransaction(async (conn) => {
+      for (let i = 0; i < lineIds.length; i += 1) {
+        const lineId = Number.parseInt(lineIds[i], 10);
+        if (!lineId) continue;
+        const machineId = Number.parseInt(machineIds[i], 10) || null;
+        const status = statuses[i] === 'inactive' ? 'inactive' : 'active';
+        await conn.query(
+          `UPDATE production_lines
+              SET thermoformer_machine_id = ?, status = ?
+            WHERE id = ?`,
+          [machineId, status, lineId],
+        );
+      }
+    });
+    req.flash('success', 'Production lines updated.');
+    return res.redirect('/manufacturing/production-lines');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------------------------------------------------ production floor
+function floorDate(value) {
+  const raw = String(value || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const date = new Date(`${raw}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === raw ? raw : null;
+}
+
+async function findActiveRunForLine(lineId) {
+  return one(
+    `SELECT r.*, pl.name AS line_name
+       FROM production_line_runs r
+       JOIN production_lines pl ON pl.id = r.production_line_id
+      WHERE r.production_line_id = ? AND r.status <> 'closed'
+      ORDER BY r.id DESC LIMIT 1`,
+    [lineId],
+  );
+}
+
+async function findRunForOrderLine(lineId, orderId) {
+  return one(
+    `SELECT * FROM production_line_runs
+      WHERE production_line_id = ? AND production_order_id = ? AND status <> 'closed'
+      ORDER BY id DESC LIMIT 1`,
+    [lineId, orderId],
+  );
+}
+
+async function validateFloorProduct(orderLineId, orderId) {
+  return one(
+    `SELECT l.*, p.name AS product_name, p.sku, p.unit
+       FROM production_order_lines l
+       JOIN products p ON p.id = l.product_id
+      WHERE l.id = ? AND l.production_order_id = ? LIMIT 1`,
+    [orderLineId, orderId],
+  );
+}
+
+async function validateFloorRawMaterial(orderLine, value, t = (text) => text) {
+  const parsed = productionFloor.pair(value);
+  if (!parsed) return { error: t('Select a raw material.') };
+  const classRow = await one(
+    `SELECT mc.*
+       FROM bom_items bi
+       JOIN material_classes mc ON mc.id = bi.material_class_id
+      WHERE bi.bom_id = ? AND mc.id = ? AND mc.status = 'active'
+        AND mc.is_bottom_film = 0 AND mc.is_top_film = 0
+      LIMIT 1`,
+    [orderLine.bom_id, parsed.classId],
+  );
+  if (!classRow) return { error: t('Select a material class from the selected BOM.') };
+  const member = await one(
+    `SELECT mcm.*, p.name AS product_name, p.sku, p.unit, p.stock_qty, p.units_per_pack
+       FROM material_class_members mcm
+       JOIN products p ON p.id = mcm.product_id
+      WHERE mcm.class_id = ? AND mcm.product_id = ? AND mcm.status = 'active'
+      LIMIT 1`,
+    [parsed.classId, parsed.productId],
+  );
+  if (!member) return { error: t('Select an active member of the material class.') };
+  return { classRow, member, parsed };
+}
+
+async function validateFloorFilm(side, value, t = (text) => text) {
+  const parsed = productionFloor.pair(value);
+  if (!parsed) {
+    return { error: t(side === 'bottom' ? 'Select the bottom film.' : 'Select the top film.') };
+  }
+  const classRow = await one(
+    `SELECT * FROM material_classes
+      WHERE id = ? AND status = 'active' AND ${side === 'bottom' ? 'is_bottom_film' : 'is_top_film'} = 1
+      LIMIT 1`,
+    [parsed.classId],
+  );
+  if (!classRow) {
+    return { error: t(side === 'bottom' ? 'Select a valid bottom film class.' : 'Select a valid top film class.') };
+  }
+  if (Number(classRow.coil_quantity) <= 0) {
+    return {
+      error: t(side === 'bottom'
+        ? 'The bottom film class needs a standard coil quantity.'
+        : 'The top film class needs a standard coil quantity.'),
+    };
+  }
+  const member = await one(
+    `SELECT mcm.*, p.name AS product_name, p.sku, p.unit, p.stock_qty, p.units_per_pack
+       FROM material_class_members mcm
+       JOIN products p ON p.id = mcm.product_id
+      WHERE mcm.class_id = ? AND mcm.product_id = ? AND mcm.status = 'active'
+      LIMIT 1`,
+    [parsed.classId, parsed.productId],
+  );
+  if (!member) {
+    return { error: t(side === 'bottom' ? 'Select an active bottom film product.' : 'Select an active top film product.') };
+  }
+  return { classRow, member, parsed };
+}
+
+async function floorRedirect(req, orderId) {
+  return `/manufacturing/floor?order_id=${orderId}`;
+}
+
+router.get('/floor', async (req, res, next) => {
+  try {
+    const orderId = Number.parseInt(req.query.order_id, 10) || 0;
+    const orders = await productionFloor.loadOrderOptions();
+    let data = null;
+    if (orderId) {
+      data = await productionFloor.loadFloorData(orderId);
+      if (!data) {
+        req.flash('error', 'Production order not found.');
+        return res.redirect('/manufacturing/floor');
+      }
+    }
+    res.render('manufacturing/floor/index', {
+      title: req.t('Production floor'),
+      active: 'manufacturing-floor',
+      breadcrumbs: [{ label: req.t('Manufacturing') }, { label: req.t('Production floor') }],
+      orders,
+      orderId,
+      data,
+      progressPlaceholder: true,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/floor/lines/:lineId(\\d+)/setup', async (req, res, next) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const orderId = Number.parseInt(req.body.order_id, 10);
+    const line = await one('SELECT * FROM production_lines WHERE id = ? LIMIT 1', [lineId]);
+    const order = await one('SELECT * FROM production_orders WHERE id = ? LIMIT 1', [orderId]);
+    if (!line || !order) {
+      req.flash('error', 'Production line or order not found.');
+      return res.redirect('/manufacturing/floor');
+    }
+    if (!line.thermoformer_machine_id) {
+      req.flash('error', 'Assign a fixed thermoformer to this production line before saving setup.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    if (!['released', 'in_progress'].includes(order.status)) {
+      req.flash('error', 'Production orders must be released or in progress.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const active = await findActiveRunForLine(lineId);
+    if (active && Number(active.production_order_id) !== orderId) {
+      req.flash('error', 'This line is already running another production order. End that run first.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    if (active && active.status !== 'setup') {
+      req.flash('error', 'The line setup is locked after the first input. Pause and end the run to change it.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const orderLine = await validateFloorProduct(Number.parseInt(req.body.production_order_line_id, 10), orderId);
+    if (!orderLine) {
+      req.flash('error', 'Select a product from the production order.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const raw = await validateFloorRawMaterial(orderLine, req.body.raw_material, req.t);
+    if (raw.error) {
+      req.flash('error', raw.error);
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const machine1Id = Number.parseInt(req.body.portioning_machine_1_id, 10) || 0;
+    const machine2Id = Number.parseInt(req.body.portioning_machine_2_id, 10) || 0;
+    if (!machine1Id) {
+      req.flash('error', 'Select at least one portioning machine for the line.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    if (machine1Id && machine2Id && machine1Id === machine2Id) {
+      req.flash('error', 'The two portioning machines must be different.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const machineIds = [machine1Id, machine2Id].filter(Boolean);
+    const machinePlaceholders = machineIds.map(() => '?').join(',');
+    const machineRows = await query(
+      `SELECT id FROM machines
+        WHERE id IN (${machinePlaceholders}) AND machine_type = 'portioning' AND status = 'active'`,
+      machineIds,
+    );
+    if (machineRows.length !== machineIds.length) {
+      req.flash('error', 'Select active portioning machines.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const conflict = await one(
+      `SELECT r.id
+         FROM production_line_runs r
+        WHERE r.status <> 'closed' AND r.production_line_id <> ?
+          AND (r.portioning_machine_1_id IN (${machinePlaceholders})
+               OR r.portioning_machine_2_id IN (${machinePlaceholders}))
+        LIMIT 1`,
+      [lineId, ...machineIds, ...machineIds],
+    );
+    if (conflict) {
+      req.flash('error', 'One of these portioning machines is assigned to the other line.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const bottom = await validateFloorFilm('bottom', req.body.bottom_film, req.t);
+    const top = await validateFloorFilm('top', req.body.top_film, req.t);
+    if (bottom.error || top.error) {
+      req.flash('error', bottom.error || top.error);
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    if (active) {
+      const loaded = await one(
+        `SELECT id, side FROM production_line_films
+          WHERE run_id = ? AND removed_at IS NULL AND loaded_at IS NOT NULL LIMIT 1`,
+        [active.id],
+      );
+      if (loaded) {
+        req.flash('error', 'Remove the loaded film coil before changing the film setup.');
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+    }
+
+    await withTransaction(async (conn) => {
+      let runId = active ? active.id : null;
+      if (runId) {
+        await conn.query(
+          `UPDATE production_line_runs
+              SET production_order_line_id = ?, raw_material_class_id = ?,
+                  raw_material_product_id = ?, raw_lot_number = ?, raw_expiry_date = ?,
+                  portioning_machine_1_id = ?, portioning_machine_2_id = ?
+            WHERE id = ?`,
+          [
+            orderLine.id,
+            raw.parsed.classId,
+            raw.parsed.productId,
+            String(req.body.raw_lot_number || '').trim().slice(0, 60) || null,
+            floorDate(req.body.raw_expiry_date),
+            machine1Id,
+            machine2Id || null,
+            runId,
+          ],
+        );
+      } else {
+        const [result] = await conn.query(
+          `INSERT INTO production_line_runs
+             (production_line_id, production_order_id, production_order_line_id, status,
+              raw_material_class_id, raw_material_product_id, raw_lot_number, raw_expiry_date,
+              portioning_machine_1_id, portioning_machine_2_id, created_by)
+           VALUES (?, ?, ?, 'setup', ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            lineId,
+            orderId,
+            orderLine.id,
+            raw.parsed.classId,
+            raw.parsed.productId,
+            String(req.body.raw_lot_number || '').trim().slice(0, 60) || null,
+            floorDate(req.body.raw_expiry_date),
+            machine1Id,
+            machine2Id || null,
+            req.session.user.id,
+          ],
+        );
+        runId = result.insertId;
+      }
+      for (const [side, film] of [['bottom', bottom], ['top', top]]) {
+        const existing = await one(
+          `SELECT id FROM production_line_films
+            WHERE run_id = ? AND side = ? AND removed_at IS NULL LIMIT 1`,
+          [runId, side],
+        );
+        if (existing) {
+          await conn.query(
+            `UPDATE production_line_films
+                SET material_class_id = ?, product_id = ?, coil_quantity = ?,
+                    lot_number = ?, expiry_date = ?
+              WHERE id = ?`,
+            [
+              film.parsed.classId,
+              film.parsed.productId,
+              film.classRow.coil_quantity,
+              String(req.body[`${side}_lot_number`] || '').trim().slice(0, 60) || null,
+              floorDate(req.body[`${side}_expiry_date`]),
+              existing.id,
+            ],
+          );
+        } else {
+          await conn.query(
+            `INSERT INTO production_line_films
+               (run_id, side, material_class_id, product_id, coil_quantity,
+                lot_number, expiry_date, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              runId,
+              side,
+              film.parsed.classId,
+              film.parsed.productId,
+              film.classRow.coil_quantity,
+              String(req.body[`${side}_lot_number`] || '').trim().slice(0, 60) || null,
+              floorDate(req.body[`${side}_expiry_date`]),
+              req.session.user.id,
+            ],
+          );
+        }
+      }
+    });
+    req.flash('success', 'Line setup saved.');
+    return res.redirect(await floorRedirect(req, orderId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const orderId = Number.parseInt(req.body.order_id, 10);
+    const run = await findRunForOrderLine(lineId, orderId);
+    if (!run) {
+      req.flash('error', 'Save the line setup before adding material.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    if (!['setup', 'running'].includes(run.status)) {
+      req.flash('error', 'Resume the line before adding material.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const type = String(req.body.input_type || 'raw_material');
+    if (type === 'raw_material') {
+      const member = await one(
+        `SELECT mcm.*, p.name, p.sku, p.unit, p.stock_qty, p.units_per_pack
+           FROM material_class_members mcm
+           JOIN products p ON p.id = mcm.product_id
+          WHERE mcm.class_id = ? AND mcm.product_id = ? LIMIT 1`,
+        [run.raw_material_class_id, run.raw_material_product_id],
+      );
+      if (!member) {
+        req.flash('error', 'The selected raw material is no longer available.');
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+      const mode = ['unit', 'two', 'pack'].includes(String(req.body.quantity_mode))
+        ? String(req.body.quantity_mode)
+        : 'unit';
+      const packUnits = Number(member.units_per_pack) || 0;
+      if (mode === 'pack' && packUnits <= 0) {
+        req.flash('error', 'This raw material does not have a pack size configured.');
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+      const quantity = mode === 'pack' ? packUnits : (mode === 'two' ? 2 : 1);
+      const conversionFactor = Number(member.conversion_factor) || 1;
+      const lot = String(req.body.lot_number || '').trim().slice(0, 60) || run.raw_lot_number || null;
+      const expiry = floorDate(req.body.expiry_date) || run.raw_expiry_date;
+      const requirement = await one(
+        `SELECT id FROM production_order_requirements
+          WHERE production_order_id = ? AND material_class_id = ? LIMIT 1`,
+        [orderId, run.raw_material_class_id],
+      );
+      await withTransaction(async (conn) => {
+        await conn.query(
+          `INSERT INTO production_line_inputs
+             (run_id, production_line_id, input_type, product_id, material_class_id,
+              requirement_id, quantity, unit, pack_units, conversion_factor, class_quantity,
+              lot_number, expiry_date, created_by)
+           VALUES (?, ?, 'raw_material', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            run.id,
+            lineId,
+            member.product_id,
+            run.raw_material_class_id,
+            requirement ? requirement.id : null,
+            quantity,
+            member.unit || 'unit',
+            packUnits || null,
+            conversionFactor,
+            productionFloor.round3(quantity * conversionFactor),
+            lot,
+            expiry || null,
+            req.session.user.id,
+          ],
+        );
+        if (lot || expiry) {
+          await conn.query(
+            'UPDATE production_line_runs SET raw_lot_number = ?, raw_expiry_date = ? WHERE id = ?',
+            [lot, expiry || null, run.id],
+          );
+        }
+        await conn.query(
+          `UPDATE production_line_runs
+              SET status = 'running', started_at = COALESCE(started_at, NOW())
+            WHERE id = ?`,
+          [run.id],
+        );
+        await conn.query(
+          "UPDATE production_orders SET status = 'in_progress' WHERE id = ? AND status = 'released'",
+          [orderId],
+        );
+      });
+      req.flash('success', 'Raw material input recorded.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+
+    if (['film_bottom', 'film_top'].includes(type)) {
+      const side = type === 'film_bottom' ? 'bottom' : 'top';
+      const film = await one(
+        `SELECT * FROM production_line_films
+          WHERE run_id = ? AND side = ? AND removed_at IS NULL
+          ORDER BY id DESC LIMIT 1`,
+        [run.id, side],
+      );
+      if (!film) {
+        req.flash(
+          'error',
+          req.t(side === 'bottom'
+            ? 'Select the bottom film in the line setup first.'
+            : 'Select the top film in the line setup first.'),
+        );
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+      if (film.loaded_at) {
+        req.flash(
+          'error',
+          req.t(side === 'bottom'
+            ? 'The bottom film coil is already loaded.'
+            : 'The top film coil is already loaded.'),
+        );
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+      const lot = String(req.body.lot_number || '').trim().slice(0, 60) || film.lot_number || null;
+      const expiry = floorDate(req.body.expiry_date) || film.expiry_date;
+      await withTransaction(async (conn) => {
+        await conn.query(
+          `INSERT INTO production_line_inputs
+             (run_id, production_line_id, input_type, product_id, material_class_id,
+              film_id, quantity, unit, lot_number, expiry_date, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            run.id,
+            lineId,
+            type,
+            film.product_id,
+            film.material_class_id,
+            film.id,
+            film.coil_quantity,
+            'coil',
+            lot,
+            expiry || null,
+            req.session.user.id,
+          ],
+        );
+        await conn.query(
+          'UPDATE production_line_films SET loaded_at = NOW(), returned_quantity = NULL, lot_number = ?, expiry_date = ? WHERE id = ?',
+          [lot, expiry || null, film.id],
+        );
+        await conn.query(
+          `UPDATE production_line_runs
+              SET status = 'running', started_at = COALESCE(started_at, NOW())
+            WHERE id = ?`,
+          [run.id],
+        );
+        await conn.query(
+          "UPDATE production_orders SET status = 'in_progress' WHERE id = ? AND status = 'released'",
+          [orderId],
+        );
+      });
+      req.flash('success', req.t(side === 'bottom' ? 'Bottom film coil loaded.' : 'Top film coil loaded.'));
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+
+    req.flash('error', 'Unknown input type.');
+    return res.redirect(await floorRedirect(req, orderId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/floor/lines/:lineId(\\d+)/film-return', async (req, res, next) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const orderId = Number.parseInt(req.body.order_id, 10);
+    const side = req.body.side === 'top' ? 'top' : 'bottom';
+    const run = await findRunForOrderLine(lineId, orderId);
+    if (!run) return res.redirect(await floorRedirect(req, orderId));
+    const film = await one(
+      `SELECT * FROM production_line_films
+        WHERE run_id = ? AND side = ? AND removed_at IS NULL AND loaded_at IS NOT NULL
+        ORDER BY id DESC LIMIT 1`,
+      [run.id, side],
+    );
+    if (!film) {
+      req.flash('error', 'No loaded film coil was found.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const returned = Math.min(
+      Math.max(toNumber(req.body.returned_quantity, 0), 0),
+      Number(film.coil_quantity) || 0,
+    );
+    await withTransaction(async (conn) => {
+      await conn.query(
+        `INSERT INTO production_line_inputs
+           (run_id, production_line_id, input_type, product_id, material_class_id,
+            film_id, quantity, unit, notes, created_by)
+         VALUES (?, ?, 'film_return', ?, ?, ?, ?, 'coil', ?, ?)`,
+        [
+          run.id,
+          lineId,
+          film.product_id,
+          film.material_class_id,
+          film.id,
+          returned,
+          'Film coil removed from line',
+          req.session.user.id,
+        ],
+      );
+      await conn.query(
+        'UPDATE production_line_films SET loaded_at = NULL, removed_at = NULL, returned_quantity = ? WHERE id = ?',
+        [returned, film.id],
+      );
+    });
+    req.flash('success', 'Film coil removed. Returned quantity recorded.');
+    return res.redirect(await floorRedirect(req, orderId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/floor/lines/:lineId(\\d+)/undo', async (req, res, next) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const orderId = Number.parseInt(req.body.order_id, 10);
+    const run = await findRunForOrderLine(lineId, orderId);
+    if (!run) return res.redirect(await floorRedirect(req, orderId));
+    const last = await one(
+      `SELECT i.* FROM production_line_inputs i
+        WHERE i.run_id = ? AND i.input_type = 'raw_material'
+          AND NOT EXISTS (
+            SELECT 1 FROM production_line_inputs x WHERE x.reverses_input_id = i.id
+          )
+        ORDER BY i.id DESC LIMIT 1`,
+      [run.id],
+    );
+    if (!last) {
+      req.flash('error', 'There is no raw material input to undo.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    await getPool().query(
+      `INSERT INTO production_line_inputs
+         (run_id, production_line_id, input_type, product_id, material_class_id,
+          requirement_id, reverses_input_id, quantity, unit, pack_units, conversion_factor,
+          class_quantity, lot_number, expiry_date, notes, created_by)
+       VALUES (?, ?, 'adjustment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        run.id,
+        lineId,
+        last.product_id,
+        last.material_class_id,
+        last.requirement_id,
+        last.id,
+        -Number(last.quantity),
+        last.unit,
+        last.pack_units,
+        last.conversion_factor,
+        -Number(last.class_quantity || 0),
+        last.lot_number,
+        last.expiry_date,
+        'Reversal of line input',
+        req.session.user.id,
+      ],
+    );
+    req.flash('success', 'Last raw material input reversed.');
+    return res.redirect(await floorRedirect(req, orderId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/floor/lines/:lineId(\\d+)/status', async (req, res, next) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const orderId = Number.parseInt(req.body.order_id, 10);
+    const target = String(req.body.target || '');
+    const run = await findRunForOrderLine(lineId, orderId);
+    if (!run) return res.redirect(await floorRedirect(req, orderId));
+    if (target === 'pause' && ['setup', 'running'].includes(run.status)) {
+      await getPool().query("UPDATE production_line_runs SET status = 'paused', paused_at = NOW() WHERE id = ?", [run.id]);
+    } else if (target === 'resume' && run.status === 'paused') {
+      await getPool().query("UPDATE production_line_runs SET status = 'running', paused_at = NULL WHERE id = ?", [run.id]);
+    } else if (target === 'end' && run.status !== 'closed') {
+      await withTransaction(async (conn) => {
+        await conn.query(
+          "UPDATE production_line_films SET removed_at = NOW(), returned_quantity = 0 WHERE run_id = ? AND removed_at IS NULL",
+          [run.id],
+        );
+        await conn.query("UPDATE production_line_runs SET status = 'closed', ended_at = NOW() WHERE id = ?", [run.id]);
+      });
+    } else {
+      req.flash('error', 'That line status change is not allowed.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    req.flash('success', 'Line status updated.');
+    return res.redirect(await floorRedirect(req, orderId));
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ------------------------------------------------------------------ machines
 router.get('/machines', async (req, res, next) => {
