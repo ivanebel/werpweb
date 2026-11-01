@@ -493,7 +493,7 @@
         const max = Number(button.dataset.max) || 0;
         const input = returnDialog.querySelector('[data-return-input]');
         input.max = max;
-        input.value = max;
+        input.value = 0;
         returnDialog.showModal();
       });
     });

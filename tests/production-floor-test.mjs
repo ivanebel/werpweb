@@ -36,7 +36,7 @@ let bomId = 0;
 let classIds = [];
 let line1Id = 0;
 let line2Id = 0;
-const originalThermoformers = new Map();
+const testLineIds = [];
 
 function absorb(res) {
   for (const cookie of res.headers.getSetCookie()) {
@@ -120,10 +120,8 @@ async function cleanup() {
     if (bomId) await q('DELETE FROM boms WHERE id = ?', [bomId]);
     if (classIds.length) await q(`DELETE FROM material_classes WHERE id IN (${classIds.map(() => '?').join(',')})`, classIds);
     if (created.products.length) await q(`DELETE FROM products WHERE id IN (${created.products.map(() => '?').join(',')})`, created.products);
+    if (testLineIds.length) await q(`DELETE FROM production_lines WHERE id IN (${testLineIds.map(() => '?').join(',')})`, testLineIds);
     if (created.machines.length) await q(`DELETE FROM machines WHERE id IN (${created.machines.map(() => '?').join(',')})`, created.machines);
-    for (const [lineId, machineId] of originalThermoformers.entries()) {
-      await q('UPDATE production_lines SET thermoformer_machine_id = ? WHERE id = ?', [machineId, lineId]);
-    }
   } catch (error) {
     console.log('CLEANUP WARNING', error.message);
   }
@@ -192,12 +190,19 @@ try {
   const p4 = await insertMachine(`QA P4 ${suffix}`, 'portioning');
   const t1 = await insertMachine(`QA T1 ${suffix}`, 'thermoforming');
   const t2 = await insertMachine(`QA T2 ${suffix}`, 'thermoforming');
-  const lineRows = await q("SELECT id, code, thermoformer_machine_id FROM production_lines WHERE code IN ('LINE-1','LINE-2') ORDER BY code");
-  for (const row of lineRows) originalThermoformers.set(Number(row.id), row.thermoformer_machine_id || null);
-  line1Id = lineRows.find((row) => row.code === 'LINE-1').id;
-  line2Id = lineRows.find((row) => row.code === 'LINE-2').id;
-  await q('UPDATE production_lines SET thermoformer_machine_id = ? WHERE id = ?', [t1, line1Id]);
-  await q('UPDATE production_lines SET thermoformer_machine_id = ? WHERE id = ?', [t2, line2Id]);
+  const [testLine1] = await db.query(
+    `INSERT INTO production_lines (code, name, thermoformer_machine_id, status, sort_order)
+     VALUES (?, ?, ?, 'active', 980)`,
+    [`QA-L1-${suffix}`.slice(0, 30), `QA Line 1 ${suffix}`.slice(0, 80), t1],
+  );
+  const [testLine2] = await db.query(
+    `INSERT INTO production_lines (code, name, thermoformer_machine_id, status, sort_order)
+     VALUES (?, ?, ?, 'active', 981)`,
+    [`QA-L2-${suffix}`.slice(0, 30), `QA Line 2 ${suffix}`.slice(0, 80), t2],
+  );
+  line1Id = testLine1.insertId;
+  line2Id = testLine2.insertId;
+  testLineIds.push(line1Id, line2Id);
   await db.query('INSERT INTO production_order_requirements (production_order_id, material_class_id, unit, quantity_required, quantity_allocated, quantity_consumed, shortage_qty, source_count, sort_order) VALUES (?, ?, "kg", 100, 100, 0, 0, 1, 0)', [orderId, mainClass]);
   ok('test production data created', Boolean(orderId && bomId && classIds.length));
 
