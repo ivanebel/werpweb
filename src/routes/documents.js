@@ -124,7 +124,8 @@ async function loadLevyOptions(includeIds = []) {
   const includeSql = ids.length ? ` OR id IN (${ids.map(() => '?').join(',')})` : '';
   return query(
     `SELECT * FROM tax_levies
-      WHERE levy_type = 'levy' AND (status = 'active'${includeSql})
+      WHERE levy_type = 'levy'
+        AND ((status = 'active' AND (expiry_date IS NULL OR expiry_date >= CURDATE()))${includeSql})
       ORDER BY code, name`,
     ids,
   );
