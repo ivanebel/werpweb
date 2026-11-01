@@ -3437,6 +3437,22 @@ const ES = {
   'Total levies': 'Total percepciones',
   'Levies': 'Percepciones',
   'Purchase levies': 'Percepciones de compra',
+  'Other purchase levies': 'Otras percepciones de compra',
+  'Tax affected': 'Impuesto afectado',
+  'IIBB levies reduce the matching jurisdiction in the tax report.':
+    'Las percepciones de IIBB reducen la jurisdicción correspondiente en el reporte de impuestos.',
+  'Required for IIBB levies so the credit is applied to the correct jurisdiction.':
+    'Obligatorio para percepciones de IIBB para imputar el crédito a la jurisdicción correcta.',
+  'Select the jurisdiction for an IIBB levy.': 'Seleccioná la jurisdicción para una percepción de IIBB.',
+  'Select a valid jurisdiction.': 'Seleccioná una jurisdicción válida.',
+  'Levies recorded on purchase invoices in this period. IIBB levies reduce the matching jurisdiction; other levies reduce the overall position.':
+    'Percepciones registradas en facturas de compra del período. Las de IIBB reducen la jurisdicción correspondiente; las demás reducen la posición general.',
+  'The IIBB tax base is net sales without VAT. Each jurisdiction applies its Convenio Multilateral coefficient and IIBB rate. Perceptions, IIBB levies and withholdings are credited by jurisdiction.':
+    'La base de IIBB son las ventas netas sin IVA. Cada jurisdicción aplica su coeficiente de Convenio Multilateral y su alícuota de IIBB. Las percepciones, percepciones de IIBB y retenciones se acreditan por jurisdicción.',
+  'IIBB uses the Convenio Multilateral coefficients agreed for the fiscal year. The total IIBB tax base is net sales without VAT; each jurisdiction base is the total base times its coefficient, then multiplied by the jurisdiction IIBB rate. IIBB perceptions, IIBB levies linked to purchase invoices and IIBB withholdings classified from customer payments reduce the jurisdiction balance.':
+    'Ingresos Brutos usa los coeficientes de Convenio Multilateral acordados para el año fiscal. La base total son las ventas netas sin IVA; la base de cada jurisdicción es la base total por su coeficiente, luego multiplicada por la alícuota de IIBB de la jurisdicción. Las percepciones de IIBB, las percepciones de IIBB vinculadas a facturas de compra y las retenciones de IIBB clasificadas en cobros a clientes reducen el saldo de la jurisdicción.',
+  'VAT credits are input VAT. IIBB credits are perceptions, IIBB levies and IIBB withholdings. Other purchase levies are shown separately as prepaid taxes.':
+    'Los créditos de IVA son el IVA de compras. Los créditos de IIBB son percepciones, percepciones de IIBB y retenciones de IIBB. Las otras percepciones de compra se muestran por separado como impuestos pagados por adelantado.',
   'Levies recorded on purchase invoices in this period. They are treated as prepaid taxes.':
     'Percepciones registradas en facturas de compra del período. Se tratan como impuestos pagados por adelantado.',
   'Total purchase levies': 'Total de percepciones de compra',

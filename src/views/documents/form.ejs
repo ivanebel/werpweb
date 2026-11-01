@@ -400,7 +400,7 @@
                           <option value=""><%= t('Select a levy') %></option>
                           <% levyOptionList.forEach((option) => { %>
                             <option value="<%= option.id %>" data-percentage="<%= option.default_percentage %>" <%= Number(levy.levy_id) === Number(option.id) ? 'selected' : '' %>>
-                              <%= option.code %> — <%= option.name %><% if (option.expiry_date) { %> · <%= t('Expires') %> <%= h.formatDate(option.expiry_date) %><% } %>
+                              <%= option.code %> — <%= option.name %><% if (option.jurisdiction_name) { %> · <%= option.jurisdiction_name %><% } %><% if (option.expiry_date) { %> · <%= t('Expires') %> <%= h.formatDate(option.expiry_date) %><% } %>
                             </option>
                           <% }) %>
                         </select>
@@ -435,7 +435,7 @@
                 <select name="levy_id[]" data-levy-select class="form-select">
                   <option value=""><%= t('Select a levy') %></option>
                   <% levyOptionList.forEach((option) => { %>
-                    <option value="<%= option.id %>" data-percentage="<%= option.default_percentage %>"><%= option.code %> — <%= option.name %><% if (option.expiry_date) { %> · <%= t('Expires') %> <%= h.formatDate(option.expiry_date) %><% } %></option>
+                    <option value="<%= option.id %>" data-percentage="<%= option.default_percentage %>"><%= option.code %> — <%= option.name %><% if (option.jurisdiction_name) { %> · <%= option.jurisdiction_name %><% } %><% if (option.expiry_date) { %> · <%= t('Expires') %> <%= h.formatDate(option.expiry_date) %><% } %></option>
                   <% }) %>
                 </select>
               </td>

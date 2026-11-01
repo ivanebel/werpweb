@@ -1,5 +1,8 @@
 <%- include('/layouts/head') %>
 <%- include('/layouts/sidebar') %>
+<%
+  const taxTypeLabel = (value) => (taxTypes.find((item) => item.value === value) || { label: value || 'Other' }).label;
+%>
 <div class="flex min-h-screen flex-col lg:pl-[290px]">
   <%- include('/layouts/header') %>
   <main class="flex-1 p-4 md:p-6">
@@ -47,6 +50,7 @@
                   <td class="table-td font-mono text-sm font-medium text-gray-900 dark:text-white/90"><%= row.code %></td>
                   <td class="table-td">
                     <p class="font-medium text-gray-900 dark:text-white/90"><%= row.name %></p>
+                    <p class="mt-0.5 text-xs text-gray-400"><%= taxTypeLabel(row.tax_type) %><% if (row.jurisdiction_name) { %> · <%= row.jurisdiction_name %><% } %></p>
                     <% if (row.notes) { %><p class="mt-0.5 text-xs text-gray-400"><%= row.notes %></p><% } %>
                   </td>
                   <td class="table-td">

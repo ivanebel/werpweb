@@ -145,6 +145,7 @@ function buildIibbRows({
   coefficients = new Map(),
   perceptions,
   withholdings,
+  levies = new Map(),
 }) {
   const rows = new Map();
   const defaultId = defaultJurisdiction ? Number(defaultJurisdiction.id) : null;
@@ -164,6 +165,7 @@ function buildIibbRows({
         calculated: 0,
         perceptions: 0,
         withholdings: 0,
+        levies: 0,
         net: 0,
         is_default: id !== null && id === defaultId,
       });
@@ -174,7 +176,7 @@ function buildIibbRows({
   for (const jurisdiction of jurisdictions || []) {
     const id = Number(jurisdiction.id);
     const isActive = jurisdiction.status === 'active';
-    const hasActivity = perceptions.has(id) || withholdings.has(id);
+    const hasActivity = perceptions.has(id) || withholdings.has(id) || levies.has(id);
     if (!isActive && !hasActivity) continue;
     const hasAnnual = isActive && coefficients.has(id);
     const coefficient = isActive
@@ -206,9 +208,20 @@ function buildIibbRows({
     row.withholdings = round2(row.withholdings + amount);
   }
 
+  for (const [key, amount] of levies.entries()) {
+    if (key === null || key === undefined) {
+      ensure(null);
+    } else {
+      const jurisdiction = (jurisdictions || []).find((item) => Number(item.id) === Number(key));
+      ensure(jurisdiction || { id: Number(key), code: '', name: '' });
+    }
+    const row = rows.get(key === null || key === undefined ? 'unassigned' : String(key));
+    row.levies = round2(row.levies + amount);
+  }
+
   const result = [...rows.values()].map((row) => ({
     ...row,
-    net: round2(row.calculated - row.perceptions - row.withholdings),
+    net: round2(row.calculated - row.perceptions - row.withholdings - row.levies),
   }));
   result.sort((a, b) => {
     if (a.is_default !== b.is_default) return a.is_default ? -1 : 1;
@@ -318,7 +331,8 @@ async function loadPerceptions(from, to) {
 
 async function loadPurchaseLevies(from, to) {
   return query(
-    `SELECT l.id, l.invoice_id, l.levy_id, l.code, l.name, l.percentage, l.base_amount, l.amount,
+    `SELECT l.id, l.invoice_id, l.levy_id, l.code, l.name, l.tax_type, l.jurisdiction_id,
+            l.jurisdiction_code, l.jurisdiction_name, l.percentage, l.base_amount, l.amount,
             i.bill_no AS number, i.invoice_date AS date,
             fdt.name AS document_type_name, s.company_name AS party_name
        FROM purchase_invoice_levies l
@@ -384,7 +398,23 @@ async function buildTaxReport(from, to) {
       signed_amount: round2(Number(row.amount) * sign),
     };
   });
-  const purchaseLevyTotal = round2(levyRows.reduce((sum, row) => sum + row.signed_amount, 0));
+  const levyByJurisdiction = new Map();
+  let iibbLevyTotal = 0;
+  let otherLevyTotal = 0;
+  for (const row of levyRows) {
+    const isIibb = row.tax_type === 'iibb' && row.jurisdiction_id;
+    if (isIibb) {
+      const jurisdictionId = Number(row.jurisdiction_id);
+      levyByJurisdiction.set(
+        jurisdictionId,
+        round2((levyByJurisdiction.get(jurisdictionId) || 0) + row.signed_amount),
+      );
+      iibbLevyTotal = round2(iibbLevyTotal + row.signed_amount);
+    } else {
+      otherLevyTotal = round2(otherLevyTotal + row.signed_amount);
+    }
+  }
+  const purchaseLevyTotal = round2(iibbLevyTotal + otherLevyTotal);
 
   const grossSales = round2(sales.reduce((sum, invoice) => sum + invoice.gross, 0));
   const netSales = round2(sales.reduce((sum, invoice) => sum + invoice.net, 0));
@@ -452,6 +482,7 @@ async function buildTaxReport(from, to) {
     coefficients: annualCoefficients,
     perceptions: perceptionByJurisdiction,
     withholdings: withholdingByJurisdiction,
+    levies: levyByJurisdiction,
   });
   const activeJurisdictions = jurisdictions.filter((row) => row.status === 'active');
   const effectiveCoefficient = (jurisdiction) => (
@@ -476,11 +507,12 @@ async function buildTaxReport(from, to) {
   const iibbCalculated = round2(iibbRows.reduce((sum, row) => sum + row.calculated, 0));
   const iibbPerceptions = round2(iibbRows.reduce((sum, row) => sum + row.perceptions, 0));
   const iibbWithholdings = round2(iibbRows.reduce((sum, row) => sum + row.withholdings, 0));
+  const iibbLevies = round2(iibbRows.reduce((sum, row) => sum + row.levies, 0));
   const iibbNet = round2(iibbRows.reduce((sum, row) => sum + row.net, 0));
 
   const municipalRate = defaultJurisdiction ? Number(defaultJurisdiction.municipal_rate) || 0 : 0;
   const municipalTax = round2(grossSales * municipalRate / 100);
-  const totalPosition = round2(vatNet + iibbNet + municipalTax - purchaseLevyTotal);
+  const totalPosition = round2(vatNet + iibbNet + municipalTax - otherLevyTotal);
 
   const alerts = [];
   if (!defaultJurisdiction) {
@@ -543,6 +575,8 @@ async function buildTaxReport(from, to) {
     levies: {
       rows: levyRows,
       total: purchaseLevyTotal,
+      iibb: iibbLevyTotal,
+      other: otherLevyTotal,
       count: levyRows.length,
     },
     vat: {
@@ -598,6 +632,7 @@ async function buildTaxReport(from, to) {
       calculated: iibbCalculated,
       perceptions: iibbPerceptions,
       withholdings: iibbWithholdings,
+      levies: iibbLevies,
       net: iibbNet,
       payable: Math.max(0, iibbNet),
       credit: Math.max(0, round2(-iibbNet)),

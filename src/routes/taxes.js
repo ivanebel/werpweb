@@ -29,12 +29,22 @@ function moneyFor(req, res) {
 
 const LEVY_TYPES = ['levy', 'withholding'];
 const LEVY_STATUSES = ['active', 'inactive'];
+const LEVY_TAX_TYPES = [
+  { value: 'iibb', label: 'IIBB (Ingresos Brutos)' },
+  { value: 'vat', label: 'VAT / IVA' },
+  { value: 'income', label: 'Income tax (Ganancias)' },
+  { value: 'municipal', label: 'Municipal tax' },
+  { value: 'other', label: 'Other' },
+];
+const LEVY_TAX_TYPE_VALUES = LEVY_TAX_TYPES.map((item) => item.value);
 
 function levyDefaults() {
   return {
     code: '',
     name: '',
     levy_type: 'levy',
+    tax_type: 'other',
+    jurisdiction_id: '',
     default_percentage: 0,
     notes: '',
     expiry_date: '',
@@ -43,10 +53,13 @@ function levyDefaults() {
 }
 
 function normalizeLevy(body) {
+  const jurisdictionId = Number.parseInt(body.jurisdiction_id, 10);
   return {
     code: String(body.code || '').trim().toUpperCase().slice(0, 20),
     name: String(body.name || '').trim().slice(0, 150),
     levy_type: LEVY_TYPES.includes(body.levy_type) ? body.levy_type : 'levy',
+    tax_type: LEVY_TAX_TYPE_VALUES.includes(body.tax_type) ? body.tax_type : 'other',
+    jurisdiction_id: jurisdictionId > 0 ? jurisdictionId : null,
     default_percentage: Number(body.default_percentage) || 0,
     notes: String(body.notes || '').trim().slice(0, 500) || null,
     expiry_date: String(body.expiry_date || '').slice(0, 10) || null,
@@ -66,6 +79,18 @@ function validateLevy(values, req) {
   }
   if (values.expiry_date && (!/^\d{4}-\d{2}-\d{2}$/.test(values.expiry_date) || Number.isNaN(new Date(`${values.expiry_date}T00:00:00Z`).getTime()))) {
     errors.expiry_date = req.t('Enter a valid expiry date.');
+  }
+  if (values.tax_type === 'iibb' && !values.jurisdiction_id) {
+    errors.jurisdiction_id = req.t('Select the jurisdiction for an IIBB levy.');
+  }
+  return errors;
+}
+
+async function validateLevyWithDatabase(values, req) {
+  const errors = validateLevy(values, req);
+  if (values.jurisdiction_id) {
+    const jurisdiction = await one('SELECT id FROM tax_jurisdictions WHERE id = ? LIMIT 1', [values.jurisdiction_id]);
+    if (!jurisdiction) errors.jurisdiction_id = req.t('Select a valid jurisdiction.');
   }
   return errors;
 }
@@ -536,6 +561,7 @@ router.post('/withholdings/:id(\\d+)', async (req, res, next) => {
 
 // ------------------------------------------------------------ levies registry
 async function renderLevyForm(req, res, { status = 200, row = null, errors = {} } = {}) {
+  const jurisdictions = await taxes.loadJurisdictions();
   return res.status(status).render('finance/taxes/levies/form', {
     title: row && row.id ? req.t('Edit levy or withholding') : req.t('New levy or withholding'),
     active: 'finance-taxes',
@@ -546,15 +572,18 @@ async function renderLevyForm(req, res, { status = 200, row = null, errors = {} 
     ],
     row: { ...levyDefaults(), ...(row || {}) },
     errors,
+    jurisdictions,
+    taxTypes: LEVY_TAX_TYPES,
   });
 }
 
 router.get('/levies', manageTaxes, async (req, res, next) => {
   try {
     const rows = await query(
-      `SELECT l.*,
+      `SELECT l.*, j.code AS jurisdiction_code, j.name AS jurisdiction_name,
               (SELECT COUNT(*) FROM purchase_invoice_levies pil WHERE pil.levy_id = l.id) AS usage_count
          FROM tax_levies l
+         LEFT JOIN tax_jurisdictions j ON j.id = l.jurisdiction_id
         ORDER BY l.levy_type, l.code, l.name`,
     );
     res.render('finance/taxes/levies/index', {
@@ -565,6 +594,7 @@ router.get('/levies', manageTaxes, async (req, res, next) => {
         { label: req.t('Levies and withholdings') },
       ],
       rows,
+      taxTypes: LEVY_TAX_TYPES,
     });
   } catch (error) {
     next(error);
@@ -582,7 +612,7 @@ router.get('/levies/new', manageTaxes, async (req, res, next) => {
 router.post('/levies', manageTaxes, async (req, res, next) => {
   try {
     const values = normalizeLevy(req.body);
-    const errors = validateLevy(values, req);
+    const errors = await validateLevyWithDatabase(values, req);
     const duplicate = await one('SELECT id FROM tax_levies WHERE code = ? LIMIT 1', [values.code]);
     if (duplicate) errors.code = req.t('This code is already in use.');
     if (Object.keys(errors).length) {
@@ -590,9 +620,12 @@ router.post('/levies', manageTaxes, async (req, res, next) => {
     }
     await query(
       `INSERT INTO tax_levies
-         (code, name, levy_type, default_percentage, notes, expiry_date, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [values.code, values.name, values.levy_type, values.default_percentage, values.notes, values.expiry_date, values.status],
+         (code, name, levy_type, tax_type, jurisdiction_id, default_percentage, notes, expiry_date, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        values.code, values.name, values.levy_type, values.tax_type, values.jurisdiction_id,
+        values.default_percentage, values.notes, values.expiry_date, values.status,
+      ],
     );
     req.flash('success', 'Levy or withholding created.');
     return res.redirect(`${basePath}/levies`);
@@ -620,7 +653,7 @@ router.post('/levies/:id(\\d+)', manageTaxes, async (req, res, next) => {
     const existing = await one('SELECT * FROM tax_levies WHERE id = ? LIMIT 1', [req.params.id]);
     if (!existing) return next(Object.assign(new Error(req.t('Levy or withholding not found.')), { status: 404 }));
     const values = normalizeLevy(req.body);
-    const errors = validateLevy(values, req);
+    const errors = await validateLevyWithDatabase(values, req);
     const duplicate = await one('SELECT id FROM tax_levies WHERE code = ? AND id <> ? LIMIT 1', [values.code, existing.id]);
     if (duplicate) errors.code = req.t('This code is already in use.');
     if (Object.keys(errors).length) {
@@ -628,9 +661,13 @@ router.post('/levies/:id(\\d+)', manageTaxes, async (req, res, next) => {
     }
     await query(
       `UPDATE tax_levies
-          SET code = ?, name = ?, levy_type = ?, default_percentage = ?, notes = ?, expiry_date = ?, status = ?
+          SET code = ?, name = ?, levy_type = ?, tax_type = ?, jurisdiction_id = ?,
+              default_percentage = ?, notes = ?, expiry_date = ?, status = ?
         WHERE id = ?`,
-      [values.code, values.name, values.levy_type, values.default_percentage, values.notes, values.expiry_date, values.status, existing.id],
+      [
+        values.code, values.name, values.levy_type, values.tax_type, values.jurisdiction_id,
+        values.default_percentage, values.notes, values.expiry_date, values.status, existing.id,
+      ],
     );
     req.flash('success', 'Levy or withholding updated.');
     return res.redirect(`${basePath}/levies`);

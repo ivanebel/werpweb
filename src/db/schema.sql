@@ -750,6 +750,8 @@ CREATE TABLE IF NOT EXISTS tax_levies (
   code               VARCHAR(20) NOT NULL,
   name               VARCHAR(150) NOT NULL,
   levy_type          ENUM('levy','withholding') NOT NULL DEFAULT 'levy',
+  tax_type           ENUM('iibb','vat','income','municipal','other') NOT NULL DEFAULT 'other',
+  jurisdiction_id    INT UNSIGNED NULL,
   default_percentage DECIMAL(7,4) NOT NULL DEFAULT 0,
   notes              VARCHAR(500) NULL,
   expiry_date        DATE NULL,
@@ -759,6 +761,8 @@ CREATE TABLE IF NOT EXISTS tax_levies (
   PRIMARY KEY (id),
   UNIQUE KEY uq_tax_levies_code (code),
   KEY idx_tax_levies_type (levy_type),
+  KEY idx_tax_levies_tax_type (tax_type),
+  KEY idx_tax_levies_jurisdiction (jurisdiction_id),
   KEY idx_tax_levies_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -834,6 +838,10 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_levies (
   levy_id     INT UNSIGNED NOT NULL,
   code        VARCHAR(20) NOT NULL,
   name        VARCHAR(150) NOT NULL,
+  tax_type    ENUM('iibb','vat','income','municipal','other') NOT NULL DEFAULT 'other',
+  jurisdiction_id   INT UNSIGNED NULL,
+  jurisdiction_code VARCHAR(20) NULL,
+  jurisdiction_name VARCHAR(120) NULL,
   percentage  DECIMAL(7,4) NOT NULL DEFAULT 0,
   base_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
   amount      DECIMAL(14,2) NOT NULL DEFAULT 0,

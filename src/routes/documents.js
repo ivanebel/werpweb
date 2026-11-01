@@ -121,19 +121,22 @@ function parseLevySelections(body) {
 
 async function loadLevyOptions(includeIds = []) {
   const ids = [...new Set(includeIds.map((id) => Number(id)).filter((id) => id > 0))];
-  const includeSql = ids.length ? ` OR id IN (${ids.map(() => '?').join(',')})` : '';
+  const includeSql = ids.length ? ` OR l.id IN (${ids.map(() => '?').join(',')})` : '';
   return query(
-    `SELECT * FROM tax_levies
-      WHERE levy_type = 'levy'
-        AND ((status = 'active' AND (expiry_date IS NULL OR expiry_date >= CURDATE()))${includeSql})
-      ORDER BY code, name`,
+    `SELECT l.*, j.code AS jurisdiction_code, j.name AS jurisdiction_name
+       FROM tax_levies l
+       LEFT JOIN tax_jurisdictions j ON j.id = l.jurisdiction_id
+      WHERE l.levy_type = 'levy'
+        AND ((l.status = 'active' AND (l.expiry_date IS NULL OR l.expiry_date >= CURDATE()))${includeSql})
+      ORDER BY l.code, l.name`,
     ids,
   );
 }
 
 async function loadPurchaseInvoiceLevies(invoiceId) {
   return query(
-    `SELECT id, invoice_id, levy_id, code, name, percentage, base_amount, amount, sort_order
+    `SELECT id, invoice_id, levy_id, code, name, tax_type, jurisdiction_id,
+            jurisdiction_code, jurisdiction_name, percentage, base_amount, amount, sort_order
        FROM purchase_invoice_levies
       WHERE invoice_id = ?
       ORDER BY sort_order, id`,
@@ -172,8 +175,10 @@ async function validatePurchaseLevies(body, req) {
   if (!parsed.rows.length) return { rows: [], error: null };
   const ids = parsed.rows.map((row) => row.levy_id);
   const rows = await query(
-    `SELECT * FROM tax_levies
-      WHERE id IN (${ids.map(() => '?').join(',')}) AND levy_type = 'levy'`,
+    `SELECT l.*, j.code AS jurisdiction_code, j.name AS jurisdiction_name
+       FROM tax_levies l
+       LEFT JOIN tax_jurisdictions j ON j.id = l.jurisdiction_id
+      WHERE l.id IN (${ids.map(() => '?').join(',')}) AND l.levy_type = 'levy'`,
     ids,
   );
   const byId = new Map(rows.map((row) => [Number(row.id), row]));
@@ -189,6 +194,10 @@ async function validatePurchaseLevies(body, req) {
     selection.percentage = percentage;
     selection.code = levy.code;
     selection.name = levy.name;
+    selection.tax_type = levy.tax_type || 'other';
+    selection.jurisdiction_id = levy.jurisdiction_id ? Number(levy.jurisdiction_id) : null;
+    selection.jurisdiction_code = levy.jurisdiction_code || null;
+    selection.jurisdiction_name = levy.jurisdiction_name || null;
   }
   return { rows: parsed.rows, error: null };
 }
@@ -1296,9 +1305,15 @@ function makeDocumentRouter(config) {
           for (const levy of totals.levy_lines) {
             await conn.query(
               `INSERT INTO purchase_invoice_levies
-                 (invoice_id, levy_id, code, name, percentage, base_amount, amount, sort_order)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-              [id, levy.levy_id, levy.code, levy.name, levy.percentage, levy.base_amount, levy.amount, levy.sort_order],
+                 (invoice_id, levy_id, code, name, tax_type, jurisdiction_id,
+                  jurisdiction_code, jurisdiction_name, percentage, base_amount, amount, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                id, levy.levy_id, levy.code, levy.name, levy.tax_type || 'other',
+                levy.jurisdiction_id || null, levy.jurisdiction_code || null,
+                levy.jurisdiction_name || null, levy.percentage, levy.base_amount,
+                levy.amount, levy.sort_order,
+              ],
             );
           }
         }
@@ -1734,9 +1749,15 @@ function makeDocumentRouter(config) {
           for (const levy of totals.levy_lines) {
             await conn.query(
               `INSERT INTO purchase_invoice_levies
-                 (invoice_id, levy_id, code, name, percentage, base_amount, amount, sort_order)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-              [existing.id, levy.levy_id, levy.code, levy.name, levy.percentage, levy.base_amount, levy.amount, levy.sort_order],
+                 (invoice_id, levy_id, code, name, tax_type, jurisdiction_id,
+                  jurisdiction_code, jurisdiction_name, percentage, base_amount, amount, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                existing.id, levy.levy_id, levy.code, levy.name, levy.tax_type || 'other',
+                levy.jurisdiction_id || null, levy.jurisdiction_code || null,
+                levy.jurisdiction_name || null, levy.percentage, levy.base_amount,
+                levy.amount, levy.sort_order,
+              ],
             );
           }
         }

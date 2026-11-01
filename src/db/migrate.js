@@ -291,6 +291,25 @@ async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'purchase_invoices', 'packing_slip_no', 'VARCHAR(30) NULL AFTER document_type_code');
   await addColumn(conn, dbName, 'purchase_invoices', 'stock_skipped', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER stock_posted');
   await addColumn(conn, dbName, 'purchase_invoices', 'levy_total', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER tax_total');
+  await addColumn(conn, dbName, 'tax_levies', 'tax_type', "ENUM('iibb','vat','income','municipal','other') NOT NULL DEFAULT 'other' AFTER levy_type");
+  await addColumn(conn, dbName, 'tax_levies', 'jurisdiction_id', 'INT UNSIGNED NULL AFTER tax_type');
+  await addIndex(conn, dbName, 'tax_levies', 'idx_tax_levies_tax_type', 'KEY `idx_tax_levies_tax_type` (`tax_type`)');
+  await addIndex(conn, dbName, 'tax_levies', 'idx_tax_levies_jurisdiction', 'KEY `idx_tax_levies_jurisdiction` (`jurisdiction_id`)');
+  await addColumn(conn, dbName, 'purchase_invoice_levies', 'tax_type', "ENUM('iibb','vat','income','municipal','other') NOT NULL DEFAULT 'other' AFTER name");
+  await addColumn(conn, dbName, 'purchase_invoice_levies', 'jurisdiction_id', 'INT UNSIGNED NULL AFTER tax_type');
+  await addColumn(conn, dbName, 'purchase_invoice_levies', 'jurisdiction_code', 'VARCHAR(20) NULL AFTER jurisdiction_id');
+  await addColumn(conn, dbName, 'purchase_invoice_levies', 'jurisdiction_name', 'VARCHAR(120) NULL AFTER jurisdiction_code');
+  await conn.query(
+    `UPDATE purchase_invoice_levies l
+       JOIN tax_levies tl ON tl.id = l.levy_id
+       LEFT JOIN tax_jurisdictions j ON j.id = tl.jurisdiction_id
+        SET l.tax_type = tl.tax_type,
+            l.jurisdiction_id = tl.jurisdiction_id,
+            l.jurisdiction_code = j.code,
+            l.jurisdiction_name = j.name
+      WHERE l.tax_type = 'other' AND l.jurisdiction_id IS NULL
+        AND (tl.tax_type <> 'other' OR tl.jurisdiction_id IS NOT NULL)`,
+  );
   await addIndex(conn, dbName, 'purchase_invoices', 'idx_purchase_invoices_fiscal_type', 'KEY `idx_purchase_invoices_fiscal_type` (`document_type_code`)');
   await addConstraint(conn, dbName, 'purchase_invoices', 'fk_purchase_invoices_fiscal_type',
     'FOREIGN KEY (`document_type_code`) REFERENCES `fiscal_document_types` (`code`) ON DELETE SET NULL');
