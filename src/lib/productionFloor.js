@@ -98,21 +98,28 @@ async function loadRawMaterialOptions(orderId) {
   return result;
 }
 
-async function loadFilmOptions() {
+async function loadFilmOptions(orderId) {
   const rows = await query(
-    `SELECT mc.id AS class_id, mc.code AS class_code, mc.name AS class_name, mc.unit AS class_unit,
+    `SELECT l.id AS order_line_id,
+            mc.id AS class_id, mc.code AS class_code, mc.name AS class_name, mc.unit AS class_unit,
             mc.coil_quantity, mc.is_bottom_film, mc.is_top_film,
             mcm.product_id, mcm.priority, mcm.conversion_factor,
-            p.name AS product_name, p.sku, p.stock_qty, p.units_per_pack, p.unit AS product_unit
-       FROM material_classes mc
+            p.name AS product_name, p.sku, p.stock_qty, p.units_per_pack, p.unit AS product_unit,
+            p.weight_kg, p.track_stock, p.cost_gross_price, p.cost_levy_rate, p.cost_price
+       FROM production_order_lines l
+       JOIN bom_items bi ON bi.bom_id = l.bom_id AND bi.material_class_id IS NOT NULL
+       JOIN material_classes mc ON mc.id = bi.material_class_id
+            AND mc.status = 'active' AND (mc.is_bottom_film = 1 OR mc.is_top_film = 1)
        JOIN material_class_members mcm ON mcm.class_id = mc.id AND mcm.status = 'active'
        JOIN products p ON p.id = mcm.product_id AND p.status = 'active'
-      WHERE mc.status = 'active' AND (mc.is_bottom_film = 1 OR mc.is_top_film = 1)
-      ORDER BY mc.name, mcm.priority, p.name`,
+      WHERE l.production_order_id = ?
+      ORDER BY l.sort_order, l.id, mc.name, mcm.priority, p.name`,
+    [orderId],
   );
-  const bottom = [];
-  const top = [];
+  const bottom = new Map();
+  const top = new Map();
   for (const row of rows) {
+    const key = `${row.class_id}:${row.product_id}`;
     const option = {
       class_id: Number(row.class_id),
       class_code: row.class_code,
@@ -125,12 +132,26 @@ async function loadFilmOptions() {
       stock_qty: Number(row.stock_qty) || 0,
       units_per_pack: Number(row.units_per_pack) || 0,
       unit: row.product_unit,
+      weight_kg: Number(row.weight_kg) || 0,
+      track_stock: Number(row.track_stock) === 1,
+      cost_gross_price: Number(row.cost_gross_price) || 0,
+      cost_levy_rate: Number(row.cost_levy_rate) || 0,
+      cost_price: Number(row.cost_price) || 0,
       conversion_factor: Number(row.conversion_factor) || 1,
+      order_line_ids: [],
     };
-    if (Number(row.is_bottom_film) === 1) bottom.push(option);
-    if (Number(row.is_top_film) === 1) top.push(option);
+    if (Number(row.is_bottom_film) === 1) {
+      const existing = bottom.get(key) || option;
+      existing.order_line_ids = [...new Set([...existing.order_line_ids, Number(row.order_line_id)])];
+      bottom.set(key, existing);
+    }
+    if (Number(row.is_top_film) === 1) {
+      const existing = top.get(key) || option;
+      existing.order_line_ids = [...new Set([...existing.order_line_ids, Number(row.order_line_id)])];
+      top.set(key, existing);
+    }
   }
-  return { bottom, top };
+  return { bottom: [...bottom.values()], top: [...top.values()] };
 }
 
 async function loadMachines() {
@@ -191,7 +212,9 @@ async function loadRunsForOrder(orderId) {
   const placeholders = runIds.map(() => '?').join(',');
   const [films, inputs] = await Promise.all([
     query(
-      `SELECT f.*, p.name AS product_name, p.sku, p.unit AS product_unit
+      `SELECT f.*, p.name AS product_name, p.sku, p.unit AS product_unit,
+              p.stock_qty, p.weight_kg, p.track_stock, p.units_per_pack,
+              p.cost_gross_price, p.cost_levy_rate, p.cost_price
          FROM production_line_films f
          JOIN products p ON p.id = f.product_id
         WHERE f.run_id IN (${placeholders}) AND f.removed_at IS NULL
@@ -243,7 +266,7 @@ async function loadFloorData(orderId) {
     loadOrder(orderId),
     loadOrderLines(orderId),
     loadRawMaterialOptions(orderId),
-    loadFilmOptions(),
+    loadFilmOptions(orderId),
     loadMachines(),
     loadProductionLines(),
     loadRunsForOrder(orderId),

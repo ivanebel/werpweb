@@ -1,4 +1,5 @@
 <%- include('/layouts/head') %>
+<%- include('/partials/flash') %>
 <%
   const order = data ? data.order : null;
   const lines = data ? data.productionLines : [];
@@ -182,22 +183,22 @@
                     </div>
                     <div>
                       <label class="form-label"><%= t('Bottom film') %> <span class="text-error-500">*</span></label>
-                      <select name="bottom_film" class="form-select" required>
+                      <select name="bottom_film" class="form-select" data-bottom-film-select required>
                         <option value=""><%= t('Select the bottom film') %></option>
                         <% filmOptions.bottom.forEach((film) => { %>
-                          <option value="<%= film.class_id %>:<%= film.product_id %>" <%= bottomFilm && Number(bottomFilm.material_class_id) === Number(film.class_id) && Number(bottomFilm.product_id) === Number(film.product_id) ? 'selected' : '' %>>
-                            <%= film.class_name %> — <%= film.product_name %> · <%= t('coil') %> <%= h.formatQty(film.coil_quantity) %> <%= film.class_unit %>
+                          <option value="<%= film.class_id %>:<%= film.product_id %>" data-order-lines="<%= (film.order_line_ids || []).join(',') %>" <%= bottomFilm && Number(bottomFilm.material_class_id) === Number(film.class_id) && Number(bottomFilm.product_id) === Number(film.product_id) ? 'selected' : '' %>>
+                            <%= film.class_name %> — <%= film.product_name %> · <%= film.weight_kg > 0 ? `${h.formatQty(film.weight_kg)} kg` : `${h.formatQty(film.coil_quantity)} ${film.class_unit}` %>
                           </option>
                         <% }) %>
                       </select>
                     </div>
                     <div>
                       <label class="form-label"><%= t('Top film') %> <span class="text-error-500">*</span></label>
-                      <select name="top_film" class="form-select" required>
+                      <select name="top_film" class="form-select" data-top-film-select required>
                         <option value=""><%= t('Select the top film') %></option>
                         <% filmOptions.top.forEach((film) => { %>
-                          <option value="<%= film.class_id %>:<%= film.product_id %>" <%= topFilm && Number(topFilm.material_class_id) === Number(film.class_id) && Number(topFilm.product_id) === Number(film.product_id) ? 'selected' : '' %>>
-                            <%= film.class_name %> — <%= film.product_name %> · <%= t('coil') %> <%= h.formatQty(film.coil_quantity) %> <%= film.class_unit %>
+                          <option value="<%= film.class_id %>:<%= film.product_id %>" data-order-lines="<%= (film.order_line_ids || []).join(',') %>" <%= topFilm && Number(topFilm.material_class_id) === Number(film.class_id) && Number(topFilm.product_id) === Number(film.product_id) ? 'selected' : '' %>>
+                            <%= film.class_name %> — <%= film.product_name %> · <%= film.weight_kg > 0 ? `${h.formatQty(film.weight_kg)} kg` : `${h.formatQty(film.coil_quantity)} ${film.class_unit}` %>
                           </option>
                         <% }) %>
                       </select>
@@ -293,20 +294,23 @@
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><%= t(label) %></p>
                             <p class="mt-1 text-sm font-medium text-gray-800 dark:text-gray-200"><%= film ? film.product_name : t('Not configured') %></p>
                             <% if (film) { %>
-                              <p class="text-xs text-gray-500 dark:text-gray-400"><%= t('Coil') %> <%= h.formatQty(film.coil_quantity) %> <%= film.product_unit %> · <%= film.loaded_at ? t('Loaded') : t('Not loaded') %></p>
+                              <% const coilWeight = Number(film.coil_weight_kg) || Number(film.weight_kg) || Number(film.coil_quantity) || 0; %>
+                              <p class="text-xs text-gray-500 dark:text-gray-400"><%= t('Coil weight') %> <%= h.formatQty(coilWeight) %> kg · <%= film.loaded_at ? t('Loaded') : t('Not loaded') %></p>
+                              <p class="text-xs text-gray-500 dark:text-gray-400"><%= t('Stock') %>: <%= h.formatQty(film.stock_qty) %> <%= film.product_unit %></p>
                               <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Lot') %> <span class="font-mono"><%= film.lot_number || '—' %></span></p>
                             <% } %>
                           </div>
                           <% if (film && !film.loaded_at) { %>
-                            <button type="button" class="btn btn-primary btn-sm" data-open-film="<%= line.id %>" data-side="<%= side %>" data-type="<%= type %>" <%= run.status === 'paused' ? 'disabled' : '' %>><%= t('Load coil') %></button>
+                            <button type="button" class="btn btn-primary btn-sm" data-open-film="<%= line.id %>" data-side="<%= side %>" data-type="<%= type %>" data-weight="<%= (Number(film.coil_weight_kg) || Number(film.weight_kg) || Number(film.coil_quantity)) || 0 %>" <%= run.status === 'paused' ? 'disabled' : '' %>><%= t('Load coil') %></button>
                           <% } else if (film && film.loaded_at) { %>
-                            <button type="button" class="btn btn-secondary btn-sm" data-open-return="<%= line.id %>" data-side="<%= side %>" data-max="<%= film.coil_quantity %>"><%= t('Remove coil') %></button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-open-return="<%= line.id %>" data-side="<%= side %>" data-max="<%= (Number(film.coil_weight_kg) || Number(film.weight_kg) || Number(film.coil_quantity)) || 0 %>"><%= t('Remove coil') %></button>
                           <% } %>
                         </div>
                         <form id="film-input-<%= line.id %>-<%= side %>" method="POST" action="<%= actionUrl %>/input" class="hidden">
                           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                           <input type="hidden" name="order_id" value="<%= order.id %>">
                           <input type="hidden" name="input_type" value="<%= type %>">
+                          <input type="hidden" name="coil_weight_kg" value="<%= (Number(film.coil_weight_kg) || Number(film.weight_kg) || Number(film.coil_quantity)) || 0 %>" data-film-weight>
                           <input type="hidden" name="lot_number" value="<%= film ? (film.lot_number || '') : '' %>" data-film-lot>
                           <input type="hidden" name="expiry_date" value="<%= film && film.expiry_date ? String(film.expiry_date).slice(0, 10) : '' %>" data-film-expiry>
                         </form>
@@ -354,7 +358,7 @@
     <div class="mt-4 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800/60">
       <p class="font-medium text-gray-800 dark:text-gray-200" data-dialog-product>—</p>
       <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Quantity') %>: <span class="font-semibold" data-dialog-quantity>—</span></p>
-      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Stock will be updated in the next phase.') %></p>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400"><%= t('Stocks are updated when you confirm.') %></p>
     </div>
     <div class="mt-4 grid grid-cols-2 gap-3">
       <div><label class="form-label"><%= t('Lot number') %></label><input class="form-input font-mono text-xs" data-dialog-lot></div>
@@ -374,11 +378,16 @@
       <button type="submit" class="btn-icon" aria-label="<%= t('Close') %>"><%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %></button>
     </div>
     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400" data-film-dialog-text>—</p>
+    <div class="mt-4">
+      <label class="form-label"><%= t('Coil weight (kg)') %></label>
+      <input type="number" min="0.001" step="0.001" class="form-input text-right" data-film-dialog-weight>
+      <p class="form-help"><%= t('Defaults to the weight configured on the film product.') %></p>
+    </div>
     <div class="mt-4 grid grid-cols-2 gap-3">
       <div><label class="form-label"><%= t('Lot number') %></label><input class="form-input font-mono text-xs" data-film-dialog-lot></div>
       <div><label class="form-label"><%= t('Expiry date') %></label><input type="date" class="form-input text-xs" data-film-dialog-expiry></div>
     </div>
-    <p class="mt-2 text-xs text-gray-400"><%= t('Stock will be updated in the next phase.') %></p>
+    <p class="mt-2 text-xs text-gray-400"><%= t('The whole coil weight is deducted from stock.') %></p>
     <div class="mt-5 flex justify-end gap-2">
       <button type="submit" class="btn btn-secondary"><%= t('Cancel') %></button>
       <button type="button" class="btn btn-primary" data-confirm-film><%= t('Confirm coil') %></button>
@@ -392,8 +401,8 @@
       <h2 class="text-base font-semibold text-gray-900 dark:text-white"><%= t('Remove film coil') %></h2>
       <button type="submit" class="btn-icon" aria-label="<%= t('Close') %>"><%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %></button>
     </div>
-    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Enter the unused quantity that returns to stock. Use zero if the coil is empty.') %></p>
-    <div class="mt-4"><label class="form-label"><%= t('Returned quantity') %></label><input type="number" min="0" step="0.001" class="form-input text-right" data-return-input></div>
+    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Enter the unused weight in kilograms that returns to stock. Use zero if the coil is empty.') %></p>
+    <div class="mt-4"><label class="form-label"><%= t('Returned quantity (kg)') %></label><input type="number" min="0" step="0.001" class="form-input text-right" data-return-input></div>
     <div class="mt-5 flex justify-end gap-2">
       <button type="submit" class="btn btn-secondary"><%= t('Cancel') %></button>
       <button type="button" class="btn btn-primary" data-confirm-return><%= t('Confirm removal') %></button>
@@ -405,23 +414,32 @@
   (function () {
     document.querySelectorAll('[data-floor-setup]').forEach((form) => {
       const product = form.querySelector('[data-order-line-select]');
-      const raw = form.querySelector('[data-raw-select]');
-      if (!product || !raw) return;
-      const options = [...raw.options];
-      const filter = () => {
+      if (!product) return;
+      const filterSelect = (select) => {
+        if (!select) return;
+        const options = [...select.options];
         const selected = options.find((option) => option.selected && !option.disabled && option.value);
         let hasSelected = false;
         options.forEach((option) => {
           if (!option.value) return;
-          const matches = option.dataset.orderLine === product.value;
+          const lineIds = String(option.dataset.orderLines || option.dataset.orderLine || '')
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+          const matches = lineIds.includes(String(product.value));
           option.hidden = !matches;
           option.disabled = !matches;
           if (matches && option === selected) hasSelected = true;
         });
         if (!hasSelected) {
-          const first = options.find((option) => option.dataset.orderLine === product.value && option.value);
-          raw.value = first ? first.value : '';
+          const first = options.find((option) => option.value && !option.disabled);
+          select.value = first ? first.value : '';
         }
+      };
+      const filter = () => {
+        filterSelect(form.querySelector('[data-raw-select]'));
+        filterSelect(form.querySelector('[data-bottom-film-select]'));
+        filterSelect(form.querySelector('[data-top-film-select]'));
       };
       product.addEventListener('change', filter);
       filter();
@@ -474,6 +492,7 @@
         filmDialog.querySelector('[data-film-dialog-text]').textContent = button.dataset.side === 'bottom'
           ? '<%= t('Confirm loading one whole bottom film coil.') %>'
           : '<%= t('Confirm loading one whole top film coil.') %>';
+        filmDialog.querySelector('[data-film-dialog-weight]').value = button.dataset.weight || form.querySelector('[data-film-weight]').value || '';
         filmDialog.querySelector('[data-film-dialog-lot]').value = form.querySelector('[data-film-lot]').value;
         filmDialog.querySelector('[data-film-dialog-expiry]').value = form.querySelector('[data-film-expiry]').value;
         filmDialog.showModal();
@@ -481,6 +500,7 @@
     });
     document.querySelector('[data-confirm-film]')?.addEventListener('click', () => {
       const form = document.getElementById('film-input-' + activeFilmLine + '-' + activeFilmSide);
+      form.querySelector('[data-film-weight]').value = filmDialog.querySelector('[data-film-dialog-weight]').value;
       form.querySelector('[data-film-lot]').value = filmDialog.querySelector('[data-film-dialog-lot]').value;
       form.querySelector('[data-film-expiry]').value = filmDialog.querySelector('[data-film-dialog-expiry]').value;
       filmDialog.close();

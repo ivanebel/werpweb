@@ -7,6 +7,7 @@ const { pagination, todayISO, addDaysISO, lotFromDate, toNumber, statusInfo, for
 const { snapshotMaterials, completeProductionOrder } = require('../lib/production');
 const materials = require('../lib/materials');
 const productionFloor = require('../lib/productionFloor');
+const productionStock = require('../lib/productionStock');
 const { requireRole } = require('../middleware/web');
 
 const round3 = materials.round3;
@@ -2048,29 +2049,26 @@ async function validateFloorRawMaterial(orderLine, value, t = (text) => text) {
   return { classRow, member, parsed };
 }
 
-async function validateFloorFilm(side, value, t = (text) => text) {
+async function validateFloorFilm(side, value, orderLine, t = (text) => text) {
   const parsed = productionFloor.pair(value);
   if (!parsed) {
     return { error: t(side === 'bottom' ? 'Select the bottom film.' : 'Select the top film.') };
   }
+  const filmFlag = side === 'bottom' ? 'is_bottom_film' : 'is_top_film';
   const classRow = await one(
-    `SELECT * FROM material_classes
-      WHERE id = ? AND status = 'active' AND ${side === 'bottom' ? 'is_bottom_film' : 'is_top_film'} = 1
+    `SELECT mc.*
+       FROM bom_items bi
+       JOIN material_classes mc ON mc.id = bi.material_class_id
+      WHERE bi.bom_id = ? AND mc.id = ? AND mc.status = 'active' AND mc.${filmFlag} = 1
       LIMIT 1`,
-    [parsed.classId],
+    [orderLine.bom_id, parsed.classId],
   );
   if (!classRow) {
     return { error: t(side === 'bottom' ? 'Select a valid bottom film class.' : 'Select a valid top film class.') };
   }
-  if (Number(classRow.coil_quantity) <= 0) {
-    return {
-      error: t(side === 'bottom'
-        ? 'The bottom film class needs a standard coil quantity.'
-        : 'The top film class needs a standard coil quantity.'),
-    };
-  }
   const member = await one(
-    `SELECT mcm.*, p.name AS product_name, p.sku, p.unit, p.stock_qty, p.units_per_pack
+    `SELECT mcm.*, p.name AS product_name, p.sku, p.unit, p.stock_qty, p.units_per_pack,
+            p.weight_kg, p.track_stock, p.cost_gross_price, p.cost_levy_rate, p.cost_price
        FROM material_class_members mcm
        JOIN products p ON p.id = mcm.product_id
       WHERE mcm.class_id = ? AND mcm.product_id = ? AND mcm.status = 'active'
@@ -2081,6 +2079,36 @@ async function validateFloorFilm(side, value, t = (text) => text) {
     return { error: t(side === 'bottom' ? 'Select an active bottom film product.' : 'Select an active top film product.') };
   }
   return { classRow, member, parsed };
+}
+
+async function loadFloorRequirement(orderId, materialClassId) {
+  if (!materialClassId) return null;
+  return one(
+    `SELECT id, quantity_required, quantity_consumed
+       FROM production_order_requirements
+      WHERE production_order_id = ? AND material_class_id = ?
+      LIMIT 1`,
+    [orderId, materialClassId],
+  );
+}
+
+function isOverRequirement(requirement, classQuantity) {
+  if (!requirement) return false;
+  return Number(requirement.quantity_consumed) + Number(classQuantity)
+    > Number(requirement.quantity_required) + 0.0005;
+}
+
+function floorWeight(value) {
+  const weight = Number(value);
+  return Number.isFinite(weight) && weight > 0 ? productionFloor.round3(weight) : 0;
+}
+
+function filmClassQuantity(materialClass, product, weightKg) {
+  const weight = floorWeight(weightKg);
+  const unit = String(materialClass && materialClass.unit || '').trim().toLowerCase();
+  if (['kg', 'kgs', 'kilogram', 'kilograms'].includes(unit)) return weight;
+  const perCoil = Math.max(0, Number(product && product.weight_kg) || 0);
+  return perCoil > 0 ? productionFloor.round3(weight / perCoil) : weight;
 }
 
 async function floorRedirect(req, orderId) {
@@ -2184,8 +2212,8 @@ router.post('/floor/lines/:lineId(\\d+)/setup', async (req, res, next) => {
       req.flash('error', 'One of these portioning machines is assigned to the other line.');
       return res.redirect(await floorRedirect(req, orderId));
     }
-    const bottom = await validateFloorFilm('bottom', req.body.bottom_film, req.t);
-    const top = await validateFloorFilm('top', req.body.top_film, req.t);
+    const bottom = await validateFloorFilm('bottom', req.body.bottom_film, orderLine, req.t);
+    const top = await validateFloorFilm('top', req.body.top_film, orderLine, req.t);
     if (bottom.error || top.error) {
       req.flash('error', bottom.error || top.error);
       return res.redirect(await floorRedirect(req, orderId));
@@ -2245,21 +2273,26 @@ router.post('/floor/lines/:lineId(\\d+)/setup', async (req, res, next) => {
         runId = result.insertId;
       }
       for (const [side, film] of [['bottom', bottom], ['top', top]]) {
-        const existing = await one(
+        const [existingRows] = await conn.query(
           `SELECT id FROM production_line_films
             WHERE run_id = ? AND side = ? AND removed_at IS NULL LIMIT 1`,
           [runId, side],
         );
+        const existing = existingRows[0] || null;
+        const defaultWeight = Number(film.member.weight_kg) > 0
+          ? Number(film.member.weight_kg)
+          : (Number(film.classRow.coil_quantity) || 0);
         if (existing) {
           await conn.query(
             `UPDATE production_line_films
-                SET material_class_id = ?, product_id = ?, coil_quantity = ?,
-                    lot_number = ?, expiry_date = ?
+                SET material_class_id = ?, product_id = ?, coil_quantity = ?, coil_weight_kg = ?,
+                    lot_number = ?, expiry_date = ?, returned_quantity = NULL
               WHERE id = ?`,
             [
               film.parsed.classId,
               film.parsed.productId,
               film.classRow.coil_quantity,
+              defaultWeight,
               String(req.body[`${side}_lot_number`] || '').trim().slice(0, 60) || null,
               floorDate(req.body[`${side}_expiry_date`]),
               existing.id,
@@ -2268,15 +2301,16 @@ router.post('/floor/lines/:lineId(\\d+)/setup', async (req, res, next) => {
         } else {
           await conn.query(
             `INSERT INTO production_line_films
-               (run_id, side, material_class_id, product_id, coil_quantity,
+               (run_id, side, material_class_id, product_id, coil_quantity, coil_weight_kg,
                 lot_number, expiry_date, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               runId,
               side,
               film.parsed.classId,
               film.parsed.productId,
               film.classRow.coil_quantity,
+              defaultWeight,
               String(req.body[`${side}_lot_number`] || '').trim().slice(0, 60) || null,
               floorDate(req.body[`${side}_expiry_date`]),
               req.session.user.id,
@@ -2308,7 +2342,8 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
     const type = String(req.body.input_type || 'raw_material');
     if (type === 'raw_material') {
       const member = await one(
-        `SELECT mcm.*, p.name, p.sku, p.unit, p.stock_qty, p.units_per_pack
+        `SELECT mcm.*, p.name, p.sku, p.unit, p.stock_qty, p.units_per_pack,
+                p.weight_kg, p.track_stock, p.cost_gross_price, p.cost_levy_rate, p.cost_price
            FROM material_class_members mcm
            JOIN products p ON p.id = mcm.product_id
           WHERE mcm.class_id = ? AND mcm.product_id = ? LIMIT 1`,
@@ -2328,20 +2363,18 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
       }
       const quantity = mode === 'pack' ? packUnits : (mode === 'two' ? 2 : 1);
       const conversionFactor = Number(member.conversion_factor) || 1;
+      const classQuantity = productionFloor.round3(quantity * conversionFactor);
       const lot = String(req.body.lot_number || '').trim().slice(0, 60) || run.raw_lot_number || null;
       const expiry = floorDate(req.body.expiry_date) || run.raw_expiry_date;
-      const requirement = await one(
-        `SELECT id FROM production_order_requirements
-          WHERE production_order_id = ? AND material_class_id = ? LIMIT 1`,
-        [orderId, run.raw_material_class_id],
-      );
+      const requirement = await loadFloorRequirement(orderId, run.raw_material_class_id);
+      const overRequirement = isOverRequirement(requirement, classQuantity);
       await withTransaction(async (conn) => {
-        await conn.query(
+        const [inserted] = await conn.query(
           `INSERT INTO production_line_inputs
              (run_id, production_line_id, input_type, product_id, material_class_id,
-              requirement_id, quantity, unit, pack_units, conversion_factor, class_quantity,
-              lot_number, expiry_date, created_by)
-           VALUES (?, ?, 'raw_material', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              requirement_id, quantity, unit, stock_quantity, pack_units, conversion_factor,
+              class_quantity, unit_cost, lot_number, expiry_date, created_by)
+           VALUES (?, ?, 'raw_material', ?, ?, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?, ?)`,
           [
             run.id,
             lineId,
@@ -2352,12 +2385,44 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
             member.unit || 'unit',
             packUnits || null,
             conversionFactor,
-            productionFloor.round3(quantity * conversionFactor),
+            classQuantity,
             lot,
             expiry || null,
             req.session.user.id,
           ],
         );
+        const movement = await productionStock.postStockMovement(conn, {
+          productId: member.product_id,
+          quantity: -quantity,
+          movementType: 'production_input',
+          referenceType: 'production_line_run',
+          referenceId: run.id,
+          notes: `Raw material input for run ${run.id}`,
+          userId: req.session.user.id,
+          t: req.t,
+        });
+        const unitCost = movement.unitCost || materials.memberUnitCost(member);
+        await conn.query(
+          `UPDATE production_line_inputs
+              SET stock_quantity = ?, unit_cost = ?, stock_posted = ?, stock_movement_id = ?
+            WHERE id = ?`,
+          [
+            movement.movementId ? -quantity : 0,
+            unitCost,
+            1,
+            movement.movementId || null,
+            inserted.insertId,
+          ],
+        );
+        await productionStock.recordConsumption(conn, {
+          productionOrderId: orderId,
+          requirementId: requirement ? requirement.id : null,
+          productId: member.product_id,
+          stockQuantity: quantity,
+          classQuantity,
+          conversionFactor,
+          unitCost,
+        });
         if (lot || expiry) {
           await conn.query(
             'UPDATE production_line_runs SET raw_lot_number = ?, raw_expiry_date = ? WHERE id = ?',
@@ -2375,7 +2440,14 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
           [orderId],
         );
       });
-      req.flash('success', 'Raw material input recorded.');
+      if (overRequirement) {
+        req.flash(
+          'warning',
+          'Raw material recorded. This input exceeds the BOM requirement; completion will not deduct it again.',
+        );
+      } else {
+        req.flash('success', 'Raw material input recorded.');
+      }
       return res.redirect(await floorRedirect(req, orderId));
     }
 
@@ -2405,14 +2477,33 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
         );
         return res.redirect(await floorRedirect(req, orderId));
       }
+      const product = await one('SELECT * FROM products WHERE id = ? LIMIT 1', [film.product_id]);
+      const materialClass = await one('SELECT * FROM material_classes WHERE id = ? LIMIT 1', [film.material_class_id]);
+      if (!product || !materialClass) {
+        req.flash('error', req.t('The selected film product is no longer available.'));
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+      const weightKg = floorWeight(req.body.coil_weight_kg)
+        || floorWeight(product.weight_kg)
+        || floorWeight(film.coil_weight_kg)
+        || floorWeight(film.coil_quantity);
+      if (weightKg <= 0) {
+        req.flash('error', req.t('Enter the weight of the film coil in kilograms.'));
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+      const stockUnits = productionStock.filmStockUnits(product, weightKg);
+      const classQuantity = filmClassQuantity(materialClass, product, weightKg);
+      const requirement = await loadFloorRequirement(orderId, film.material_class_id);
+      const overRequirement = isOverRequirement(requirement, classQuantity);
       const lot = String(req.body.lot_number || '').trim().slice(0, 60) || film.lot_number || null;
       const expiry = floorDate(req.body.expiry_date) || film.expiry_date;
       await withTransaction(async (conn) => {
-        await conn.query(
+        const [inserted] = await conn.query(
           `INSERT INTO production_line_inputs
              (run_id, production_line_id, input_type, product_id, material_class_id,
-              film_id, quantity, unit, lot_number, expiry_date, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              film_id, quantity, unit, stock_quantity, class_quantity, unit_cost,
+              lot_number, expiry_date, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'kg', 0, ?, 0, ?, ?, ?)`,
           [
             run.id,
             lineId,
@@ -2420,16 +2511,51 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
             film.product_id,
             film.material_class_id,
             film.id,
-            film.coil_quantity,
-            'coil',
+            weightKg,
+            classQuantity,
             lot,
             expiry || null,
             req.session.user.id,
           ],
         );
+        const movement = await productionStock.postStockMovement(conn, {
+          productId: film.product_id,
+          quantity: -stockUnits,
+          movementType: 'production_input',
+          referenceType: 'production_line_run',
+          referenceId: run.id,
+          notes: `Film coil loaded for run ${run.id}`,
+          userId: req.session.user.id,
+          t: req.t,
+        });
+        const unitCost = movement.unitCost || materials.memberUnitCost(product);
         await conn.query(
-          'UPDATE production_line_films SET loaded_at = NOW(), returned_quantity = NULL, lot_number = ?, expiry_date = ? WHERE id = ?',
-          [lot, expiry || null, film.id],
+          `UPDATE production_line_inputs
+              SET stock_quantity = ?, unit_cost = ?, stock_posted = ?, stock_movement_id = ?
+            WHERE id = ?`,
+          [
+            movement.movementId ? -stockUnits : 0,
+            unitCost,
+            1,
+            movement.movementId || null,
+            inserted.insertId,
+          ],
+        );
+        await productionStock.recordConsumption(conn, {
+          productionOrderId: orderId,
+          requirementId: requirement ? requirement.id : null,
+          productId: film.product_id,
+          stockQuantity: stockUnits,
+          classQuantity,
+          conversionFactor: 1,
+          unitCost,
+        });
+        await conn.query(
+          `UPDATE production_line_films
+              SET coil_weight_kg = ?, loaded_at = NOW(), returned_quantity = NULL,
+                  lot_number = ?, expiry_date = ?
+            WHERE id = ?`,
+          [weightKg, lot, expiry || null, film.id],
         );
         await conn.query(
           `UPDATE production_line_runs
@@ -2442,13 +2568,24 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
           [orderId],
         );
       });
-      req.flash('success', req.t(side === 'bottom' ? 'Bottom film coil loaded.' : 'Top film coil loaded.'));
+      if (overRequirement) {
+        req.flash(
+          'warning',
+          'Film coil loaded. This input exceeds the BOM requirement; completion will not deduct it again.',
+        );
+      } else {
+        req.flash('success', req.t(side === 'bottom' ? 'Bottom film coil loaded.' : 'Top film coil loaded.'));
+      }
       return res.redirect(await floorRedirect(req, orderId));
     }
 
     req.flash('error', 'Unknown input type.');
     return res.redirect(await floorRedirect(req, orderId));
   } catch (err) {
+    if (err.status === 422) {
+      req.flash('error', err.message);
+      return res.redirect(await floorRedirect(req, Number.parseInt(req.body.order_id, 10) || 0));
+    }
     next(err);
   }
 });
@@ -2460,6 +2597,10 @@ router.post('/floor/lines/:lineId(\\d+)/film-return', async (req, res, next) => 
     const side = req.body.side === 'top' ? 'top' : 'bottom';
     const run = await findRunForOrderLine(lineId, orderId);
     if (!run) return res.redirect(await floorRedirect(req, orderId));
+    if (run.status === 'closed') {
+      req.flash('error', 'The line run is closed. Film coils can no longer be returned.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
     const film = await one(
       `SELECT * FROM production_line_films
         WHERE run_id = ? AND side = ? AND removed_at IS NULL AND loaded_at IS NOT NULL
@@ -2470,16 +2611,32 @@ router.post('/floor/lines/:lineId(\\d+)/film-return', async (req, res, next) => 
       req.flash('error', 'No loaded film coil was found.');
       return res.redirect(await floorRedirect(req, orderId));
     }
-    const returned = Math.min(
-      Math.max(toNumber(req.body.returned_quantity, 0), 0),
-      Number(film.coil_quantity) || 0,
+    const product = await one('SELECT * FROM products WHERE id = ? LIMIT 1', [film.product_id]);
+    const materialClass = await one('SELECT * FROM material_classes WHERE id = ? LIMIT 1', [film.material_class_id]);
+    if (!product || !materialClass) {
+      req.flash('error', req.t('The selected film product is no longer available.'));
+      return res.redirect(await floorRedirect(req, orderId));
+    }
+    const maxWeight = floorWeight(film.coil_weight_kg)
+      || floorWeight(product.weight_kg)
+      || floorWeight(film.coil_quantity);
+    const returned = Math.min(Math.max(toNumber(req.body.returned_quantity, 0), 0), maxWeight);
+    const stockUnits = productionStock.filmStockUnits(product, returned);
+    const classQuantity = filmClassQuantity(materialClass, product, returned);
+    const requirement = await loadFloorRequirement(orderId, film.material_class_id);
+    const loadedInput = await one(
+      `SELECT id, stock_posted FROM production_line_inputs
+        WHERE film_id = ? AND input_type IN ('film_bottom', 'film_top')
+        ORDER BY id DESC LIMIT 1`,
+      [film.id],
     );
+    const loadPosted = loadedInput && Number(loadedInput.stock_posted) === 1;
     await withTransaction(async (conn) => {
-      await conn.query(
+      const [inserted] = await conn.query(
         `INSERT INTO production_line_inputs
            (run_id, production_line_id, input_type, product_id, material_class_id,
-            film_id, quantity, unit, notes, created_by)
-         VALUES (?, ?, 'film_return', ?, ?, ?, ?, 'coil', ?, ?)`,
+            film_id, quantity, unit, stock_quantity, class_quantity, unit_cost, notes, created_by)
+         VALUES (?, ?, 'film_return', ?, ?, ?, ?, 'kg', 0, ?, 0, ?, ?)`,
         [
           run.id,
           lineId,
@@ -2487,10 +2644,47 @@ router.post('/floor/lines/:lineId(\\d+)/film-return', async (req, res, next) => 
           film.material_class_id,
           film.id,
           returned,
-          'Film coil removed from line',
+          classQuantity,
+          loadPosted
+            ? 'Film coil removed from line'
+            : 'Film coil removed from line (legacy load, stock was not posted)',
           req.session.user.id,
         ],
       );
+      if (loadPosted) {
+        const movement = await productionStock.postStockMovement(conn, {
+          productId: film.product_id,
+          quantity: stockUnits,
+          movementType: 'production_return',
+          referenceType: 'production_line_run',
+          referenceId: run.id,
+          notes: `Film return from run ${run.id}`,
+          userId: req.session.user.id,
+          t: req.t,
+        });
+        const unitCost = movement.unitCost || materials.memberUnitCost(product);
+        await conn.query(
+          `UPDATE production_line_inputs
+              SET stock_quantity = ?, unit_cost = ?, stock_posted = ?, stock_movement_id = ?
+            WHERE id = ?`,
+          [
+            movement.movementId ? stockUnits : 0,
+            unitCost,
+            1,
+            movement.movementId || null,
+            inserted.insertId,
+          ],
+        );
+        await productionStock.recordConsumption(conn, {
+          productionOrderId: orderId,
+          requirementId: requirement ? requirement.id : null,
+          productId: film.product_id,
+          stockQuantity: -stockUnits,
+          classQuantity: -classQuantity,
+          conversionFactor: 1,
+          unitCost,
+        });
+      }
       await conn.query(
         'UPDATE production_line_films SET loaded_at = NULL, removed_at = NULL, returned_quantity = ? WHERE id = ?',
         [returned, film.id],
@@ -2499,6 +2693,10 @@ router.post('/floor/lines/:lineId(\\d+)/film-return', async (req, res, next) => 
     req.flash('success', 'Film coil removed. Returned quantity recorded.');
     return res.redirect(await floorRedirect(req, orderId));
   } catch (err) {
+    if (err.status === 422) {
+      req.flash('error', err.message);
+      return res.redirect(await floorRedirect(req, orderId));
+    }
     next(err);
   }
 });
@@ -2509,6 +2707,10 @@ router.post('/floor/lines/:lineId(\\d+)/undo', async (req, res, next) => {
     const orderId = Number.parseInt(req.body.order_id, 10);
     const run = await findRunForOrderLine(lineId, orderId);
     if (!run) return res.redirect(await floorRedirect(req, orderId));
+    if (run.status === 'closed') {
+      req.flash('error', 'The line run is closed. Inputs can no longer be reversed.');
+      return res.redirect(await floorRedirect(req, orderId));
+    }
     const last = await one(
       `SELECT i.* FROM production_line_inputs i
         WHERE i.run_id = ? AND i.input_type = 'raw_material'
@@ -2522,33 +2724,70 @@ router.post('/floor/lines/:lineId(\\d+)/undo', async (req, res, next) => {
       req.flash('error', 'There is no raw material input to undo.');
       return res.redirect(await floorRedirect(req, orderId));
     }
-    await getPool().query(
-      `INSERT INTO production_line_inputs
-         (run_id, production_line_id, input_type, product_id, material_class_id,
-          requirement_id, reverses_input_id, quantity, unit, pack_units, conversion_factor,
-          class_quantity, lot_number, expiry_date, notes, created_by)
-       VALUES (?, ?, 'adjustment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        run.id,
-        lineId,
-        last.product_id,
-        last.material_class_id,
-        last.requirement_id,
-        last.id,
-        -Number(last.quantity),
-        last.unit,
-        last.pack_units,
-        last.conversion_factor,
-        -Number(last.class_quantity || 0),
-        last.lot_number,
-        last.expiry_date,
-        'Reversal of line input',
-        req.session.user.id,
-      ],
-    );
+    await withTransaction(async (conn) => {
+      const [inserted] = await conn.query(
+        `INSERT INTO production_line_inputs
+           (run_id, production_line_id, input_type, product_id, material_class_id,
+            requirement_id, reverses_input_id, quantity, unit, stock_quantity, pack_units,
+            conversion_factor, class_quantity, unit_cost, lot_number, expiry_date, notes, created_by)
+         VALUES (?, ?, 'adjustment', ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          run.id,
+          lineId,
+          last.product_id,
+          last.material_class_id,
+          last.requirement_id,
+          last.id,
+          -Number(last.quantity),
+          last.unit,
+          last.pack_units,
+          last.conversion_factor,
+          -Number(last.class_quantity || 0),
+          last.unit_cost,
+          last.lot_number,
+          last.expiry_date,
+          'Reversal of line input',
+          req.session.user.id,
+        ],
+      );
+      if (Number(last.stock_posted) === 1) {
+        const stockDelta = -Number(last.stock_quantity || 0);
+        const movement = Math.abs(stockDelta) >= 0.0005
+          ? await productionStock.postStockMovement(conn, {
+            productId: last.product_id,
+            quantity: stockDelta,
+            movementType: 'production_return',
+            referenceType: 'production_line_run',
+            referenceId: run.id,
+            notes: `Reversal of line input ${last.id}`,
+            userId: req.session.user.id,
+            t: req.t,
+          })
+          : null;
+        await productionStock.recordConsumption(conn, {
+          productionOrderId: orderId,
+          requirementId: last.requirement_id,
+          productId: last.product_id,
+          stockQuantity: Number(last.stock_quantity || 0),
+          classQuantity: -Number(last.class_quantity || 0),
+          conversionFactor: last.conversion_factor,
+          unitCost: last.unit_cost,
+        });
+        await conn.query(
+          `UPDATE production_line_inputs
+              SET stock_quantity = ?, stock_posted = 1, stock_movement_id = ?
+            WHERE id = ?`,
+          [stockDelta, movement && movement.movementId ? movement.movementId : null, inserted.insertId],
+        );
+      }
+    });
     req.flash('success', 'Last raw material input reversed.');
     return res.redirect(await floorRedirect(req, orderId));
   } catch (err) {
+    if (err.status === 422) {
+      req.flash('error', err.message);
+      return res.redirect(await floorRedirect(req, orderId));
+    }
     next(err);
   }
 });
@@ -2565,13 +2804,22 @@ router.post('/floor/lines/:lineId(\\d+)/status', async (req, res, next) => {
     } else if (target === 'resume' && run.status === 'paused') {
       await getPool().query("UPDATE production_line_runs SET status = 'running', paused_at = NULL WHERE id = ?", [run.id]);
     } else if (target === 'end' && run.status !== 'closed') {
-      await withTransaction(async (conn) => {
-        await conn.query(
-          "UPDATE production_line_films SET removed_at = NOW(), returned_quantity = 0 WHERE run_id = ? AND removed_at IS NULL",
-          [run.id],
+      const loaded = await one(
+        `SELECT side FROM production_line_films
+          WHERE run_id = ? AND removed_at IS NULL AND loaded_at IS NOT NULL
+          ORDER BY id DESC LIMIT 1`,
+        [run.id],
+      );
+      if (loaded) {
+        req.flash(
+          'error',
+          req.t(loaded.side === 'bottom'
+            ? 'Remove and return the loaded bottom film coil before ending the run.'
+            : 'Remove and return the loaded top film coil before ending the run.'),
         );
-        await conn.query("UPDATE production_line_runs SET status = 'closed', ended_at = NOW() WHERE id = ?", [run.id]);
-      });
+        return res.redirect(await floorRedirect(req, orderId));
+      }
+      await getPool().query("UPDATE production_line_runs SET status = 'closed', ended_at = NOW() WHERE id = ?", [run.id]);
     } else {
       req.flash('error', 'That line status change is not allowed.');
       return res.redirect(await floorRedirect(req, orderId));

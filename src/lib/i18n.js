@@ -3774,13 +3774,34 @@ const ES = {
   'Confirm coil': 'Confirmar bobina',
   'Confirm removal': 'Confirmar retiro',
   'Review the quantity and lot before recording it.': 'Revisá la cantidad y el lote antes de registrarlo.',
-  'Stock will be updated in the next phase.': 'El stock se actualizará en la siguiente etapa.',
+  'Stocks are updated when you confirm.': 'El stock se actualiza al confirmar.',
   'Confirm loading one whole bottom film coil.': 'Confirmá la carga de una bobina completa de film fondo.',
   'Confirm loading one whole top film coil.': 'Confirmá la carga de una bobina completa de film tapa.',
+  'Coil weight': 'Peso de la bobina',
+  'Coil weight (kg)': 'Peso de la bobina (kg)',
+  'Defaults to the weight configured on the film product.':
+    'Por defecto usa el peso configurado en el producto de film.',
+  'The whole coil weight is deducted from stock.': 'El peso completo de la bobina se descuenta del stock.',
   'Remove film coil': 'Quitar bobina de film',
-  'Enter the unused quantity that returns to stock. Use zero if the coil is empty.':
-    'Ingresá la cantidad sin usar que vuelve al stock. Usá cero si la bobina está vacía.',
-  'Returned quantity': 'Cantidad devuelta',
+  'Enter the unused weight in kilograms that returns to stock. Use zero if the coil is empty.':
+    'Ingresá el peso sin usar en kilogramos que vuelve al stock. Usá cero si la bobina está vacía.',
+  'Returned quantity (kg)': 'Cantidad devuelta (kg)',
+  'The selected film product is no longer available.': 'El producto de film seleccionado ya no está disponible.',
+  'Enter the weight of the film coil in kilograms.': 'Ingresá el peso de la bobina de film en kilogramos.',
+  'Insufficient stock for {product}: need {need}, available {stock}.':
+    'Stock insuficiente para {product}: se necesitan {need}, disponibles {stock}.',
+  'Raw material recorded. This input exceeds the BOM requirement; completion will not deduct it again.':
+    'Materia prima registrada. Este ingreso supera el requerimiento de la BOM; la finalización no lo descontará otra vez.',
+  'Film coil loaded. This input exceeds the BOM requirement; completion will not deduct it again.':
+    'Bobina de film cargada. Este ingreso supera el requerimiento de la BOM; la finalización no lo descontará otra vez.',
+  'The line run is closed. Film coils can no longer be returned.':
+    'El turno de la línea está cerrado. Ya no se pueden devolver bobinas de film.',
+  'The line run is closed. Inputs can no longer be reversed.':
+    'El turno de la línea está cerrado. Ya no se pueden revertir ingresos.',
+  'Remove and return the loaded bottom film coil before ending the run.':
+    'Quitá y devolvé la bobina de film fondo cargada antes de finalizar el turno.',
+  'Remove and return the loaded top film coil before ending the run.':
+    'Quitá y devolvé la bobina de film tapa cargada antes de finalizar el turno.',
   'Pause line': 'Pausar línea',
   'Resume line': 'Reanudar línea',
   'End run': 'Finalizar turno',

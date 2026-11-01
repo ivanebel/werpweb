@@ -389,6 +389,32 @@ async function upgradeSchema(conn, dbName) {
     `INSERT IGNORE INTO production_lines (code, name, status, sort_order)
      VALUES ('LINE-1', 'Line 1', 'active', 1), ('LINE-2', 'Line 2', 'active', 2)`,
   );
+  await addColumn(conn, dbName, 'production_line_films', 'coil_weight_kg', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER coil_quantity');
+  await conn.query(
+    `UPDATE production_line_films f
+       JOIN products p ON p.id = f.product_id
+        SET f.coil_weight_kg = CASE
+          WHEN p.weight_kg > 0 THEN p.weight_kg
+          ELSE f.coil_quantity
+        END
+      WHERE f.coil_weight_kg = 0`,
+  );
+  await addColumn(conn, dbName, 'production_line_inputs', 'stock_quantity', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER unit');
+  await addColumn(conn, dbName, 'production_line_inputs', 'unit_cost', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER class_quantity');
+
+  const [movementColumns] = await conn.query(
+    `SELECT COLUMN_TYPE AS column_type
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'stock_movements' AND COLUMN_NAME = 'movement_type'
+      LIMIT 1`,
+    [dbName],
+  );
+  if (movementColumns.length && !String(movementColumns[0].column_type || movementColumns[0].COLUMN_TYPE).includes("'production_input'")) {
+    await conn.query(
+      "ALTER TABLE stock_movements MODIFY COLUMN movement_type ENUM('purchase_in','sale_out','production_in','production_out','production_input','production_return','adjustment') NOT NULL",
+    );
+    console.log('[migrate] added production line stock movement types');
+  }
 
   await addColumn(conn, dbName, 'production_order_materials', 'requirement_id', 'INT UNSIGNED NULL AFTER production_order_id');
   await addColumn(conn, dbName, 'production_order_materials', 'material_class_id', 'INT UNSIGNED NULL AFTER requirement_id');

@@ -425,7 +425,9 @@ The QR is treated as a data-entry helper, not as proof of authenticity. Run the 
 9. Mark the film material classes with **Bottom film** and/or **Top film** and set their **standard coil quantity** in the class unit. The production floor uses these classes to offer whole coils for each side of the thermoformer.
 10. Configure the two physical lines under **Manufacturing → Production lines**. Each line has a fixed thermoformer; portioning machines are selected per run.
 11. Open **Manufacturing → Production floor** to select a released production order, assign a product and setup to each line, select the main raw material, one or two portioning machines and the bottom/top films. Raw material and film inputs are recorded as event history with a confirmation dialog. The setup locks after the first input; pause continues the run, while ending the run closes it and unlocks a new setup.
-12. Phase 1 records line inputs and partial film returns but **does not change stock**. Progress is a placeholder until the labeling-machine integration. Stock posting for raw materials and film coils is the next phase.
+12. Confirmations post stock immediately. Raw materials are deducted in their product unit; film coils are entered in **kilograms**, defaulting to the film product's weight, and converted to the product stock unit when needed. Partial returns add the unused weight back to stock.
+13. Insufficient stock blocks an input. Inputs above the BOM requirement are allowed with a warning. The run cannot end while a film coil is loaded; remove and return the coil first.
+14. Completing a production order consumes only the quantity that has **not** already been posted from the floor, so nothing is deducted twice. Finished goods are added at completion. Progress is still a placeholder until the labeling-machine integration.
 
 ### Point-of-sale reporting
 

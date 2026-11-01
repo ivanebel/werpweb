@@ -381,6 +381,10 @@ async function completeProductionOrder(productionOrderId, userId) {
     const byComponent = new Map();
     for (const allocation of allocations) {
       const componentId = Number(allocation.component_id);
+      const remaining = Math.max(
+        0,
+        round3(Number(allocation.quantity_required) - Number(allocation.quantity_consumed)),
+      );
       const entry = byComponent.get(componentId) || {
         sku: allocation.sku,
         name: allocation.name,
@@ -388,7 +392,7 @@ async function completeProductionOrder(productionOrderId, userId) {
         track_stock: Number(allocation.track_stock) === 1,
         required: 0,
       };
-      entry.required = round3(entry.required + Number(allocation.quantity_required));
+      entry.required = round3(entry.required + remaining);
       byComponent.set(componentId, entry);
     }
     const stockShortages = [...byComponent.entries()]
@@ -401,23 +405,32 @@ async function completeProductionOrder(productionOrderId, userId) {
       );
     }
 
+    let consumedAllocations = 0;
     for (const allocation of allocations) {
-      await conn.query('UPDATE products SET stock_qty = stock_qty - ? WHERE id = ?', [allocation.quantity_required, allocation.component_id]);
-      await conn.query(
-        `INSERT INTO stock_movements (product_id, movement_type, quantity, unit_cost, reference_type, reference_id, notes, created_by)
-         VALUES (?, 'production_out', ?, ?, 'production_order', ?, ?, ?)`,
-        [
-          allocation.component_id,
-          -allocation.quantity_required,
-          allocation.unit_cost || allocation.cost_price,
-          productionOrderId,
-          'Material consumed',
-          userId,
-        ],
+      const remaining = Math.max(
+        0,
+        round3(Number(allocation.quantity_required) - Number(allocation.quantity_consumed)),
       );
+      if (remaining <= 0.0005) continue;
+      consumedAllocations += 1;
+      if (Number(allocation.track_stock) === 1) {
+        await conn.query('UPDATE products SET stock_qty = stock_qty - ? WHERE id = ?', [remaining, allocation.component_id]);
+        await conn.query(
+          `INSERT INTO stock_movements (product_id, movement_type, quantity, unit_cost, reference_type, reference_id, notes, created_by)
+           VALUES (?, 'production_out', ?, ?, 'production_order', ?, ?, ?)`,
+          [
+            allocation.component_id,
+            -remaining,
+            allocation.unit_cost || allocation.cost_price,
+            productionOrderId,
+            'Material consumed',
+            userId,
+          ],
+        );
+      }
       await conn.query(
-        'UPDATE production_order_materials SET quantity_consumed = ? WHERE id = ?',
-        [allocation.quantity_required, allocation.id],
+        'UPDATE production_order_materials SET quantity_consumed = quantity_required WHERE id = ?',
+        [allocation.id],
       );
     }
     await conn.query(
@@ -449,7 +462,7 @@ async function completeProductionOrder(productionOrderId, userId) {
       `UPDATE production_orders SET status = 'completed', completed_at = NOW() WHERE id = ?`,
       [productionOrderId],
     );
-    return { materials: allocations.length, lines: lines.length };
+    return { materials: consumedAllocations, lines: lines.length };
   });
 }
 
