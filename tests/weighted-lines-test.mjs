@@ -29,6 +29,10 @@ let csrf = '';
 let failures = 0;
 const stamp = Date.now().toString(36).slice(-7);
 const today = new Date().toISOString().slice(0, 10);
+const displayDate = (iso) => {
+  const [year, month, day] = String(iso).split('-');
+  return `${day}/${month}/${year}`;
+};
 let supplierId = 0;
 let productId = 0;
 let orderId = 0;
@@ -126,8 +130,8 @@ try {
 
   {
     const res = await post('/purchase-orders', {
-      order_date: today,
-      expected_date: today,
+      order_date: displayDate(today),
+      expected_date: displayDate(today),
       status: 'draft',
       supplier_id: String(supplierId),
       discount_total: '0',
@@ -135,7 +139,7 @@ try {
       item_product_id: [String(productId)],
       item_quantity: ['1'],
       item_unit_price: ['10'],
-      item_tax_rate: ['0'],
+      item_tax_rate: ['21'],
       item_weight_per_unit: ['4'],
     });
     const location = res.headers.get('location') || '';
@@ -146,7 +150,8 @@ try {
       : null;
     ok('weighted purchase order created', res.status === 302 && order && line, `${res.status} ${location}`);
     ok('weighted order calculates total weight', line && Number(line.weight_per_unit) === 4 && Number(line.total_weight) === 4);
-    ok('weighted order line total uses total weight', line && Number(line.line_total) === 40 && Number(order.total) === 40, line && `line=${line.line_total} total=${order.total}`);
+    ok('weighted order line total uses net price plus VAT', line && Number(line.line_total) === 48.4 && Number(order.total) === 48.4, line && `line=${line.line_total} total=${order.total}`);
+    ok('dd/mm/yyyy document dates are stored as ISO', order && String(order.order_date).slice(0, 10) === today);
   }
 
   {
@@ -154,8 +159,8 @@ try {
       bill_no: `00001-${String((Number.parseInt(stamp, 36) % 100000000) + 1).padStart(8, '0')}`,
       document_type_code: '1',
       supplier_id: String(supplierId),
-      invoice_date: today,
-      due_date: today,
+      invoice_date: displayDate(today),
+      due_date: displayDate(today),
       status: 'received',
       packing_slip_no: '',
       notes: 'Weighted invoice test',

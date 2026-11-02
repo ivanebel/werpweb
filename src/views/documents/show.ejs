@@ -7,7 +7,7 @@
       <%
         const isInvoice = doc.kind.includes('invoice');
         const isSalesInvoice = doc.kind === 'sales_invoice';
-        const netPrices = isInvoice || doc.kind === 'sales_order';
+        const netPrices = true;
         const numberLabel = t(doc.kind === 'purchase_invoice' ? 'Bill' : isInvoice ? 'Invoice' : 'Order');
         const showCustomerCode = doc.party.table === 'customers';
         const balance = Number(row.total) - Number(row.amount_paid || 0);

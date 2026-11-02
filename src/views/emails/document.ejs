@@ -1,6 +1,6 @@
 <%
   const balance = Number(row.total) - Number(row.amount_paid || 0);
-  const netPrices = doc.isInvoice || doc.kind === 'sales_order';
+  const netPrices = true;
   const companyName = settings.company_name || 'WerpWeb';
   const companyInitial = String(companyName).charAt(0).toUpperCase();
   const customerOrder = doc.customerOrder

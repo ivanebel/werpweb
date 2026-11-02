@@ -11,7 +11,14 @@
         const allErrors = errorList.concat(itemErrors || []);
         const backUrl = mode === 'edit' ? `${doc.basePath}/${row.id}` : doc.basePath;
         const skipStockChecked = Boolean(row.skip_stock) || Number(row.stock_skipped) === 1;
-        const netLineEntry = doc.isInvoice || doc.kind === 'sales_order';
+        const netLineEntry = true;
+        const qtyWidthClass = doc.isInvoice ? 'w-36' : (doc.kind === 'purchase_order' ? 'w-28' : 'w-24');
+        const displayDateInput = (value) => {
+          const raw = String(value || '').trim();
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) return raw;
+          if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return h.formatDate(raw.slice(0, 10));
+          return raw;
+        };
         const levyRows = typeof levies !== 'undefined' && levies ? levies : [];
         const levyOptionList = typeof levyOptions !== 'undefined' && levyOptions ? levyOptions : [];
       %>
@@ -102,12 +109,13 @@
             </div>
             <div>
               <label for="doc-date" class="form-label"><%= doc.dateLabel %> <span class="text-error-500">*</span></label>
-              <input id="doc-date" type="date" name="<%= doc.dateField %>" value="<%= String(row[doc.dateField] || '').slice(0,10) %>" class="form-input" required>
+              <input id="doc-date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" name="<%= doc.dateField %>" value="<%= displayDateInput(row[doc.dateField]) %>" class="form-input" required>
               <% if (errors[doc.dateField]) { %><p class="form-error"><%= errors[doc.dateField] %></p><% } %>
             </div>
             <div>
               <label for="doc-due" class="form-label"><%= doc.dueLabel %></label>
-              <input id="doc-due" type="date" name="<%= doc.dueField %>" value="<%= String(row[doc.dueField] || '').slice(0,10) %>" class="form-input">
+              <input id="doc-due" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" name="<%= doc.dueField %>" value="<%= displayDateInput(row[doc.dueField]) %>" class="form-input">
+              <% if (errors[doc.dueField]) { %><p class="form-error"><%= errors[doc.dueField] %></p><% } %>
             </div>
             <% if (doc.kind === 'purchase_invoice') { %>
               <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50 md:col-span-4">
@@ -243,8 +251,8 @@
                     <th class="table-th w-8">#</th>
                     <th class="table-th <%= netLineEntry ? 'min-w-[360px]' : 'min-w-[240px]' %>">Product</th>
                     <% if (!netLineEntry) { %><th class="table-th min-w-[160px]">Description</th><% } %>
-                    <th class="table-th <%= doc.isInvoice ? 'w-36' : 'w-24' %> text-right">Qty</th>
-                    <th class="table-th w-40 text-right"><%= t('Weight / unit') %></th>
+                    <th class="table-th <%= qtyWidthClass %> text-right">Qty</th>
+                    <th class="table-th w-20 text-right"><%= t('Weight / unit') %></th>
                     <th class="table-th w-32 text-right"><%= netLineEntry ? t('Unit price (net)') : t('Unit price') %></th>
                     <th class="table-th w-24 text-right">VAT %</th>
                     <% if (netLineEntry) { %><th class="table-th w-32 text-right"><%= t('Net price') %></th><% } %>

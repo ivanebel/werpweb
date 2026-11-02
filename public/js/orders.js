@@ -377,10 +377,19 @@
     filterAssociationOptions(noteInvoiceSelect, 'party');
   }
 
+  function parseDateOnly(value) {
+    const raw = String(value || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+    if (!match) return '';
+    const iso = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+    return new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) === iso ? iso : '';
+  }
+
   function addDays(dateValue, days) {
-    if (!dateValue) return '';
-    const date = new Date(`${dateValue}T00:00:00Z`);
-    if (Number.isNaN(date.getTime())) return '';
+    const iso = parseDateOnly(dateValue);
+    if (!iso) return '';
+    const date = new Date(`${iso}T00:00:00Z`);
     date.setUTCDate(date.getUTCDate() + days);
     return date.toISOString().slice(0, 10);
   }

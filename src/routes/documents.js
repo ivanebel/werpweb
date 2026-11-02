@@ -73,17 +73,13 @@ function parseItems(body, config, defaultTaxRate) {
     const effectiveQuantity = weightPerUnit > 0 ? quantity * weightPerUnit : quantity;
     let grossUnitPrice = enteredPrice;
     let netUnitPrice = enteredPrice;
-    if (config.isInvoice || config.kind === 'sales_order') {
-      const postedGross = grossPrices[i];
-      if (postedGross !== undefined && String(postedGross).trim() !== '') {
-        grossUnitPrice = toNumber(postedGross, 0);
-        netUnitPrice = taxRate > 0 ? grossUnitPrice / (1 + taxRate / 100) : grossUnitPrice;
-      } else {
-        netUnitPrice = enteredPrice;
-        grossUnitPrice = taxRate > 0 ? netUnitPrice * (1 + taxRate / 100) : netUnitPrice;
-      }
-    } else if (taxRate > 0) {
-      netUnitPrice = grossUnitPrice / (1 + taxRate / 100);
+    const postedGross = grossPrices[i];
+    if (postedGross !== undefined && String(postedGross).trim() !== '') {
+      grossUnitPrice = toNumber(postedGross, 0);
+      netUnitPrice = taxRate > 0 ? grossUnitPrice / (1 + taxRate / 100) : grossUnitPrice;
+    } else {
+      netUnitPrice = enteredPrice;
+      grossUnitPrice = taxRate > 0 ? netUnitPrice * (1 + taxRate / 100) : netUnitPrice;
     }
     items.push({
       product_id: productId,
@@ -227,6 +223,15 @@ async function validatePurchaseLevies(body, req) {
 function validDateValue(value) {
   const raw = String(value || '').slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(new Date(`${raw}T00:00:00Z`).getTime());
+}
+
+function parseDateInput(value) {
+  const raw = String(value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return validDateValue(raw) ? raw : null;
+  const match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  if (!match) return null;
+  const iso = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+  return validDateValue(iso) && new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) === iso ? iso : null;
 }
 
 function parseIdList(value) {
@@ -1143,8 +1148,9 @@ function makeDocumentRouter(config) {
         levyResult = await validatePurchaseLevies(req.body, req);
         if (levyResult.error) errors.levies = levyResult.error;
       }
-      const date = (req.body[config.dateField] || '').slice(0, 10);
-      const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
+      const date = parseDateInput(req.body[config.dateField]);
+      const dueRaw = String(req.body[config.dueField] || '').trim();
+      const dueDate = dueRaw ? parseDateInput(req.body[config.dueField]) : null;
 
       const invoiceNumber = await validateInvoiceNumber(config, req.body, req);
       Object.assign(errors, invoiceNumber.errors);
@@ -1153,8 +1159,8 @@ function makeDocumentRouter(config) {
       const fiscalCode = fiscal.values.document_type_code;
 
       if (!partyId) errors[config.party.field] = req.t('{party} is required.', { party: lc.party.label });
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errors[config.dateField] = req.t('A valid date is required.');
-      if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) errors[config.dueField] = req.t('Invalid date.');
+      if (!date) errors[config.dateField] = req.t('A valid date is required.');
+      if (dueRaw && !dueDate) errors[config.dueField] = req.t('Invalid date.');
       if (items.length === 0) {
         itemErrors.push(req.t('Add at least one line item with a quantity greater than zero.'));
       }
@@ -1585,8 +1591,9 @@ function makeDocumentRouter(config) {
         levyResult = await validatePurchaseLevies(req.body, req);
         if (levyResult.error) errors.levies = levyResult.error;
       }
-      const date = (req.body[config.dateField] || '').slice(0, 10);
-      const dueDate = req.body[config.dueField] ? req.body[config.dueField].slice(0, 10) : null;
+      const date = parseDateInput(req.body[config.dateField]);
+      const dueRaw = String(req.body[config.dueField] || '').trim();
+      const dueDate = dueRaw ? parseDateInput(req.body[config.dueField]) : null;
 
       const invoiceNumber = await validateInvoiceNumber(config, req.body, req, existing);
       Object.assign(errors, invoiceNumber.errors);
@@ -1595,7 +1602,7 @@ function makeDocumentRouter(config) {
       const fiscalCode = fiscal.values.document_type_code;
 
       if (!partyId) errors[config.party.field] = req.t('{party} is required.', { party: lc.party.label });
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) errors[config.dateField] = req.t('A valid date is required.');
+      if (!date) errors[config.dateField] = req.t('A valid date is required.');
       if (items.length === 0) {
         itemErrors.push(req.t('Add at least one line item with a quantity greater than zero.'));
       }
