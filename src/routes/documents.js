@@ -15,6 +15,7 @@ const {
 } = require('../lib/fiscalDocumentTypes');
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const round3 = (n) => Math.round((Number(n) + Number.EPSILON) * 1000) / 1000;
 
 function localizeDocConfig(config, locale) {
   const t = translator(locale);
@@ -57,6 +58,7 @@ function parseItems(body, config, defaultTaxRate) {
   const quantities = arr(body.item_quantity);
   const prices = arr(body.item_unit_price);
   const grossPrices = arr(body.item_unit_price_gross);
+  const weights = arr(body.item_weight_per_unit);
   const taxes = arr(body.item_tax_rate);
   const items = [];
 
@@ -65,8 +67,10 @@ function parseItems(body, config, defaultTaxRate) {
     if (!productId) continue;
     const quantity = toNumber(quantities[i], 0);
     const enteredPrice = toNumber(prices[i], 0);
+    const weightPerUnit = round3(Math.max(0, toNumber(weights[i], 0)));
     const taxRate = taxes[i] === undefined || taxes[i] === '' ? Number(defaultTaxRate || 0) : toNumber(taxes[i], 0);
     if (quantity <= 0) continue;
+    const effectiveQuantity = weightPerUnit > 0 ? quantity * weightPerUnit : quantity;
     let grossUnitPrice = enteredPrice;
     let netUnitPrice = enteredPrice;
     if (config.isInvoice || config.kind === 'sales_order') {
@@ -85,10 +89,12 @@ function parseItems(body, config, defaultTaxRate) {
       product_id: productId,
       description: String(descriptions[i] || '').slice(0, 255) || null,
       quantity,
+      weight_per_unit: weightPerUnit,
+      total_weight: round3(quantity * weightPerUnit),
       unit_price: round2(grossUnitPrice),
       net_unit_price: round2(netUnitPrice),
       tax_rate: taxRate,
-      line_total: round2(quantity * grossUnitPrice),
+      line_total: round2(effectiveQuantity * grossUnitPrice),
     });
   }
   return items;
@@ -591,7 +597,7 @@ async function loadPartyOptions(config) {
 async function loadProductOptions(config) {
   const rows = await query(
     `SELECT p.id, p.sku, p.name, p.unit, p.sale_price, p.cost_price,
-            p.sale_vat_rate, p.cost_vat_rate, p.sold_by_weight,
+            p.sale_vat_rate, p.cost_vat_rate, p.sold_by_weight, p.weight_kg,
             b.name AS brand_name
        FROM products p
        LEFT JOIN brands b ON b.id = p.brand_id
@@ -608,6 +614,7 @@ async function loadProductOptions(config) {
     price: config.priceField === 'cost_price' ? Number(p.cost_price) : Number(p.sale_price),
     taxRate: config.priceField === 'cost_price' ? Number(p.cost_vat_rate || 0) : Number(p.sale_vat_rate || 0),
     weighted: Number(p.sold_by_weight) === 1,
+    weightKg: Number(p.weight_kg) || 0,
   }));
 }
 
@@ -860,16 +867,18 @@ function makeDocumentRouter(config) {
 
   async function applyPurchaseStock(conn, invoiceId, direction, label) {
     const [rows] = await conn.query(
-      `SELECT i.product_id, i.quantity, i.unit_price FROM \`${config.itemTable}\` i WHERE i.\`${config.itemFk}\` = ?`,
+      `SELECT i.product_id, i.quantity, i.unit_price, i.weight_per_unit FROM \`${config.itemTable}\` i WHERE i.\`${config.itemFk}\` = ?`,
       [invoiceId],
     );
     for (const item of rows) {
       const qty = Number(item.quantity) * direction;
+      const weightPerUnit = Number(item.weight_per_unit) || 0;
+      const unitCost = round2(Number(item.unit_price) * (weightPerUnit > 0 ? weightPerUnit : 1));
       await conn.query('UPDATE products SET stock_qty = stock_qty + ? WHERE id = ?', [qty, item.product_id]);
       await conn.query(
         `INSERT INTO stock_movements (product_id, movement_type, quantity, unit_cost, reference_type, reference_id, notes)
          VALUES (?, 'purchase_in', ?, ?, ?, ?, ?)`,
-        [item.product_id, qty, item.unit_price, 'purchase_invoice', invoiceId, label],
+        [item.product_id, qty, unitCost, 'purchase_invoice', invoiceId, label],
       );
     }
   }
@@ -1312,9 +1321,9 @@ function makeDocumentRouter(config) {
         for (let i = 0; i < items.length; i++) {
           const it = items[i];
           await conn.query(
-            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, unit_price, tax_rate, line_total)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [id, it.product_id, it.description, it.quantity, it.unit_price, it.tax_rate, it.line_total],
+            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, weight_per_unit, total_weight, unit_price, tax_rate, line_total)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, it.product_id, it.description, it.quantity, it.weight_per_unit, it.total_weight, it.unit_price, it.tax_rate, it.line_total],
           );
         }
         if (config.kind === 'purchase_invoice' && totals.levy_lines.length) {
@@ -1755,9 +1764,9 @@ function makeDocumentRouter(config) {
         await conn.query(`DELETE FROM \`${config.itemTable}\` WHERE \`${config.itemFk}\` = ?`, [existing.id]);
         for (const it of items) {
           await conn.query(
-            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, unit_price, tax_rate, line_total)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [existing.id, it.product_id, it.description, it.quantity, it.unit_price, it.tax_rate, it.line_total],
+            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, weight_per_unit, total_weight, unit_price, tax_rate, line_total)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [existing.id, it.product_id, it.description, it.quantity, it.weight_per_unit, it.total_weight, it.unit_price, it.tax_rate, it.line_total],
           );
         }
         if (config.kind === 'purchase_invoice') {

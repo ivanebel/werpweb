@@ -126,8 +126,14 @@
                         <div style="font-weight:bold;"><%= item.name %></div>
                         <div style="font-size:11px;color:#98a2b3;"><%= item.sku %><%= item.customer_code ? ' · ' + t('Customer code') + ': ' + item.customer_code : '' %><%= item.description ? ' · ' + item.description : '' %></div>
                       </td>
-                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= h.formatQty(item.quantity) %> <span style="font-size:11px;color:#98a2b3;"><%= item.unit || '' %></span></td>
-                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= money(netPrices ? itemNetUnit : item.unit_price) %></td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;">
+                        <%= h.formatQty(item.quantity) %> <span style="font-size:11px;color:#98a2b3;"><%= item.unit || '' %></span>
+                        <% if (Number(item.total_weight) > 0) { %><div style="font-size:11px;color:#98a2b3;"><%= h.formatQty(item.total_weight) %> kg</div><% } %>
+                      </td>
+                      <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;">
+                        <%= money(netPrices ? itemNetUnit : item.unit_price) %>
+                        <span style="font-size:11px;color:#98a2b3;">/ <%= Number(item.weight_per_unit) > 0 ? 'kg' : (item.unit || 'unit') %></span>
+                      </td>
                       <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
                       <% if (netPrices) { %><td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#475467;white-space:nowrap;vertical-align:top;"><%= money(itemNetTotal) %></td><% } %>
                       <td align="right" style="padding:10px 8px;border-bottom:1px solid #f2f4f7;font-size:13px;color:#1d2939;font-weight:bold;white-space:nowrap;vertical-align:top;"><%= money(item.line_total) %></td>

@@ -155,8 +155,14 @@
             <% if (showCustomerCode) { %>
               <td class="px-2 py-3 align-top font-mono text-xs text-gray-600"><%= item.customer_code || '—' %></td>
             <% } %>
-            <td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
-            <td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= money(netPrices ? itemNetUnit : item.unit_price) %></td>
+            <td class="px-2 py-3 text-right align-top whitespace-nowrap">
+              <%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span>
+              <% if (Number(item.total_weight) > 0) { %><span class="block text-[11px] text-gray-400"><%= h.formatQty(item.total_weight) %> kg</span><% } %>
+            </td>
+            <td class="px-2 py-3 text-right align-top whitespace-nowrap">
+              <%= money(netPrices ? itemNetUnit : item.unit_price) %>
+              <span class="text-[11px] text-gray-400">/ <%= Number(item.weight_per_unit) > 0 ? 'kg' : (item.unit || 'unit') %></span>
+            </td>
             <td class="px-2 py-3 text-right align-top"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
             <% if (netPrices) { %><td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= money(itemNetTotal) %></td><% } %>
             <td class="py-3 pl-2 pr-3 text-right align-top font-medium whitespace-nowrap"><%= money(item.line_total) %></td>

@@ -237,13 +237,14 @@
               </button>
             </div>
             <div class="table-wrap">
-              <table class="table-base <%= netLineEntry ? 'min-w-[1100px]' : 'min-w-[980px]' %>">
+              <table class="table-base <%= netLineEntry ? 'min-w-[1200px]' : 'min-w-[1080px]' %>">
                 <thead>
                   <tr>
                     <th class="table-th w-8">#</th>
                     <th class="table-th <%= netLineEntry ? 'min-w-[360px]' : 'min-w-[240px]' %>">Product</th>
                     <% if (!netLineEntry) { %><th class="table-th min-w-[160px]">Description</th><% } %>
                     <th class="table-th <%= doc.isInvoice ? 'w-36' : 'w-24' %> text-right">Qty</th>
+                    <th class="table-th w-40 text-right"><%= t('Weight / unit') %></th>
                     <th class="table-th w-32 text-right"><%= netLineEntry ? t('Unit price (net)') : t('Unit price') %></th>
                     <th class="table-th w-24 text-right">VAT %</th>
                     <% if (netLineEntry) { %><th class="table-th w-32 text-right"><%= t('Net price') %></th><% } %>
@@ -252,8 +253,19 @@
                   </tr>
                 </thead>
                 <tbody id="line-items">
-                  <% (items.length ? items : [{}]).forEach((item, i) => { const p = productById[String(item.product_id || '')]; const itemTax = item.tax_rate !== undefined ? Number(item.tax_rate) : Number(defaultTaxRate); const itemGross = item.unit_price !== undefined ? Number(item.unit_price) : 0; const itemNet = item.net_unit_price !== undefined ? Number(item.net_unit_price) : (itemTax > 0 ? itemGross / (1 + itemTax / 100) : itemGross); %>
-                    <tr data-line class="align-top">
+                  <% (items.length ? items : [{}]).forEach((item, i) => {
+                    const p = productById[String(item.product_id || '')];
+                    const itemTax = item.tax_rate !== undefined ? Number(item.tax_rate) : Number(defaultTaxRate);
+                    const itemGross = item.unit_price !== undefined ? Number(item.unit_price) : 0;
+                    const itemNet = item.net_unit_price !== undefined ? Number(item.net_unit_price) : (itemTax > 0 ? itemGross / (1 + itemTax / 100) : itemGross);
+                    const itemUnit = String(item.unit || p?.unit || '');
+                    const isKgUnit = ['kg', 'kgs', 'kilogram', 'kilograms'].includes(itemUnit.toLowerCase());
+                    const savedWeight = item.weight_per_unit !== undefined ? Number(item.weight_per_unit) || 0 : 0;
+                    const weightedRow = savedWeight > 0 || (p && p.weighted && !isKgUnit);
+                    const weightValue = savedWeight > 0 ? savedWeight : (weightedRow && p && item.id === undefined ? Number(p.weightKg) || 0 : 0);
+                    const effectiveQty = Number(item.quantity || 0) * (weightValue > 0 ? weightValue : 1);
+                  %>
+                    <tr data-line class="align-top" data-weighted="<%= weightedRow ? '1' : '0' %>">
                       <td class="table-td pt-5 text-xs text-gray-400"><span data-line-number><%= i + 1 %></span></td>
                       <td class="table-td">
                         <%- include('/partials/product-combobox', {
@@ -273,6 +285,11 @@
                       <td class="table-td">
                         <input name="item_quantity[<%= i %>]" data-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
                       </td>
+                      <td class="table-td" data-weight-cell>
+                        <input name="item_weight_per_unit[<%= i %>]" data-weight-unit type="number" min="0" step="0.001" value="<%= weightValue %>" class="form-input text-right <%= weightedRow ? '' : 'hidden' %>" <%= weightedRow ? '' : 'disabled' %>>
+                        <span class="block text-right text-xs text-gray-300 <%= weightedRow ? 'hidden' : '' %>" data-weight-empty>—</span>
+                        <span class="mt-0.5 block text-[11px] text-gray-400 <%= weightedRow ? '' : 'hidden' %>" data-weight-total-wrapper><span data-total-weight><%= weightValue > 0 ? h.formatQty(Number(item.quantity || 0) * weightValue) : '0' %></span> kg</span>
+                      </td>
                       <td class="table-td">
                         <% if (netLineEntry) { %>
                           <input name="item_unit_price[<%= i %>]" data-price type="number" min="0" step="0.01" value="<%= itemNet.toFixed(2) %>" class="form-input text-right">
@@ -280,15 +297,16 @@
                         <% } else { %>
                           <input name="item_unit_price[<%= i %>]" data-price type="number" min="0" step="0.01" value="<%= itemGross.toFixed(2) %>" class="form-input text-right">
                         <% } %>
+                        <span class="mt-0.5 block text-[11px] text-gray-400" data-price-unit><%= weightedRow ? '/kg' : (itemUnit ? `/${itemUnit}` : '') %></span>
                       </td>
                       <td class="table-td">
                         <input name="item_tax_rate[<%= i %>]" data-tax type="number" min="0" step="0.01" value="<%= item.tax_rate !== undefined ? item.tax_rate : defaultTaxRate %>" class="form-input text-right">
                       </td>
                       <% if (netLineEntry) { %>
-                        <td class="table-td text-right pt-7 text-gray-600 dark:text-gray-300" data-net-total><%= money(Number(item.quantity || 0) * itemNet) %></td>
+                        <td class="table-td text-right pt-7 text-gray-600 dark:text-gray-300" data-net-total><%= money(effectiveQty * itemNet) %></td>
                       <% } %>
                       <td class="table-td pt-7 text-right">
-                        <span class="font-medium text-gray-800 dark:text-gray-200" data-line-total><%= money(item.line_total !== undefined ? item.line_total : Number(item.quantity || 0) * itemGross) %></span>
+                        <span class="font-medium text-gray-800 dark:text-gray-200" data-line-total><%= money(item.line_total !== undefined ? item.line_total : effectiveQty * itemGross) %></span>
                         <span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span>
                       </td>
                       <td class="table-td pt-4 text-right">
@@ -318,6 +336,11 @@
                   <td class="table-td"><input name="item_description[__INDEX__]" data-description class="form-input" placeholder="Optional"></td>
                 <% } %>
                 <td class="table-td"><input name="item_quantity[__INDEX__]" data-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
+                <td class="table-td" data-weight-cell>
+                  <input name="item_weight_per_unit[__INDEX__]" data-weight-unit type="number" min="0" step="0.001" value="0" class="form-input hidden text-right" disabled>
+                  <span class="block text-right text-xs text-gray-300" data-weight-empty>—</span>
+                  <span class="mt-0.5 block text-[11px] text-gray-400 hidden" data-weight-total-wrapper><span data-total-weight>0</span> kg</span>
+                </td>
                 <td class="table-td">
                   <% if (netLineEntry) { %>
                     <input name="item_unit_price[__INDEX__]" data-price type="number" min="0" step="0.01" value="0.00" class="form-input text-right">
@@ -325,6 +348,7 @@
                   <% } else { %>
                     <input name="item_unit_price[__INDEX__]" data-price type="number" min="0" step="0.01" value="0.00" class="form-input text-right">
                   <% } %>
+                  <span class="mt-0.5 block text-[11px] text-gray-400" data-price-unit></span>
                 </td>
                 <td class="table-td"><input name="item_tax_rate[__INDEX__]" data-tax type="number" min="0" step="0.01" value="<%= defaultTaxRate %>" class="form-input text-right"></td>
                 <% if (netLineEntry) { %><td class="table-td pt-7 text-right text-gray-600 dark:text-gray-300" data-net-total></td><% } %>

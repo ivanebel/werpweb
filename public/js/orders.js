@@ -50,6 +50,14 @@
     }
   }
 
+  function fmtQty(value) {
+    try {
+      return new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(Number(value || 0));
+    } catch (e) {
+      return Number(value || 0).toFixed(3).replace(/\.?0+$/, '');
+    }
+  }
+
   function normalizeProductText(value) {
     return String(value || '')
       .normalize('NFD')
@@ -254,11 +262,16 @@
     const qty = Number(row.querySelector('[data-qty]')?.value || 0);
     const price = Number(row.querySelector('input[data-price]')?.value || 0);
     const tax = Number(row.querySelector('[data-tax]')?.value || 0);
-    const net = qty * price;
+    const weightInput = row.querySelector('[data-weight-unit]');
+    const weight = weightInput && !weightInput.disabled ? Number(weightInput.value || 0) : 0;
+    const effectiveQty = weight > 0 ? qty * weight : qty;
+    const net = effectiveQty * price;
     const grossUnit = netPrices && tax ? price * (1 + tax / 100) : price;
     const gross = netPrices ? net * (1 + tax / 100) : net;
     const grossInput = row.querySelector('[data-price-gross]');
     if (grossInput) grossInput.value = grossUnit.toFixed(2);
+    const totalWeight = row.querySelector('[data-total-weight]');
+    if (totalWeight) totalWeight.textContent = weight > 0 ? fmtQty(qty * weight) : '0';
     const netCell = row.querySelector('[data-net-total]');
     if (netCell) netCell.textContent = fmt(net);
     const line = row.querySelector('[data-line-total]');
@@ -286,7 +299,10 @@
       const qty = Number(row.querySelector('[data-qty]')?.value || 0);
       const price = Number(row.querySelector('input[data-price]')?.value || 0);
       const tax = Number(row.querySelector('[data-tax]')?.value || 0);
-      const net = qty * price;
+      const weightInput = row.querySelector('[data-weight-unit]');
+      const weight = weightInput && !weightInput.disabled ? Number(weightInput.value || 0) : 0;
+      const effectiveQty = weight > 0 ? qty * weight : qty;
+      const net = effectiveQty * price;
       const gross = netPrices ? net * (1 + tax / 100) : net;
       subtotal += gross;
       taxTotal += netPrices ? net * (tax / 100) : includedTax(net, tax);
@@ -442,7 +458,23 @@
       if (price) price.value = displayPrice.toFixed(2);
     }
     const unit = row.querySelector('[data-unit]');
+    const unitName = String(option?.dataset.productUnit || '').toLowerCase();
     if (unit) unit.textContent = option?.dataset.productUnit || '';
+    const kgUnits = ['kg', 'kgs', 'kilogram', 'kilograms'];
+    const weighted = option?.dataset.weighted === '1' && !kgUnits.includes(unitName);
+    const weightInput = row.querySelector('[data-weight-unit]');
+    const weightEmpty = row.querySelector('[data-weight-empty]');
+    const weightWrapper = row.querySelector('[data-weight-total-wrapper]');
+    row.dataset.weighted = weighted ? '1' : '0';
+    if (weightInput) {
+      weightInput.disabled = !weighted;
+      weightInput.classList.toggle('hidden', !weighted);
+      weightInput.value = weighted ? String(Number(option.dataset.weightKg || 0)) : '0';
+    }
+    if (weightEmpty) weightEmpty.classList.toggle('hidden', weighted);
+    if (weightWrapper) weightWrapper.classList.toggle('hidden', !weighted);
+    const priceUnit = row.querySelector('[data-price-unit]');
+    if (priceUnit) priceUnit.textContent = weighted ? '/kg' : (unitName ? `/${unitName}` : '');
     const desc = row.querySelector('[data-description]');
     if (desc && !desc.value && option?.dataset.name) desc.value = option.dataset.name;
     updateCustomerCode(row);

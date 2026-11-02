@@ -299,6 +299,10 @@ async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'purchase_invoice_levies', 'jurisdiction_id', 'INT UNSIGNED NULL AFTER tax_type');
   await addColumn(conn, dbName, 'purchase_invoice_levies', 'jurisdiction_code', 'VARCHAR(20) NULL AFTER jurisdiction_id');
   await addColumn(conn, dbName, 'purchase_invoice_levies', 'jurisdiction_name', 'VARCHAR(120) NULL AFTER jurisdiction_code');
+  for (const table of ['sales_order_items', 'purchase_order_items', 'sales_invoice_items', 'purchase_invoice_items']) {
+    await addColumn(conn, dbName, table, 'weight_per_unit', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER quantity');
+    await addColumn(conn, dbName, table, 'total_weight', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER weight_per_unit');
+  }
   await conn.query(
     `UPDATE purchase_invoice_levies l
        JOIN tax_levies tl ON tl.id = l.levy_id

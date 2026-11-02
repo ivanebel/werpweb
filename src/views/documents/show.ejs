@@ -167,9 +167,15 @@
                     <% if (showCustomerCode) { %>
                       <td class="table-td font-mono text-xs text-gray-600 dark:text-gray-300"><%= item.customer_code || '—' %></td>
                     <% } %>
-                    <td class="table-td text-right"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
+                    <td class="table-td text-right">
+                      <%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span>
+                      <% if (Number(item.total_weight) > 0) { %><span class="mt-0.5 block text-[11px] text-gray-400"><%= h.formatQty(item.total_weight) %> kg</span><% } %>
+                    </td>
                     <% if (doc.showDelivered) { %><td class="table-td text-right"><%= h.formatQty(item[doc.qtyKey]) %></td><% } %>
-                    <td class="table-td text-right"><%= money(netPrices ? itemNetUnit : item.unit_price) %></td>
+                    <td class="table-td text-right">
+                      <%= money(netPrices ? itemNetUnit : item.unit_price) %>
+                      <span class="text-[11px] text-gray-400">/ <%= Number(item.weight_per_unit) > 0 ? 'kg' : (item.unit || 'unit') %></span>
+                    </td>
                     <td class="table-td text-right"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
                     <% if (netPrices) { %><td class="table-td text-right"><%= money(itemNetTotal) %></td><% } %>
                     <td class="table-td text-right font-medium"><%= money(item.line_total) %></td>

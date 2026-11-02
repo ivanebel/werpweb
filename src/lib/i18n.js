@@ -3455,6 +3455,7 @@ const ES = {
   'Total levies': 'Total percepciones',
   'Levies': 'Percepciones',
   'Unit price (net)': 'Precio unitario (neto)',
+  'Weight / unit': 'Peso / unidad',
   'Unit prices are net of VAT. VAT and the gross line total are calculated automatically.':
     'Los precios unitarios son netos de IVA. El IVA y el total bruto de la línea se calculan automáticamente.',
   'Purchase levies': 'Percepciones de compra',
