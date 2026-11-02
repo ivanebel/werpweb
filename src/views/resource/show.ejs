@@ -37,6 +37,9 @@
             <a href="<%= resource.basePath %>/<%= row.id %>/dashboard" class="btn btn-secondary btn-sm">
               <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %> <%= t('Account dashboard') %>
             </a>
+            <a href="<%= resource.basePath %>/<%= row.id %>/statement" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'receipt', className: 'h-4 w-4' }) %> <%= t('Account statement') %>
+            </a>
           <% } %>
           <% if (resource.key === 'customers') { %>
             <a href="/payments/new?type=customer&party_id=<%= row.id %>" class="btn btn-primary btn-sm">

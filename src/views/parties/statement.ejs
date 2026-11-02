@@ -1,0 +1,91 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const basePath = statement.type === 'customer' ? '/customers' : '/suppliers';
+  const detailPath = `${basePath}/${statement.party.id}`;
+  const printUrl = `${detailPath}/statement/print?from=${encodeURIComponent(statement.from)}&to=${encodeURIComponent(statement.to)}`;
+  const balanceTone = Number(statement.closingBalance) > 0
+    ? 'text-warning-600 dark:text-warning-400'
+    : Number(statement.closingBalance) < 0
+      ? 'text-success-600 dark:text-success-400'
+      : 'text-gray-900 dark:text-white';
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Account statement') %></h1>
+            <span class="badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t(statement.partyLabel) %></span>
+          </div>
+          <p class="page-subtitle"><%= statement.party.company_name %></p>
+          <p class="mt-1 text-xs text-gray-400">
+            <%= h.formatDate(statement.from) %> – <%= h.formatDate(statement.to) %>
+            · <span class="font-mono"><%= statement.type === 'customer' ? statement.party.customer_no : statement.party.supplier_no %></span>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="<%= detailPath %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+          </a>
+          <a href="<%= detailPath %>/dashboard" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %> <%= t('Account dashboard') %>
+          </a>
+          <a href="<%= printUrl %>" target="_blank" rel="noopener" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'printer', className: 'h-4 w-4' }) %> <%= t('Print statement') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card mb-5 p-4 md:p-5">
+        <form method="GET" action="<%= detailPath %>/statement" class="flex flex-wrap items-end gap-3">
+          <div>
+            <label for="statement-from" class="form-label"><%= t('From') %></label>
+            <input id="statement-from" name="from" type="date" value="<%= statement.from %>" class="form-input">
+          </div>
+          <div>
+            <label for="statement-to" class="form-label"><%= t('To') %></label>
+            <input id="statement-to" name="to" type="date" value="<%= statement.to %>" class="form-input">
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
+          <a href="<%= detailPath %>/statement" class="btn btn-ghost btn-sm"><%= t('This month') %></a>
+        </form>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Opening balance') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(statement.openingBalance) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Charges') %></p>
+          <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white"><%= money(statement.charges) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= h.pluralize(statement.invoiceCount, statement.invoiceLabel.toLowerCase(), `${statement.invoiceLabel.toLowerCase()}s`) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Payments') %></p>
+          <p class="mt-2 text-2xl font-bold text-success-600 dark:text-success-400"><%= money(statement.payments) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= h.pluralize(statement.paymentCount, 'payment') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Closing balance') %></p>
+          <p class="mt-2 text-2xl font-bold <%= balanceTone %>"><%= money(statement.closingBalance) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t(statement.balanceLabel) %></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Movements') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Invoices, credit notes and payments with a running balance.') %></p>
+          </div>
+        </div>
+        <%- include('/parties/_statement-table', { statement, printMode: false }) %>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

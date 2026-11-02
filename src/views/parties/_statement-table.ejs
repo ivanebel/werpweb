@@ -1,0 +1,73 @@
+<%
+  const isPrint = typeof printMode !== 'undefined' && printMode;
+  const rowLink = (row) => (!isPrint && row.href ? row.href : null);
+%>
+<div class="table-wrap border-t border-gray-100 dark:border-gray-800">
+  <table class="table-base min-w-[980px]">
+    <thead>
+      <tr>
+        <th class="table-th whitespace-nowrap"><%= t('Date') %></th>
+        <th class="table-th"><%= t('Document') %></th>
+        <th class="table-th"><%= t('Type') %></th>
+        <th class="table-th"><%= t('Description') %></th>
+        <th class="table-th whitespace-nowrap"><%= t('Due date') %></th>
+        <th class="table-th text-right"><%= t('Charge') %></th>
+        <th class="table-th text-right"><%= t('Payment') %></th>
+        <th class="table-th text-right"><%= t('Balance') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="bg-gray-50 dark:bg-gray-800/60">
+        <td class="table-td whitespace-nowrap"><%= h.formatDate(statement.from) %></td>
+        <td class="table-td" colspan="3"><span class="font-medium text-gray-700 dark:text-gray-300"><%= t('Opening balance') %></span></td>
+        <td class="table-td"></td>
+        <td class="table-td text-right">—</td>
+        <td class="table-td text-right">—</td>
+        <td class="table-td text-right font-semibold text-gray-900 dark:text-white"><%= money(statement.openingBalance) %></td>
+      </tr>
+      <% statement.rows.forEach((row) => { %>
+        <tr class="table-row">
+          <td class="table-td whitespace-nowrap"><%= h.formatDate(row.date) %></td>
+          <td class="table-td whitespace-nowrap">
+            <% if (rowLink(row)) { %>
+              <a href="<%= rowLink(row) %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.reference %></a>
+            <% } else { %>
+              <span class="font-medium text-gray-900 dark:text-white/90"><%= row.reference %></span>
+            <% } %>
+          </td>
+          <td class="table-td whitespace-nowrap">
+            <% if (row.kind === 'payment') { %>
+              <span class="badge bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/15 dark:text-success-400"><%= t(row.type_label) %></span>
+            <% } else if (row.is_credit) { %>
+              <span class="badge bg-blue-light-50 text-blue-light-700 ring-blue-light-600/20 dark:bg-blue-light-500/15 dark:text-blue-light-400"><%= t(row.type_label) %></span>
+            <% } else { %>
+              <span class="badge bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/15 dark:text-brand-400"><%= t(row.type_label) %></span>
+            <% } %>
+          </td>
+          <td class="table-td text-sm text-gray-600 dark:text-gray-300"><%= row.description || '—' %></td>
+          <td class="table-td whitespace-nowrap text-sm text-gray-500 dark:text-gray-400"><%= row.due_date ? h.formatDate(row.due_date) : '—' %></td>
+          <td class="table-td text-right"><%= row.charge ? money(row.charge) : '—' %></td>
+          <td class="table-td text-right"><%= row.payment ? money(row.payment) : '—' %></td>
+          <td class="table-td text-right font-semibold <%= Number(row.balance) < 0 ? 'text-success-600 dark:text-success-400' : 'text-gray-900 dark:text-white' %>"><%= money(row.balance) %></td>
+        </tr>
+      <% }) %>
+      <% if (!statement.rows.length) { %>
+        <tr>
+          <td colspan="8" class="px-6 py-10 text-center text-sm text-gray-400"><%= t('No movements in this period.') %></td>
+        </tr>
+      <% } %>
+    </tbody>
+    <tfoot>
+      <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+        <td colspan="5" class="px-5 py-3 text-sm"><%= t('Period totals') %></td>
+        <td class="px-3 py-3 text-right text-sm"><%= money(statement.charges) %></td>
+        <td class="px-3 py-3 text-right text-sm"><%= money(statement.payments) %></td>
+        <td class="px-3 py-3 text-right text-sm"><%= money(statement.closingBalance) %></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+<div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-3 text-xs text-gray-400 dark:border-gray-800">
+  <span><%= t('{invoices} invoices · {payments} payments', { invoices: statement.invoiceCount, payments: statement.paymentCount }) %></span>
+  <span><%= t(statement.balanceLabel) %></span>
+</div>

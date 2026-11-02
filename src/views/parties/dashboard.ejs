@@ -56,6 +56,9 @@
             <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %>
             <%= meta.isCustomer ? t('Record customer payment') : t('Record supplier payment') %>
           </a>
+          <a href="<%= detailPath %>/statement" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'receipt', className: 'h-4 w-4' }) %> <%= t('Account statement') %>
+          </a>
           <a href="<%= editPath %>" class="btn btn-secondary btn-sm">
             <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> <%= t('Edit') %>
           </a>

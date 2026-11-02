@@ -4,6 +4,7 @@ const { makeResourceRouter } = require('./resource');
 const { query, one, getPool } = require('../db');
 const h = require('../lib/helpers');
 const { renderAccountDashboard } = require('../lib/accountDashboard');
+const { renderAccountStatement } = require('../lib/accountStatement');
 
 const statusOptions = [
   { value: 'active', label: 'Active' },
@@ -198,6 +199,8 @@ const router = makeResourceRouter({
 
 // ------------------------------------------------------- account dashboard
 router.get('/:id(\\d+)/dashboard', (req, res, next) => renderAccountDashboard(req, res, next, 'customer'));
+router.get('/:id(\\d+)/statement', (req, res, next) => renderAccountStatement(req, res, next, 'customer'));
+router.get('/:id(\\d+)/statement/print', (req, res, next) => renderAccountStatement(req, res, next, 'customer', { print: true }));
 
 // --------------------------------------------------------- product codes
 async function loadProductCodePage(customerId) {

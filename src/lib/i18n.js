@@ -2372,6 +2372,23 @@ const ES = {
 
   // ------------------------------------------------------ account dashboards
   'Account dashboard': 'Panel de cuenta',
+  'Account statement': 'Estado de cuenta',
+  'Print statement': 'Imprimir estado de cuenta',
+  'Opening balance': 'Saldo inicial',
+  'Closing balance': 'Saldo final',
+  'Charge': 'Cargo',
+  'Charges': 'Cargos',
+  'Payments': 'Pagos',
+  'Movements': 'Movimientos',
+  'Period totals': 'Totales del período',
+  'No movements in this period.': 'No hay movimientos en este período.',
+  'Generated on': 'Generado el',
+  'Invoices, credit notes and payments with a running balance.':
+    'Facturas, notas de crédito y pagos con saldo acumulado.',
+  'This statement lists issued invoices, credit notes and payments. Closing balance includes all movements up to the end date.':
+    'Este estado lista facturas emitidas, notas de crédito y pagos. El saldo final incluye todos los movimientos hasta la fecha final.',
+  '{invoices} invoices · {payments} payments': '{invoices} facturas · {payments} pagos',
+  'Receipt': 'Cobro',
   'Receivable balance': 'Saldo a cobrar',
   'Payable balance': 'Saldo a pagar',
   'Credit balance': 'Saldo a favor',

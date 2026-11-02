@@ -3,6 +3,7 @@
 const { makeResourceRouter } = require('./resource');
 const { query } = require('../db');
 const { renderAccountDashboard } = require('../lib/accountDashboard');
+const { renderAccountStatement } = require('../lib/accountStatement');
 
 const statusOptions = [
   { value: 'active', label: 'Active' },
@@ -157,5 +158,7 @@ const router = makeResourceRouter({
 });
 
 router.get('/:id(\\d+)/dashboard', (req, res, next) => renderAccountDashboard(req, res, next, 'supplier'));
+router.get('/:id(\\d+)/statement', (req, res, next) => renderAccountStatement(req, res, next, 'supplier'));
+router.get('/:id(\\d+)/statement/print', (req, res, next) => renderAccountStatement(req, res, next, 'supplier', { print: true }));
 
 module.exports = router;

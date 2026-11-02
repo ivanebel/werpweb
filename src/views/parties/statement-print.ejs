@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= t('Account statement') %> · <%= statement.party.company_name %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css?v=<%= assetVersion %>">
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    body { background: #fff; color: #1d2939; }
+    @media print {
+      .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-outfit text-gray-800" data-locale="<%= locale %>">
+  <div class="no-print sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
+    <a href="<%= statement.type === 'customer' ? '/customers' : '/suppliers' %>/<%= statement.party.id %>/statement?from=<%= encodeURIComponent(statement.from) %>&to=<%= encodeURIComponent(statement.to) %>" class="btn btn-secondary btn-sm"><%= t('Back') %></a>
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-gray-500"><%= t('Account statement') %> · <%= h.formatDate(statement.from) %> – <%= h.formatDate(statement.to) %></span>
+      <button type="button" onclick="window.print()" class="btn btn-primary btn-sm"><%= t('Print / Save PDF') %></button>
+    </div>
+  </div>
+
+  <div class="mx-auto my-6 max-w-[1120px] bg-white p-8 shadow-theme-lg print:my-0 print:max-w-none print:p-0 print:shadow-none sm:p-10">
+    <div class="flex flex-wrap items-start justify-between gap-6 border-b border-gray-200 pb-6">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-white"><%= (settings.company_name || 'W').charAt(0) %></span>
+          <div>
+            <p class="text-lg font-bold text-gray-900"><%= settings.company_name %></p>
+            <p class="text-xs text-gray-500"><%= settings.company_email %><%= settings.company_phone ? ' · ' + settings.company_phone : '' %></p>
+          </div>
+        </div>
+        <div class="mt-4 whitespace-pre-line text-xs leading-relaxed text-gray-500"><%= settings.company_address %></div>
+        <% if (settings.company_tax_id) { %><p class="mt-1 text-xs text-gray-500">Tax ID: <%= settings.company_tax_id %></p><% } %>
+      </div>
+      <div class="text-right">
+        <p class="text-2xl font-semibold uppercase tracking-wide text-brand-600"><%= t('Account statement') %></p>
+        <p class="mt-1 text-sm font-medium text-gray-700"><%= statement.party.company_name %></p>
+        <p class="text-xs text-gray-500"><%= t(statement.partyLabel) %> · <span class="font-mono"><%= statement.type === 'customer' ? statement.party.customer_no : statement.party.supplier_no %></span></p>
+        <p class="mt-2 text-xs text-gray-500"><%= t('Period') %>: <%= h.formatDate(statement.from) %> – <%= h.formatDate(statement.to) %></p>
+        <p class="text-xs text-gray-500"><%= t('Generated on') %> <%= h.formatDate(h.todayISO()) %></p>
+      </div>
+    </div>
+
+    <div class="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[11px] uppercase tracking-wide text-gray-400"><%= t('Opening balance') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= money(statement.openingBalance) %></p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[11px] uppercase tracking-wide text-gray-400"><%= t('Charges') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= money(statement.charges) %></p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[11px] uppercase tracking-wide text-gray-400"><%= t('Payments') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= money(statement.payments) %></p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[11px] uppercase tracking-wide text-gray-400"><%= t('Closing balance') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= money(statement.closingBalance) %></p>
+      </div>
+    </div>
+
+    <div class="mt-5 overflow-hidden rounded-xl border border-gray-200">
+      <%- include('/parties/_statement-table', { statement, printMode: true }) %>
+    </div>
+
+    <p class="mt-6 text-[11px] text-gray-400"><%= t('This statement lists issued invoices, credit notes and payments. Closing balance includes all movements up to the end date.') %></p>
+  </div>
+</body>
+</html>
