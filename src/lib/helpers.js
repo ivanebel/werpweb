@@ -153,20 +153,26 @@ function formatQty(value, locale = DEFAULT_LOCALE) {
 }
 
 function formatDate(value, locale = DEFAULT_LOCALE) {
-  if (!value) return '—';
+  if (!value) return '-';
   const raw = String(value);
   const d = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00Z`) : new Date(value);
   if (Number.isNaN(d.getTime())) return raw;
-  return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(d);
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function formatDateTime(value, locale = DEFAULT_LOCALE) {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(String(value).replace(' ', 'T') + (String(value).includes('Z') ? '' : 'Z'));
   if (Number.isNaN(d.getTime())) return String(value);
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC',
-  }).format(d);
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  const hours = String(d.getUTCHours()).padStart(2, '0');
+  const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
 function relativeDate(value, locale = DEFAULT_LOCALE) {
