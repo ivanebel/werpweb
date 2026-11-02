@@ -43,11 +43,11 @@
         <form method="GET" action="<%= detailPath %>/statement" class="flex flex-wrap items-end gap-3">
           <div>
             <label for="statement-from" class="form-label"><%= t('From') %></label>
-            <input id="statement-from" name="from" type="date" value="<%= statement.from %>" class="form-input">
+            <input id="statement-from" name="from" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" value="<%= h.formatDate(statement.from) %>" class="form-input">
           </div>
           <div>
             <label for="statement-to" class="form-label"><%= t('To') %></label>
-            <input id="statement-to" name="to" type="date" value="<%= statement.to %>" class="form-input">
+            <input id="statement-to" name="to" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" value="<%= h.formatDate(statement.to) %>" class="form-input">
           </div>
           <button type="submit" class="btn btn-secondary btn-sm"><%= t('Apply') %></button>
           <a href="<%= detailPath %>/statement" class="btn btn-ghost btn-sm"><%= t('This month') %></a>

@@ -201,6 +201,8 @@ try {
   await insertPayment({ direction: 'supplier', partyId: supplierId, date: today, method: 20 });
 
   await appDb.initDb();
+  const slashRange = statements.statementRange('01/11/2026', '02/11/2026');
+  ok('dd/mm/yyyy query dates are parsed', slashRange.from === '2026-11-01' && slashRange.to === '2026-11-02');
   const customerStatement = await statements.loadAccountStatement('customer', customerId, from, today);
   ok('customer statement loads', Boolean(customerStatement));
   ok('customer opening balance includes earlier invoices', Number(customerStatement.openingBalance) === 50, `opening=${customerStatement.openingBalance}`);

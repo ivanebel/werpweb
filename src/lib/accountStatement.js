@@ -34,9 +34,20 @@ const CONFIG = {
 };
 
 function validDate(value) {
-  const raw = String(value || '').slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
-  return Number.isNaN(new Date(`${raw}T00:00:00Z`).getTime()) ? null : raw;
+  const raw = String(value || '').trim();
+  let iso = null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    iso = raw;
+  } else {
+    const match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+    if (match) {
+      iso = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+    }
+  }
+  if (!iso) return null;
+  const date = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso) return null;
+  return iso;
 }
 
 function statementRange(from, to) {
