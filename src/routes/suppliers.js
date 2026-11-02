@@ -53,9 +53,9 @@ const router = makeResourceRouter({
   fields,
   columns: [
     { key: 'company_name', label: 'Supplier', type: 'primary', sub: 'supplier_no' },
+    { key: 'tax_id', label: 'CUIT' },
     { key: 'contact_name', label: 'Contact' },
     { key: 'email', label: 'Email' },
-    { key: 'phone', label: 'Phone' },
     { key: 'order_count', label: 'Orders', type: 'number', align: 'right' },
     { key: 'current_balance', label: 'Current balance', type: 'money', align: 'right' },
     { key: 'status', label: 'Status', type: 'status' },

@@ -69,7 +69,7 @@ function parseItems(body, config, defaultTaxRate) {
     if (quantity <= 0) continue;
     let grossUnitPrice = enteredPrice;
     let netUnitPrice = enteredPrice;
-    if (config.isInvoice) {
+    if (config.isInvoice || config.kind === 'sales_order') {
       const postedGross = grossPrices[i];
       if (postedGross !== undefined && String(postedGross).trim() !== '') {
         grossUnitPrice = toNumber(postedGross, 0);

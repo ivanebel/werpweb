@@ -8,6 +8,7 @@
   const docTitle = labels[doc.kind] || t('Document');
   const isInvoice = doc.kind.includes('invoice');
   const isSalesInvoice = doc.kind === 'sales_invoice';
+  const netPrices = isInvoice || doc.kind === 'sales_order';
   const isNonFiscal = Number(row.document_type_code) === 999;
   const caePending = isSalesInvoice && !row.cae && !isNonFiscal;
   const documentTitle = isInvoice && row.document_type_name ? row.document_type_name : docTitle;
@@ -138,14 +139,14 @@
           <th class="py-2.5 pl-3 pr-2 font-semibold">Item</th>
           <% if (showCustomerCode) { %><th class="px-2 py-2.5 font-semibold">Customer code</th><% } %>
           <th class="px-2 py-2.5 text-right font-semibold">Qty</th>
-          <th class="px-2 py-2.5 text-right font-semibold"><%= doc.isInvoice ? t('Unit price (net)') : t('Unit price') %></th>
+          <th class="px-2 py-2.5 text-right font-semibold"><%= netPrices ? t('Unit price (net)') : t('Unit price') %></th>
           <th class="px-2 py-2.5 text-right font-semibold">VAT</th>
-          <% if (doc.isInvoice) { %><th class="px-2 py-2.5 text-right font-semibold"><%= t('Net price') %></th><% } %>
+          <% if (netPrices) { %><th class="px-2 py-2.5 text-right font-semibold"><%= t('Net price') %></th><% } %>
           <th class="py-2.5 pl-2 pr-3 text-right font-semibold">Amount</th>
         </tr>
       </thead>
       <tbody>
-        <% items.forEach(item => { const itemTax = Number(item.tax_rate) || 0; const itemNetUnit = doc.isInvoice && itemTax > 0 ? Number(item.unit_price) / (1 + itemTax / 100) : Number(item.unit_price); const itemNetTotal = doc.isInvoice && itemTax > 0 ? Number(item.line_total) / (1 + itemTax / 100) : Number(item.line_total); %>
+        <% items.forEach(item => { const itemTax = Number(item.tax_rate) || 0; const itemNetUnit = netPrices && itemTax > 0 ? Number(item.unit_price) / (1 + itemTax / 100) : Number(item.unit_price); const itemNetTotal = netPrices && itemTax > 0 ? Number(item.line_total) / (1 + itemTax / 100) : Number(item.line_total); %>
           <tr class="border-b border-gray-100">
             <td class="py-3 pl-3 pr-2 align-top">
               <p class="font-medium text-gray-800"><%= item.name %></p>
@@ -155,9 +156,9 @@
               <td class="px-2 py-3 align-top font-mono text-xs text-gray-600"><%= item.customer_code || '—' %></td>
             <% } %>
             <td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
-            <td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= money(doc.isInvoice ? itemNetUnit : item.unit_price) %></td>
+            <td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= money(netPrices ? itemNetUnit : item.unit_price) %></td>
             <td class="px-2 py-3 text-right align-top"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
-            <% if (doc.isInvoice) { %><td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= money(itemNetTotal) %></td><% } %>
+            <% if (netPrices) { %><td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= money(itemNetTotal) %></td><% } %>
             <td class="py-3 pl-2 pr-3 text-right align-top font-medium whitespace-nowrap"><%= money(item.line_total) %></td>
           </tr>
         <% }) %>

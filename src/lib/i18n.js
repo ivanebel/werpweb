@@ -177,6 +177,7 @@ const ES = {
   'Postal code': 'Código postal',
   'Country': 'País',
   'Tax ID': 'ID fiscal',
+  'CUIT': 'CUIT',
   'Notes': 'Notas',
   'Description': 'Descripción',
   'Created': 'Creado',

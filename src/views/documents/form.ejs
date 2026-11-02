@@ -11,6 +11,7 @@
         const allErrors = errorList.concat(itemErrors || []);
         const backUrl = mode === 'edit' ? `${doc.basePath}/${row.id}` : doc.basePath;
         const skipStockChecked = Boolean(row.skip_stock) || Number(row.stock_skipped) === 1;
+        const netLineEntry = doc.isInvoice || doc.kind === 'sales_order';
         const levyRows = typeof levies !== 'undefined' && levies ? levies : [];
         const levyOptionList = typeof levyOptions !== 'undefined' && levyOptions ? levyOptions : [];
       %>
@@ -46,7 +47,7 @@
         </div>
       <% } %>
 
-      <form id="document-form" method="POST" action="<%= action %>" data-currency="<%= currency %>" data-default-tax="<%= defaultTaxRate %>" data-net-prices="<%= doc.isInvoice ? '1' : '0' %>" data-customer-codes="<%= JSON.stringify(customerCodes || {}) %>" data-warehouses="<%= JSON.stringify(warehouseOptions || []) %>">
+      <form id="document-form" method="POST" action="<%= action %>" data-currency="<%= currency %>" data-default-tax="<%= defaultTaxRate %>" data-net-prices="<%= netLineEntry ? '1' : '0' %>" data-customer-codes="<%= JSON.stringify(customerCodes || {}) %>" data-warehouses="<%= JSON.stringify(warehouseOptions || []) %>">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <% if (doc.linkOrder) { %>
           <input type="hidden" name="<%= doc.linkOrder.field %>" value="<%= row[doc.linkOrder.field] || '' %>">
@@ -229,23 +230,23 @@
             <div class="card-header">
               <div>
                 <h2 class="card-title">Line items</h2>
-                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= doc.isInvoice ? t('Unit prices are net of VAT. VAT and the gross line total are calculated automatically.') : t('Add products, quantities and prices. Unit prices are tax-inclusive; VAT is extracted for the totals.') %></p>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= netLineEntry ? t('Unit prices are net of VAT. VAT and the gross line total are calculated automatically.') : t('Add products, quantities and prices. Unit prices are tax-inclusive; VAT is extracted for the totals.') %></p>
               </div>
               <button type="button" id="add-line" class="btn btn-secondary btn-sm">
                 <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> Add line
               </button>
             </div>
             <div class="table-wrap">
-              <table class="table-base <%= doc.isInvoice ? 'min-w-[1100px]' : 'min-w-[980px]' %>">
+              <table class="table-base <%= netLineEntry ? 'min-w-[1100px]' : 'min-w-[980px]' %>">
                 <thead>
                   <tr>
                     <th class="table-th w-8">#</th>
-                    <th class="table-th <%= doc.isInvoice ? 'min-w-[360px]' : 'min-w-[240px]' %>">Product</th>
-                    <% if (!doc.isInvoice) { %><th class="table-th min-w-[160px]">Description</th><% } %>
+                    <th class="table-th <%= netLineEntry ? 'min-w-[360px]' : 'min-w-[240px]' %>">Product</th>
+                    <% if (!netLineEntry) { %><th class="table-th min-w-[160px]">Description</th><% } %>
                     <th class="table-th <%= doc.isInvoice ? 'w-36' : 'w-24' %> text-right">Qty</th>
-                    <th class="table-th w-32 text-right"><%= doc.isInvoice ? t('Unit price (net)') : t('Unit price') %></th>
+                    <th class="table-th w-32 text-right"><%= netLineEntry ? t('Unit price (net)') : t('Unit price') %></th>
                     <th class="table-th w-24 text-right">VAT %</th>
-                    <% if (doc.isInvoice) { %><th class="table-th w-32 text-right"><%= t('Net price') %></th><% } %>
+                    <% if (netLineEntry) { %><th class="table-th w-32 text-right"><%= t('Net price') %></th><% } %>
                     <th class="table-th w-32 text-right">Line total</th>
                     <th class="table-th w-12"></th>
                   </tr>
@@ -264,7 +265,7 @@
                         <span class="mt-1 block text-[11px] text-gray-400" data-unit><%= item.unit || p?.unit || '' %></span>
                         <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
                       </td>
-                      <% if (!doc.isInvoice) { %>
+                      <% if (!netLineEntry) { %>
                         <td class="table-td">
                           <input name="item_description[<%= i %>]" data-description value="<%= item.description || '' %>" class="form-input" placeholder="Optional">
                         </td>
@@ -273,7 +274,7 @@
                         <input name="item_quantity[<%= i %>]" data-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
                       </td>
                       <td class="table-td">
-                        <% if (doc.isInvoice) { %>
+                        <% if (netLineEntry) { %>
                           <input name="item_unit_price[<%= i %>]" data-price type="number" min="0" step="0.01" value="<%= itemNet.toFixed(2) %>" class="form-input text-right">
                           <input name="item_unit_price_gross[<%= i %>]" data-price-gross type="hidden" value="<%= itemGross.toFixed(2) %>">
                         <% } else { %>
@@ -283,7 +284,7 @@
                       <td class="table-td">
                         <input name="item_tax_rate[<%= i %>]" data-tax type="number" min="0" step="0.01" value="<%= item.tax_rate !== undefined ? item.tax_rate : defaultTaxRate %>" class="form-input text-right">
                       </td>
-                      <% if (doc.isInvoice) { %>
+                      <% if (netLineEntry) { %>
                         <td class="table-td text-right pt-7 text-gray-600 dark:text-gray-300" data-net-total><%= money(Number(item.quantity || 0) * itemNet) %></td>
                       <% } %>
                       <td class="table-td pt-7 text-right">
@@ -313,12 +314,12 @@
                   <span class="mt-1 block text-[11px] text-gray-400" data-unit></span>
                   <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
                 </td>
-                <% if (!doc.isInvoice) { %>
+                <% if (!netLineEntry) { %>
                   <td class="table-td"><input name="item_description[__INDEX__]" data-description class="form-input" placeholder="Optional"></td>
                 <% } %>
                 <td class="table-td"><input name="item_quantity[__INDEX__]" data-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
                 <td class="table-td">
-                  <% if (doc.isInvoice) { %>
+                  <% if (netLineEntry) { %>
                     <input name="item_unit_price[__INDEX__]" data-price type="number" min="0" step="0.01" value="0.00" class="form-input text-right">
                     <input name="item_unit_price_gross[__INDEX__]" data-price-gross type="hidden" value="0.00">
                   <% } else { %>
@@ -326,7 +327,7 @@
                   <% } %>
                 </td>
                 <td class="table-td"><input name="item_tax_rate[__INDEX__]" data-tax type="number" min="0" step="0.01" value="<%= defaultTaxRate %>" class="form-input text-right"></td>
-                <% if (doc.isInvoice) { %><td class="table-td pt-7 text-right text-gray-600 dark:text-gray-300" data-net-total></td><% } %>
+                <% if (netLineEntry) { %><td class="table-td pt-7 text-right text-gray-600 dark:text-gray-300" data-net-total></td><% } %>
                 <td class="table-td pt-7 text-right"><span class="font-medium" data-line-total></span><span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span></td>
                 <td class="table-td pt-4 text-right">
                   <button type="button" data-remove-line class="btn-icon text-error-500 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10" title="Remove line">

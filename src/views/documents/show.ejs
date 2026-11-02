@@ -7,6 +7,7 @@
       <%
         const isInvoice = doc.kind.includes('invoice');
         const isSalesInvoice = doc.kind === 'sales_invoice';
+        const netPrices = isInvoice || doc.kind === 'sales_order';
         const numberLabel = t(doc.kind === 'purchase_invoice' ? 'Bill' : isInvoice ? 'Invoice' : 'Order');
         const showCustomerCode = doc.party.table === 'customers';
         const balance = Number(row.total) - Number(row.amount_paid || 0);
@@ -150,14 +151,14 @@
                   <% if (showCustomerCode) { %><th class="table-th">Customer code</th><% } %>
                   <th class="table-th text-right">Qty</th>
                   <% if (doc.showDelivered) { %><th class="table-th text-right"><%= doc.qtyLabel %></th><% } %>
-                  <th class="table-th text-right"><%= doc.isInvoice ? t('Unit price (net)') : t('Unit price') %></th>
+                  <th class="table-th text-right"><%= netPrices ? t('Unit price (net)') : t('Unit price') %></th>
                   <th class="table-th text-right">VAT</th>
-                  <% if (doc.isInvoice) { %><th class="table-th text-right"><%= t('Net price') %></th><% } %>
+                  <% if (netPrices) { %><th class="table-th text-right"><%= t('Net price') %></th><% } %>
                   <th class="table-th text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                <% items.forEach(item => { const itemTax = Number(item.tax_rate) || 0; const itemNetUnit = doc.isInvoice && itemTax > 0 ? Number(item.unit_price) / (1 + itemTax / 100) : Number(item.unit_price); const itemNetTotal = doc.isInvoice && itemTax > 0 ? Number(item.line_total) / (1 + itemTax / 100) : Number(item.line_total); %>
+                <% items.forEach(item => { const itemTax = Number(item.tax_rate) || 0; const itemNetUnit = netPrices && itemTax > 0 ? Number(item.unit_price) / (1 + itemTax / 100) : Number(item.unit_price); const itemNetTotal = netPrices && itemTax > 0 ? Number(item.line_total) / (1 + itemTax / 100) : Number(item.line_total); %>
                   <tr>
                     <td class="table-td">
                       <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
@@ -168,9 +169,9 @@
                     <% } %>
                     <td class="table-td text-right"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
                     <% if (doc.showDelivered) { %><td class="table-td text-right"><%= h.formatQty(item[doc.qtyKey]) %></td><% } %>
-                    <td class="table-td text-right"><%= money(doc.isInvoice ? itemNetUnit : item.unit_price) %></td>
+                    <td class="table-td text-right"><%= money(netPrices ? itemNetUnit : item.unit_price) %></td>
                     <td class="table-td text-right"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
-                    <% if (doc.isInvoice) { %><td class="table-td text-right"><%= money(itemNetTotal) %></td><% } %>
+                    <% if (netPrices) { %><td class="table-td text-right"><%= money(itemNetTotal) %></td><% } %>
                     <td class="table-td text-right font-medium"><%= money(item.line_total) %></td>
                   </tr>
                 <% }) %>
