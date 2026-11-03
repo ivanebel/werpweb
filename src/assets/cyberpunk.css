@@ -10,24 +10,24 @@
    ========================================================================== */
 
 :root {
-  --chart-fore: #667085;
-  --chart-grid: #f2f4f7;
-  --chart-ink: #1d2939;
+  --chart-fore: #7d8181;
+  --chart-grid: #e2ddd1;
+  --chart-ink: #223640;
   --chart-tooltip: light;
-  --chart-1: #465fff;
-  --chart-2: #12b76a;
-  --chart-3: #f79009;
-  --chart-4: #0ba5ec;
-  --chart-5: #7a5af8;
-  --chart-6: #f04438;
-  --chart-7: #ee46bc;
-  --chart-8: #84cc16;
+  --chart-1: #b89359;
+  --chart-2: #3f7b5b;
+  --chart-3: #a96c2c;
+  --chart-4: #4b6f86;
+  --chart-5: #7b5d32;
+  --chart-6: #a34d4d;
+  --chart-7: #8c806b;
+  --chart-8: #5f8793;
 }
 
 html.dark {
-  --chart-fore: #98a2b3;
-  --chart-grid: #1f2937;
-  --chart-ink: #f9fafb;
+  --chart-fore: #93a3a9;
+  --chart-grid: #1d3641;
+  --chart-ink: #eef2f0;
   --chart-tooltip: dark;
 }
 

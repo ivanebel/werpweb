@@ -37,27 +37,27 @@
         return {
           theme: root.classList.contains('dark') ? 'dark' : 'light',
           palette: root.dataset.palette || 'default',
-          fore: value('--chart-fore', '#667085'),
-          grid: value('--chart-grid', '#f2f4f7'),
-          ink: value('--chart-ink', '#1d2939'),
+          fore: value('--chart-fore', '#7d8181'),
+          grid: value('--chart-grid', '#e2ddd1'),
+          ink: value('--chart-ink', '#223640'),
           tooltip: value('--chart-tooltip', 'light'),
           series: [
-            value('--chart-1', '#465fff'),
-            value('--chart-2', '#12b76a'),
-            value('--chart-3', '#f79009'),
-            value('--chart-4', '#0ba5ec'),
-            value('--chart-5', '#7a5af8'),
-            value('--chart-6', '#f04438'),
-            value('--chart-7', '#ee46bc'),
-            value('--chart-8', '#84cc16'),
+            value('--chart-1', '#b89359'),
+            value('--chart-2', '#3f7b5b'),
+            value('--chart-3', '#a96c2c'),
+            value('--chart-4', '#4b6f86'),
+            value('--chart-5', '#7b5d32'),
+            value('--chart-6', '#a34d4d'),
+            value('--chart-7', '#8c806b'),
+            value('--chart-8', '#5f8793'),
           ],
         };
       };
     })();
   </script>
   <style>
-    html { background-color: #f9fafb; color-scheme: light; }
-    html.dark { background-color: #030712; color-scheme: dark; }
+    html { background-color: #f4f1e9; color-scheme: light; }
+    html.dark { background-color: #07141c; color-scheme: dark; }
     html[data-palette="cyberpunk"] { background-color: #05030a; color-scheme: dark; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">

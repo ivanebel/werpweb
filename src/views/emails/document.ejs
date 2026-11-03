@@ -30,7 +30,7 @@
                   <td style="vertical-align:middle;">
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                       <tr>
-                        <td style="width:38px;height:38px;background:#465fff;border-radius:10px;color:#ffffff;font-size:16px;font-weight:bold;text-align:center;vertical-align:middle;"><%= companyInitial %></td>
+                        <td style="width:38px;height:38px;background:#0B1E28;border-radius:10px;color:#DCC08D;font-size:16px;font-weight:bold;text-align:center;vertical-align:middle;"><%= companyInitial %></td>
                         <td style="padding-left:12px;vertical-align:middle;">
                           <div style="font-size:15px;font-weight:bold;color:#ffffff;"><%= companyName %></div>
                           <div style="font-size:12px;color:#98a2b3;"><%= settings.company_email || '' %></div>
@@ -63,7 +63,7 @@
                     <% if (row.party_contact) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= row.party_contact %></div><% } %>
                     <% if (row.party_address) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= row.party_address %></div><% } %>
                     <% if (row.party_city) { %><div style="font-size:13px;color:#475467;line-height:1.6;"><%= row.party_city %><%= row.party_state ? ', ' + row.party_state : '' %> <%= row.party_postal || '' %></div><% } %>
-                    <% if (row.party_email) { %><div style="font-size:13px;color:#465fff;line-height:1.6;"><%= row.party_email %></div><% } %>
+                    <% if (row.party_email) { %><div style="font-size:13px;color:#8A6633;line-height:1.6;"><%= row.party_email %></div><% } %>
                     <% if (row.party_tax_id) { %><div style="font-size:12px;color:#667085;margin-top:4px;"><%= t('Tax ID:') %> <%= row.party_tax_id %></div><% } %>
                   </td>
                   <td style="padding-top:18px;vertical-align:top;text-align:right;">
@@ -176,11 +176,11 @@
                 <% if (doc.hasAmountPaid) { %>
                   <tr>
                     <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Paid') %></td>
-                    <td align="right" style="font-size:13px;color:#12b76a;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.amount_paid) %></td>
+                    <td align="right" style="font-size:13px;color:#3F7B5B;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.amount_paid) %></td>
                   </tr>
                   <tr>
                     <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Balance due') %></td>
-                    <td align="right" style="font-size:14px;color:<%= balance > 0.005 ? '#f79009' : '#12b76a' %>;font-weight:bold;padding:3px 0 3px 24px;"><%= money(balance) %></td>
+                    <td align="right" style="font-size:14px;color:<%= balance > 0.005 ? '#A96C2C' : '#3F7B5B' %>;font-weight:bold;padding:3px 0 3px 24px;"><%= money(balance) %></td>
                   </tr>
                 <% } %>
               </table>

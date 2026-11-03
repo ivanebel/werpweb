@@ -39,7 +39,7 @@
   }
 
   .btn-primary {
-    @apply bg-brand-500 text-white shadow-theme-sm hover:bg-brand-600;
+    @apply bg-navy-900 text-white shadow-theme-sm hover:bg-navy-800 dark:bg-brand-500 dark:text-gray-950 dark:hover:bg-brand-400;
   }
 
   .btn-secondary {
@@ -68,6 +68,11 @@
 
   .card {
     @apply rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-white/[0.03];
+  }
+
+  .app-sidebar {
+    @apply border-gray-800 bg-gray-950;
+    background-image: radial-gradient(420px 280px at 0% 0%, rgba(184, 147, 89, 0.12), transparent 65%);
   }
 
   .card-header {
@@ -115,15 +120,16 @@
   }
 
   .menu-group {
-    @apply px-4 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500;
+    @apply px-4 text-[11px] font-semibold uppercase tracking-wider text-[#7f9299];
   }
 
   .menu-item {
-    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white;
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#b9c7cb] transition hover:bg-white/[0.06] hover:text-[#f3efe4];
   }
 
   .menu-item-active {
-    @apply bg-brand-50 text-brand-600 hover:bg-brand-50 hover:text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 dark:hover:bg-brand-500/15 dark:hover:text-brand-400;
+    @apply bg-brand-500/15 text-brand-300 hover:bg-brand-500/15 hover:text-brand-300;
+    box-shadow: inset 2px 0 0 theme('colors.brand.500');
   }
 
   .menu-icon {
