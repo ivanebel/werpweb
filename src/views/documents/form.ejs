@@ -245,18 +245,18 @@
               </button>
             </div>
             <div class="table-wrap">
-              <table class="table-base <%= netLineEntry ? 'min-w-[1200px]' : 'min-w-[1080px]' %>">
+              <table class="table-base table-fixed <%= netLineEntry ? 'min-w-[1200px]' : 'min-w-[1080px]' %>">
                 <thead>
                   <tr>
                     <th class="table-th w-8">#</th>
-                    <th class="table-th <%= netLineEntry ? 'min-w-[360px]' : 'min-w-[240px]' %>">Product</th>
-                    <% if (!netLineEntry) { %><th class="table-th min-w-[160px]">Description</th><% } %>
-                    <th class="table-th <%= qtyWidthClass %> text-right">Qty</th>
-                    <th class="table-th w-20 text-right"><%= t('Weight / unit') %></th>
-                    <th class="table-th w-32 text-right"><%= netLineEntry ? t('Unit price (net)') : t('Unit price') %></th>
-                    <th class="table-th w-24 text-right">VAT %</th>
-                    <% if (netLineEntry) { %><th class="table-th w-32 text-right"><%= t('Net price') %></th><% } %>
-                    <th class="table-th w-32 text-right">Line total</th>
+                    <th class="table-th <%= netLineEntry ? 'w-[360px]' : 'w-[240px]' %>"><%= t('Product') %></th>
+                    <% if (!netLineEntry) { %><th class="table-th w-[160px]"><%= t('Description') %></th><% } %>
+                    <th class="table-th <%= qtyWidthClass %> whitespace-normal text-right"><%= t('Qty') %></th>
+                    <th class="table-th w-20 whitespace-normal text-right"><%= t('Weight / unit') %></th>
+                    <th class="table-th w-32 whitespace-normal text-right"><%= netLineEntry ? t('Unit price (net)') : t('Unit price') %></th>
+                    <th class="table-th w-24 whitespace-normal text-right"><%= t('VAT %') %></th>
+                    <% if (netLineEntry) { %><th class="table-th w-32 whitespace-normal text-right"><%= t('Net price') %></th><% } %>
+                    <th class="table-th w-32 whitespace-normal text-right"><%= t('Line total') %></th>
                     <th class="table-th w-12"></th>
                   </tr>
                 </thead>
