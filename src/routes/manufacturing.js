@@ -172,14 +172,16 @@ async function productOptions() {
 
 async function materialProductOptions() {
   const rows = await query(
-    `SELECT id, sku, name, type, unit, cost_price, stock_qty, status
-       FROM products
-      WHERE type <> 'service'
-      ORDER BY status, name`,
+    `SELECT p.id, p.sku, p.name, p.type, p.unit, p.cost_price, p.stock_qty, p.status,
+            b.name AS brand_name
+       FROM products p
+       LEFT JOIN brands b ON b.id = p.brand_id
+      WHERE p.type = 'raw_material'
+      ORDER BY p.status, b.name, p.name`,
   );
   return rows.map((p) => ({
     value: String(p.id),
-    label: `${p.sku} - ${p.name}${p.status === 'inactive' ? ' (inactive)' : ''}`,
+    label: `${p.brand_name ? `${p.brand_name} - ` : ''}${p.name}${p.status === 'inactive' ? ' (inactive)' : ''}`,
     cost: Number(p.cost_price),
     stock: Number(p.stock_qty),
     unit: p.unit,
