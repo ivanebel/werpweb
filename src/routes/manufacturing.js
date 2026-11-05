@@ -10,7 +10,7 @@ const productionFloor = require('../lib/productionFloor');
 const productionStock = require('../lib/productionStock');
 const { requireRole } = require('../middleware/web');
 
-const round3 = materials.round3;
+const round4 = materials.round4;
 
 const router = express.Router();
 const manageMaterials = requireRole('admin', 'manager');
@@ -155,19 +155,34 @@ function scaleRecordFilters(queryParams) {
   return { where, params, lot, range, from, to };
 }
 
-async function productOptions() {
+async function productOptions(type) {
   const rows = await query(
-    `SELECT id, sku, name, type, unit, cost_price, sale_price, stock_qty FROM products WHERE status = 'active' ORDER BY name`,
+    `SELECT p.id, p.name, p.type, p.unit, p.cost_price, p.sale_price, p.stock_qty,
+            b.name AS brand_name
+       FROM products p
+       LEFT JOIN brands b ON b.id = p.brand_id
+      WHERE p.status = 'active' AND p.type = ?
+      ORDER BY b.name, p.name`,
+    [type],
   );
   return rows.map((p) => ({
     value: String(p.id),
-    label: `${p.sku} — ${p.name}`,
+    label: `${p.brand_name ? `${p.brand_name} - ` : ''}${p.name}`,
     cost: Number(p.cost_price),
     sale: Number(p.sale_price),
     stock: Number(p.stock_qty),
     unit: p.unit,
     type: p.type,
   }));
+}
+
+async function bomFormOptions() {
+  const [outputProducts, componentProducts, classes] = await Promise.all([
+    productOptions('finished_good'),
+    productOptions('raw_material'),
+    materials.loadMaterialClasses(),
+  ]);
+  return { outputProducts, componentProducts, classes };
 }
 
 async function materialProductOptions() {
@@ -587,7 +602,7 @@ router.get('/boms', async (req, res, next) => {
 
 router.get('/boms/new', async (req, res, next) => {
   try {
-    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
+    const { outputProducts, componentProducts, classes } = await bomFormOptions();
     const row = {
       product_id: req.query.product_id || '',
       name: '',
@@ -605,7 +620,8 @@ router.get('/boms/new', async (req, res, next) => {
         { label: req.t('Bills of materials'), href: '/manufacturing/boms' },
         { label: req.t('New BOM') },
       ],
-      products,
+      outputProducts,
+      componentProducts,
       classes,
       row,
       items,
@@ -700,7 +716,7 @@ function collectBomItems(body, t = (value) => value, classMap = new Map(), outpu
 
 router.post('/boms', async (req, res, next) => {
   try {
-    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
+    const { outputProducts, componentProducts, classes } = await bomFormOptions();
     const classMap = new Map(classes.map((row) => [Number(row.id), row]));
     const productId = Number.parseInt(req.body.product_id, 10);
     const { items, errors } = collectBomItems(req.body, req.t, classMap, productId);
@@ -721,7 +737,8 @@ router.post('/boms', async (req, res, next) => {
           { label: req.t('Bills of materials'), href: '/manufacturing/boms' },
           { label: req.t('New BOM') },
         ],
-        products,
+        outputProducts,
+        componentProducts,
         classes,
         row: req.body,
         items: items.length ? items : [{ item_type: 'component', component_id: '', material_class_id: '', quantity: 1, scrap_percent: 0 }],
@@ -813,7 +830,7 @@ router.get('/boms/:id(\\d+)/edit', async (req, res, next) => {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('BOM') })), { status: 404 }));
     }
     const items = await loadBomItems(bom.id);
-    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
+    const { outputProducts, componentProducts, classes } = await bomFormOptions();
     res.render('manufacturing/boms/form', {
       title: req.t('Edit {name}', { name: bom.name }),
       active: 'manufacturing-boms',
@@ -823,7 +840,8 @@ router.get('/boms/:id(\\d+)/edit', async (req, res, next) => {
         { label: bom.name, href: `/manufacturing/boms/${bom.id}` },
         { label: req.t('Edit') },
       ],
-      products,
+      outputProducts,
+      componentProducts,
       classes,
       row: bom,
       items,
@@ -843,7 +861,7 @@ router.post('/boms/:id(\\d+)', async (req, res, next) => {
     if (!bom) {
       return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('BOM') })), { status: 404 }));
     }
-    const [products, classes] = await Promise.all([productOptions(), materials.loadMaterialClasses()]);
+    const { outputProducts, componentProducts, classes } = await bomFormOptions();
     const classMap = new Map(classes.map((row) => [Number(row.id), row]));
     const productId = Number.parseInt(req.body.product_id, 10);
     const { items, errors } = collectBomItems(req.body, req.t, classMap, productId);
@@ -865,7 +883,8 @@ router.post('/boms/:id(\\d+)', async (req, res, next) => {
           { label: bom.name, href: `/manufacturing/boms/${bom.id}` },
           { label: req.t('Edit') },
         ],
-        products,
+        outputProducts,
+        componentProducts,
         classes,
         row: { ...bom, ...req.body },
         items: items.length ? items : [{ item_type: 'component', component_id: '', material_class_id: '', quantity: 1, scrap_percent: 0 }],
@@ -1323,7 +1342,7 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
         (Number(allocation.stock_qty) || 0) - allocation.reserved_other,
       );
     }
-    const shortage = requirements.some((requirement) => Number(requirement.shortage_qty) > 0.0005)
+    const shortage = requirements.some((requirement) => Number(requirement.shortage_qty) > 0.00005)
       || allocations.some((allocation) => (
         Number(allocation.track_stock) === 1
         && Number(allocation.stock_qty) < Number(allocation.quantity_required)
@@ -1381,7 +1400,7 @@ router.get('/production-orders/:id(\\d+)/readonly', async (req, res, next) => {
       loadProductionRequirements(order.id),
       loadProductionMaterials(order.id),
     ]);
-    const shortage = requirements.some((requirement) => Number(requirement.shortage_qty) > 0.0005);
+    const shortage = requirements.some((requirement) => Number(requirement.shortage_qty) > 0.00005);
     res.set('X-Robots-Tag', 'noindex, nofollow');
     return res.render('manufacturing/production/readonly', {
       title: `${order.production_no} · ${req.t('Read-only')}`,
@@ -1519,7 +1538,7 @@ router.post('/production-orders/:id(\\d+)/materials', async (req, res, next) => 
           0,
           Number(member.available) - (reservedInOrder.get(Number(member.product_id)) || 0),
         );
-        if (quantity > available + 0.0005) {
+        if (quantity > available + 0.00005) {
           errors.push(req.t('Line {line}: {product} only has {available} available.', {
             line: requirement.class_name || requirement.id,
             product: member.name,
@@ -1533,7 +1552,7 @@ router.post('/production-orders/:id(\\d+)/materials', async (req, res, next) => 
         );
         totalClass += quantity * Number(member.conversion_factor);
       }
-      if (totalClass > Number(requirement.quantity_required) + 0.0005) {
+      if (totalClass > Number(requirement.quantity_required) + 0.00005) {
         errors.push(req.t('Line {line}: allocation exceeds the requirement of {required} {unit}.', {
           line: requirement.class_name || requirement.id,
           required: requirement.quantity_required,
@@ -1584,8 +1603,8 @@ router.post('/production-orders/:id(\\d+)/materials', async (req, res, next) => 
               SET quantity_allocated = ?, shortage_qty = ?
             WHERE id = ?`,
           [
-            round3(totalClass),
-            Math.max(0, round3(Number(requirement.quantity_required) - totalClass)),
+            round4(totalClass),
+            Math.max(0, round4(Number(requirement.quantity_required) - totalClass)),
             requirement.id,
           ],
         );
@@ -1685,7 +1704,7 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
     const linesChanged = existingLines.length !== lines.length
       || existingLines.some((line, index) => (
         Number(line.bom_id) !== Number(lines[index].bom_id)
-        || Math.abs(Number(line.quantity) - Number(lines[index].quantity)) > 0.0005
+        || Math.abs(Number(line.quantity) - Number(lines[index].quantity)) > 0.00005
       ));
 
     await withTransaction(async (conn) => {
@@ -2097,7 +2116,7 @@ async function loadFloorRequirement(orderId, materialClassId) {
 function isOverRequirement(requirement, classQuantity) {
   if (!requirement) return false;
   return Number(requirement.quantity_consumed) + Number(classQuantity)
-    > Number(requirement.quantity_required) + 0.0005;
+    > Number(requirement.quantity_required) + 0.00005;
 }
 
 function floorWeight(value) {
@@ -2365,7 +2384,7 @@ router.post('/floor/lines/:lineId(\\d+)/input', async (req, res, next) => {
       }
       const quantity = mode === 'pack' ? packUnits : (mode === 'two' ? 2 : 1);
       const conversionFactor = Number(member.conversion_factor) || 1;
-      const classQuantity = productionFloor.round3(quantity * conversionFactor);
+      const classQuantity = materials.round4(quantity * conversionFactor);
       const lot = String(req.body.lot_number || '').trim().slice(0, 60) || run.raw_lot_number || null;
       const expiry = floorDate(req.body.expiry_date) || run.raw_expiry_date;
       const requirement = await loadFloorRequirement(orderId, run.raw_material_class_id);
@@ -2754,7 +2773,7 @@ router.post('/floor/lines/:lineId(\\d+)/undo', async (req, res, next) => {
       );
       if (Number(last.stock_posted) === 1) {
         const stockDelta = -Number(last.stock_quantity || 0);
-        const movement = Math.abs(stockDelta) >= 0.0005
+        const movement = Math.abs(stockDelta) >= 0.00005
           ? await productionStock.postStockMovement(conn, {
             productId: last.product_id,
             quantity: stockDelta,

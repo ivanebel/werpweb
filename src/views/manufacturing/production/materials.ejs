@@ -44,7 +44,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <h2 class="card-title"><%= requirement.material_class_id ? requirement.class_name : requirement.component_name %></h2>
                   <% if (requirement.material_class_id) { %><span class="badge bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400"><%= t('Material class') %></span><% } %>
-                  <% if (Number(requirement.shortage_qty) > 0.0005) { %><span class="badge bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Shortage') %></span><% } %>
+                  <% if (Number(requirement.shortage_qty) > 0.00005) { %><span class="badge bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Shortage') %></span><% } %>
                 </div>
                 <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                   <%= t('Required: {qty} {unit}', { qty: h.formatQty(requirement.quantity_required), unit: requirement.unit }) %>
@@ -87,7 +87,7 @@
                         <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(member.reserved_other) %></td>
                         <td class="table-td text-right font-medium"><%= h.formatQty(member.available) %></td>
                         <td class="table-td text-right">
-                          <input name="<%= field %>" data-allocation-qty data-factor="<%= member.conversion_factor %>" type="number" min="0" step="0.001" max="<%= member.available %>" value="<%= active ? value : 0 %>" class="form-input w-32 text-right" <%= active ? '' : 'disabled' %>>
+                          <input name="<%= field %>" data-allocation-qty data-factor="<%= member.conversion_factor %>" type="number" min="0" step="0.0001" max="<%= member.available %>" value="<%= active ? value : 0 %>" class="form-input w-32 text-right" <%= active ? '' : 'disabled' %>>
                           <span class="mt-0.5 block text-[10px] text-gray-400"><%= member.product_unit %></span>
                         </td>
                         <td class="table-td text-right"><%= money(member.unit_cost) %></td>

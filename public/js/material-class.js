@@ -8,7 +8,7 @@
   const locale = document.body.dataset.locale || document.documentElement.lang || 'en-US';
 
   function fmt(value) {
-    return Number(value || 0).toLocaleString(locale, { maximumFractionDigits: 3 });
+    return Number(value || 0).toLocaleString(locale, { maximumFractionDigits: 4 });
   }
 
   function classUnit() {

@@ -59,7 +59,7 @@ function classCostSummary(members, method = 'priority') {
 }
 
 function classStock(members) {
-  return round3(activeMembers(members).reduce(
+  return round4(activeMembers(members).reduce(
     (sum, member) => sum + Math.max(0, Number(member.stock_qty) || 0) * Math.max(0, Number(member.conversion_factor) || 0),
     0,
   ));
@@ -72,31 +72,31 @@ function allocateClassRequirement({ required, members, reservedByProduct = new M
   let remaining = quantity;
 
   for (const member of active) {
-    if (remaining <= 0.0005) break;
+    if (remaining <= 0.00005) break;
     const factor = Math.max(0.000001, Number(member.conversion_factor) || 1);
     const reserved = Math.max(0, Number(reservedByProduct.get(Number(member.product_id)) || 0));
     const stock = Math.max(0, (Number(member.stock_qty) || 0) - reserved);
-    const availableClass = round3(stock * factor);
+    const availableClass = round4(stock * factor);
     const takeClass = allowMix
       ? Math.min(remaining, availableClass)
       : (availableClass >= remaining ? remaining : 0);
-    if (takeClass <= 0.0005) continue;
+    if (takeClass <= 0.00005) continue;
     allocations.push({
       member,
       product_id: Number(member.product_id),
-      class_quantity: round3(takeClass),
-      quantity: round3(takeClass / factor),
+      class_quantity: round4(takeClass),
+      quantity: round4(takeClass / factor),
       priority: Number(member.priority) || 0,
       conversion_factor: factor,
       unit_cost: memberUnitCost(member),
     });
-    remaining = round3(remaining - takeClass);
+    remaining = round4(remaining - takeClass);
   }
 
   return {
     allocations,
-    allocated_class_qty: round3(quantity - remaining),
-    shortage_qty: round3(Math.max(0, remaining)),
+    allocated_class_qty: round4(quantity - remaining),
+    shortage_qty: round4(Math.max(0, remaining)),
   };
 }
 
@@ -133,7 +133,7 @@ async function loadClassMembers({ classIds = null, activeOnly = true, conn = nul
     };
     member.unit_cost = memberUnitCost(member);
     member.class_unit_cost = memberClassCost(member);
-    member.class_stock = round3(
+    member.class_stock = round4(
       Math.max(0, member.stock_qty) * Math.max(0, member.conversion_factor),
     );
     return member;
@@ -252,7 +252,7 @@ async function loadBomLineCosts(bomIds) {
       unit: unit || 'unit',
       quantity,
       scrap_percent: scrap,
-      qty_with_scrap: round3(quantity * (1 + scrap / 100)),
+      qty_with_scrap: round4(quantity * (1 + scrap / 100)),
       unit_cost: round4(unitCost),
       cost_price: round4(unitCost),
       cost_min: round4(costMin),

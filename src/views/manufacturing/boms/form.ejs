@@ -8,7 +8,7 @@
         const backUrl = mode === 'edit' ? `/manufacturing/boms/${row.id}` : '/manufacturing/boms';
         const errorList = Object.values(errors || {}).concat(itemErrors || []);
         const productById = {};
-        products.forEach(p => { productById[String(p.value)] = p; });
+        componentProducts.forEach(p => { productById[String(p.value)] = p; });
         const classById = {};
         (classes || []).forEach(c => { classById[String(c.id)] = c; });
         const lines = items && items.length ? items : [{ item_type: 'component', component_id: '', material_class_id: '', quantity: 1, scrap_percent: 0 }];
@@ -51,12 +51,12 @@
               <label for="product_id" class="form-label">Output product <span class="text-error-500">*</span></label>
               <select id="product_id" name="product_id" class="form-select <%= errors.product_id ? 'form-input-error' : '' %>" required>
                 <option value="">Select the manufactured product…</option>
-                <% products.forEach(opt => { %>
-                  <option value="<%= opt.value %>" <%= String(row.product_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %> (<%= h.statusInfo(opt.type).label %>)</option>
+                <% outputProducts.forEach(opt => { %>
+                  <option value="<%= opt.value %>" <%= String(row.product_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
                 <% }) %>
               </select>
               <% if (errors.product_id) { %><p class="form-error"><%= errors.product_id %></p><% } %>
-              <p class="form-help">Only products set up in Inventory can be selected.</p>
+              <p class="form-help">Only active finished goods can be selected.</p>
             </div>
             <div class="md:col-span-2">
               <label for="name" class="form-label">BOM name <span class="text-error-500">*</span></label>
@@ -129,7 +129,7 @@
                         <div class="mt-2 <%= itemType === 'class' ? 'hidden' : '' %>" data-bom-component-wrap>
                           <select name="component_id[<%= i %>]" data-component-select class="form-select w-full">
                             <option value=""><%= t('Select component') %></option>
-                            <% products.forEach(opt => { %>
+                            <% componentProducts.forEach(opt => { %>
                               <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>" data-stock="<%= opt.stock %>" <%= String(item.component_id || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
                             <% }) %>
                           </select>
@@ -158,7 +158,7 @@
                         </div>
                       </td>
                       <td class="table-td">
-                        <input name="quantity[<%= i %>]" data-bom-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
+                        <input name="quantity[<%= i %>]" data-bom-qty type="number" min="0" step="0.0001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
                       </td>
                       <td class="table-td">
                         <input name="scrap_percent[<%= i %>]" data-bom-scrap type="number" min="0" step="0.01" value="<%= item.scrap_percent !== undefined ? item.scrap_percent : 0 %>" class="form-input text-right">
@@ -187,7 +187,7 @@
                   <div class="mt-2" data-bom-component-wrap>
                     <select name="component_id[__INDEX__]" data-component-select class="form-select w-full">
                       <option value=""><%= t('Select component') %></option>
-                      <% products.forEach(opt => { %>
+                      <% componentProducts.forEach(opt => { %>
                         <option value="<%= opt.value %>" data-cost="<%= opt.cost %>" data-unit="<%= opt.unit %>" data-stock="<%= opt.stock %>"><%= opt.label %></option>
                       <% }) %>
                     </select>
@@ -210,7 +210,7 @@
                     <span class="mt-0.5 block text-[11px] text-gray-400" data-bom-cost-range></span>
                   </div>
                 </td>
-                <td class="table-td"><input name="quantity[__INDEX__]" data-bom-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
+                <td class="table-td"><input name="quantity[__INDEX__]" data-bom-qty type="number" min="0" step="0.0001" value="1" class="form-input text-right"></td>
                 <td class="table-td"><input name="scrap_percent[__INDEX__]" data-bom-scrap type="number" min="0" step="0.01" value="0" class="form-input text-right"></td>
                 <td class="table-td pt-7 text-right"><span class="font-medium" data-bom-cost>0.00</span></td>
                 <td class="table-td pt-4 text-right">

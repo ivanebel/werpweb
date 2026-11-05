@@ -5,7 +5,7 @@ const { nextNumber } = require('../lib/sequences');
 const { todayISO, addDaysISO, lotFromDate } = require('../lib/helpers');
 const materials = require('./materials');
 
-const round3 = (n) => Math.round((Number(n) + Number.EPSILON) * 1000) / 1000;
+const round4 = (n) => Math.round((Number(n) + Number.EPSILON) * 10000) / 10000;
 
 async function reservedByComponent(conn, excludeOrderId) {
   const [rows] = await conn.query(
@@ -78,14 +78,14 @@ async function snapshotMaterials(conn, productionOrderId) {
         * (1 + Number(item.scrap_percent) / 100);
       const existing = requirements.get(key);
       if (existing) {
-        existing.quantity_required = round3(existing.quantity_required + quantity);
+        existing.quantity_required = round4(existing.quantity_required + quantity);
         existing.source_count += 1;
       } else {
         requirements.set(key, {
           material_class_id: isClass ? Number(item.material_class_id) : null,
           component_id: isClass ? null : Number(item.component_id),
           unit: isClass ? (item.class_unit || 'unit') : (item.component_unit || 'unit'),
-          quantity_required: round3(quantity),
+          quantity_required: round4(quantity),
           source_count: 1,
           sort_order: sort++,
           class_row: isClass ? item : null,
@@ -164,7 +164,7 @@ async function snapshotMaterials(conn, productionOrderId) {
         );
         reserved.set(
           selected.product_id,
-          round3((reserved.get(selected.product_id) || 0) + selected.quantity),
+          round4((reserved.get(selected.product_id) || 0) + selected.quantity),
         );
       }
       await conn.query(
@@ -179,7 +179,7 @@ async function snapshotMaterials(conn, productionOrderId) {
       const stock = tracked
         ? Math.max(0, (Number(row.stock_qty) || 0) - (reserved.get(componentId) || 0))
         : requirement.quantity_required;
-      const shortage = tracked ? Math.max(0, round3(requirement.quantity_required - stock)) : 0;
+      const shortage = tracked ? Math.max(0, round4(requirement.quantity_required - stock)) : 0;
       await conn.query(
         `INSERT INTO production_order_materials
            (production_order_id, requirement_id, material_class_id, component_id,
@@ -195,7 +195,7 @@ async function snapshotMaterials(conn, productionOrderId) {
           materials.memberUnitCost(row),
         ],
       );
-      reserved.set(componentId, round3((reserved.get(componentId) || 0) + requirement.quantity_required));
+      reserved.set(componentId, round4((reserved.get(componentId) || 0) + requirement.quantity_required));
       await conn.query(
         `UPDATE production_order_requirements
             SET quantity_allocated = ?, shortage_qty = ?
@@ -255,7 +255,7 @@ async function createProductionFromSalesOrder(salesOrderId, userId) {
         product_id: item.product_id,
         quantity: 0,
       };
-      line.quantity = round3(Number(line.quantity) + Number(item.quantity));
+      line.quantity = round4(Number(line.quantity) + Number(item.quantity));
       lineMap.set(key, line);
     }
     const lines = [...lineMap.values()];
@@ -364,7 +364,7 @@ async function completeProductionOrder(productionOrderId, userId) {
     );
 
     const requirementShortages = requirements
-      .filter((requirement) => Number(requirement.shortage_qty) > 0.0005)
+      .filter((requirement) => Number(requirement.shortage_qty) > 0.00005)
       .map((requirement) => {
         const label = requirement.material_class_id
           ? `${requirement.class_code || ''} ${requirement.class_name || ''}`.trim()
@@ -383,7 +383,7 @@ async function completeProductionOrder(productionOrderId, userId) {
       const componentId = Number(allocation.component_id);
       const remaining = Math.max(
         0,
-        round3(Number(allocation.quantity_required) - Number(allocation.quantity_consumed)),
+        round4(Number(allocation.quantity_required) - Number(allocation.quantity_consumed)),
       );
       const entry = byComponent.get(componentId) || {
         sku: allocation.sku,
@@ -392,7 +392,7 @@ async function completeProductionOrder(productionOrderId, userId) {
         track_stock: Number(allocation.track_stock) === 1,
         required: 0,
       };
-      entry.required = round3(entry.required + remaining);
+      entry.required = round4(entry.required + remaining);
       byComponent.set(componentId, entry);
     }
     const stockShortages = [...byComponent.entries()]
@@ -409,9 +409,9 @@ async function completeProductionOrder(productionOrderId, userId) {
     for (const allocation of allocations) {
       const remaining = Math.max(
         0,
-        round3(Number(allocation.quantity_required) - Number(allocation.quantity_consumed)),
+        round4(Number(allocation.quantity_required) - Number(allocation.quantity_consumed)),
       );
-      if (remaining <= 0.0005) continue;
+      if (remaining <= 0.00005) continue;
       consumedAllocations += 1;
       if (Number(allocation.track_stock) === 1) {
         await conn.query('UPDATE products SET stock_qty = stock_qty - ? WHERE id = ?', [remaining, allocation.component_id]);
@@ -466,4 +466,4 @@ async function completeProductionOrder(productionOrderId, userId) {
   });
 }
 
-module.exports = { snapshotMaterials, createProductionFromSalesOrder, completeProductionOrder, round3 };
+module.exports = { snapshotMaterials, createProductionFromSalesOrder, completeProductionOrder, round4 };

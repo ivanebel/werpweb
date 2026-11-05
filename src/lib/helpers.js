@@ -149,7 +149,7 @@ function formatNumber(value, digits = 2, locale = DEFAULT_LOCALE) {
 
 function formatQty(value, locale = DEFAULT_LOCALE) {
   const n = Number(value || 0);
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(n);
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(n);
 }
 
 function formatDate(value, locale = DEFAULT_LOCALE) {

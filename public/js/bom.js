@@ -11,6 +11,10 @@
     return Number(value || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  function fmtQty(value) {
+    return Number(value || 0).toLocaleString(locale, { maximumFractionDigits: 4 });
+  }
+
   function selectedOption(row) {
     const type = row.querySelector('[data-bom-type]')?.value === 'class' ? 'class' : 'component';
     const select = type === 'class'
@@ -34,9 +38,9 @@
           ? 'Class quantity per output unit'
           : 'Quantity per output unit';
       } else if (type === 'class') {
-        unitHint.textContent = `${unit} · class stock ${fmt(stock)}`;
+        unitHint.textContent = `${unit} · class stock ${fmtQty(stock)}`;
       } else {
-        unitHint.textContent = `${unit} · stock ${fmt(stock)}`;
+        unitHint.textContent = `${unit} · stock ${fmtQty(stock)}`;
       }
     }
     if (rangeHint) {

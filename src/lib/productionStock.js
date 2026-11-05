@@ -3,6 +3,7 @@
 const materials = require('./materials');
 
 const round3 = (value) => Math.round((Number(value) + Number.EPSILON) * 1000) / 1000;
+const round4 = (value) => Math.round((Number(value) + Number.EPSILON) * 10000) / 10000;
 
 /**
  * Film stock is measured in kilograms, but a film product can be stocked in
@@ -39,15 +40,15 @@ async function postStockMovement(conn, {
   t = (value) => value,
 }) {
   const product = await lockProduct(conn, productId);
-  const qty = round3(quantity);
-  if (Math.abs(qty) < 0.0005) {
+  const qty = round4(quantity);
+  if (Math.abs(qty) < 0.00005) {
     return { product, movementId: null, tracked: Number(product.track_stock) === 1 };
   }
   if (Number(product.track_stock) !== 1) {
     return { product, movementId: null, tracked: false };
   }
   const stock = Number(product.stock_qty) || 0;
-  if (qty < 0 && stock + qty < -0.0005) {
+  if (qty < 0 && stock + qty < -0.00005) {
     throw Object.assign(
       new Error(t('Insufficient stock for {product}: need {need}, available {stock}.', {
         product: product.name,
@@ -95,8 +96,8 @@ async function recordConsumption(conn, {
   unitCost,
 }) {
   if (!requirementId) return;
-  const stockQty = round3(stockQuantity);
-  const classQty = round3(classQuantity);
+  const stockQty = round4(stockQuantity);
+  const classQty = round4(classQuantity);
   await conn.query(
     `UPDATE production_order_requirements
         SET quantity_consumed = GREATEST(0, quantity_consumed + ?)
@@ -115,7 +116,7 @@ async function recordConsumption(conn, {
         WHERE id = ?`,
       [stockQty, existing[0].id],
     );
-  } else if (Math.abs(stockQty) > 0.0005) {
+  } else if (Math.abs(stockQty) > 0.00005) {
     await conn.query(
       `INSERT INTO production_order_materials
          (production_order_id, requirement_id, material_class_id, component_id,

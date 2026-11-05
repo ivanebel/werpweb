@@ -1448,7 +1448,7 @@ const ES = {
   'No invoiced sales yet.': 'Todavía no hay ventas facturadas.',
   'No materials snapped for this order.': 'No se copiaron materiales para esta orden.',
   'No production orders yet.': 'Todavía no hay órdenes de producción.',
-  'Only products set up in Inventory can be selected.': 'Solo se pueden seleccionar productos creados en Inventario.',
+  'Only active finished goods can be selected.': 'Solo se pueden seleccionar productos terminados activos.',
   'Open customer': 'Abrir cliente',
   'Open lines': 'Abrir líneas',
   'Optional link for traceability.': 'Vínculo opcional para trazabilidad.',

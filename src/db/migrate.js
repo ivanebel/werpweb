@@ -45,6 +45,20 @@ async function makeNullable(conn, dbName, table, column, definition) {
   return true;
 }
 
+async function ensureDecimalScale(conn, dbName, table, column, definition, scale) {
+  const [rows] = await conn.query(
+    `SELECT NUMERIC_SCALE FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [dbName, table, column],
+  );
+  if (!rows.length) return false;
+  const current = Number(rows[0].NUMERIC_SCALE ?? rows[0].numeric_scale);
+  if (!Number.isFinite(current) || current >= scale) return false;
+  await conn.query(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`);
+  console.log(`[migrate] expanded ${table}.${column} to ${scale} decimals`);
+  return true;
+}
+
 async function indexExists(conn, dbName, table, indexName) {
   const [rows] = await conn.query(
     `SELECT 1 FROM information_schema.STATISTICS
@@ -511,6 +525,26 @@ async function upgradeSchema(conn, dbName) {
         WHERE id = ?`,
       [requirementId, material.unit_cost, material.id],
     );
+  }
+
+  // Production component quantities keep four decimals through BOM definition,
+  // production requirements, floor consumption and stock.
+  const quantityColumns = [
+    ['bom_items', 'quantity', 'DECIMAL(14,4) NOT NULL DEFAULT 1'],
+    ['production_order_requirements', 'quantity_required', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_order_requirements', 'quantity_allocated', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_order_requirements', 'quantity_consumed', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_order_requirements', 'shortage_qty', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_order_materials', 'quantity_required', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_order_materials', 'quantity_consumed', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_line_inputs', 'quantity', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_line_inputs', 'stock_quantity', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['production_line_inputs', 'class_quantity', 'DECIMAL(14,4) NULL'],
+    ['products', 'stock_qty', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+    ['stock_movements', 'quantity', 'DECIMAL(14,4) NOT NULL DEFAULT 0'],
+  ];
+  for (const [table, column, definition] of quantityColumns) {
+    await ensureDecimalScale(conn, dbName, table, column, definition, 4);
   }
 }
 

@@ -180,7 +180,7 @@ function formatOrderDetail(order, lines, requirements) {
     if (requirements.length > visible.length) {
       parts.push(`… y ${requirements.length - visible.length} material(es) más.`);
     }
-    const shortage = requirements.filter((row) => Number(row.shortage_qty) > 0.0005);
+    const shortage = requirements.filter((row) => Number(row.shortage_qty) > 0.00005);
     parts.push('');
     parts.push(shortage.length ? '<b>Hay faltantes de materiales.</b>' : '<b>Sin faltantes de materiales.</b>');
   } else {

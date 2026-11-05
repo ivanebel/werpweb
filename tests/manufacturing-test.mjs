@@ -22,6 +22,7 @@ const suffix = `${Date.now()}`;
 const ids = { products: [], orders: [] };
 let classId = null;
 let bomId = null;
+let precisionBomId = null;
 
 async function insertProduct(sku, name, type, unit, stock, cost) {
   const [result] = await conn.query(
@@ -176,6 +177,67 @@ try {
     'stock movements carry the snapshotted member and finished-goods costs',
   );
 
+  // ------------------------------------------ four-decimal component quantity
+  const precisionComponentId = await insertProduct(
+    `TST-P-${suffix}`,
+    'Test precision component',
+    'raw_material',
+    'kg',
+    100,
+    1,
+  );
+  const [precisionBom] = await conn.query(
+    `INSERT INTO boms (product_id, name, version, output_qty, status)
+     VALUES (?, ?, 'precision', 1, 'active')`,
+    [finishedId, `Test precision BOM ${suffix}`],
+  );
+  precisionBomId = precisionBom.insertId;
+  await conn.query(
+    `INSERT INTO bom_items (bom_id, component_id, material_class_id, quantity, scrap_percent, sort_order)
+     VALUES (?, ?, NULL, 0.1234, 0, 0)`,
+    [precisionBomId, precisionComponentId],
+  );
+  const [precisionOrder] = await conn.query(
+    `INSERT INTO production_orders (production_no, start_date, status)
+     VALUES (?, '2026-10-26', 'planned')`,
+    [`TST-${suffix}-P`.slice(0, 30)],
+  );
+  ids.orders.push(precisionOrder.insertId);
+  await conn.query(
+    `INSERT INTO production_order_lines
+       (production_order_id, bom_id, product_id, quantity, lot_number, expiry_date, sort_order)
+     VALUES (?, ?, ?, 1, 'TEST-LOT', '2027-12-31', 0)`,
+    [precisionOrder.insertId, precisionBomId, finishedId],
+  );
+  await snapshotMaterials(conn, precisionOrder.insertId);
+  const [precisionRequirement] = await conn.query(
+    `SELECT quantity_required FROM production_order_requirements
+      WHERE production_order_id = ? AND component_id = ?`,
+    [precisionOrder.insertId, precisionComponentId],
+  );
+  assert.equal(
+    Number(precisionRequirement[0].quantity_required),
+    0.1234,
+    'four-decimal component quantities survive the production snapshot',
+  );
+
+  await conn.query("UPDATE production_orders SET status = 'in_progress' WHERE id = ?", [precisionOrder.insertId]);
+  await completeProductionOrder(precisionOrder.insertId, null);
+  const [precisionConsumed] = await conn.query(
+    `SELECT quantity_consumed FROM production_order_materials
+      WHERE production_order_id = ? AND component_id = ?`,
+    [precisionOrder.insertId, precisionComponentId],
+  );
+  assert.equal(Number(precisionConsumed[0].quantity_consumed), 0.1234, 'four-decimal quantities are consumed in full');
+  const [precisionStock] = await conn.query('SELECT stock_qty FROM products WHERE id = ?', [precisionComponentId]);
+  assert.equal(Number(precisionStock[0].stock_qty), 99.8766, 'four-decimal stock consumption is preserved');
+  const [precisionMovement] = await conn.query(
+    `SELECT quantity FROM stock_movements
+      WHERE reference_type = 'production_order' AND reference_id = ? AND movement_type = 'production_out'`,
+    [precisionOrder.insertId],
+  );
+  assert.equal(Number(precisionMovement[0].quantity), -0.1234, 'the stock movement keeps four decimals');
+
   console.log('All manufacturing integration checks passed.');
 } finally {
   try {
@@ -187,6 +249,7 @@ try {
       await conn.query('DELETE FROM production_orders WHERE id = ?', [orderId]);
     }
     if (bomId) await conn.query('DELETE FROM boms WHERE id = ?', [bomId]);
+    if (precisionBomId) await conn.query('DELETE FROM boms WHERE id = ?', [precisionBomId]);
     if (classId) await conn.query('DELETE FROM material_classes WHERE id = ?', [classId]);
     for (const productId of ids.products) {
       await conn.query('DELETE FROM products WHERE id = ?', [productId]);

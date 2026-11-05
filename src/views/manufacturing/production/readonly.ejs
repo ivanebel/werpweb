@@ -86,7 +86,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <% requirements.forEach((requirement) => { const short = Number(requirement.shortage_qty) > 0.0005; %>
+                  <% requirements.forEach((requirement) => { const short = Number(requirement.shortage_qty) > 0.00005; %>
                     <tr class="table-row">
                       <td class="table-td">
                         <p class="font-medium text-gray-800 dark:text-gray-200"><%= requirement.material_class_id ? requirement.class_name : requirement.component_name %></p>

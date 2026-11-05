@@ -124,7 +124,7 @@ async function listShortageOrders(statuses = ACTIVE_STATUSES, limit = 10) {
        LEFT JOIN material_classes mc ON mc.id = r.material_class_id
        LEFT JOIN products p ON p.id = r.component_id
       WHERE po.status IN (${placeholders})
-        AND r.shortage_qty > 0.0005
+        AND r.shortage_qty > 0.00005
       ORDER BY (po.due_date IS NULL), po.due_date, po.id, r.sort_order, r.id`,
     selected,
   );
