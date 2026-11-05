@@ -209,6 +209,31 @@ try {
     ok('pricing matches the source', copy && near(copy.cost_gross_price, 12.34) && near(copy.cost_vat_rate, 21) && near(copy.sale_vat_rate, 0));
     ok('source product is unchanged', source && source.sku === sourceSku && near(source.stock_qty, 7.5) && source.ean13 === ean13 && source.dun14 === dun14 && source.plu === plu);
   }
+
+  // ------------------------------------------------------- quick price update
+  {
+    const res = await post(`/products/${copyId}/prices`, {
+      cost_gross_price: '20',
+      cost_vat_rate: '21',
+      cost_levy_rate: '2.5',
+      sale_gross_price: '40',
+      sale_vat_rate: '10.5',
+      return_to: '/products?category_id=4',
+    });
+    ok('price update redirects to the list', res.status === 302 && res.headers.get('location') === '/products?category_id=4', `${res.status} ${res.headers.get('location')}`);
+    const priced = await one('SELECT cost_price, sale_price FROM products WHERE id = ?', [copyId]);
+    ok('price update recalculates net prices', priced && near(priced.cost_price, 24.7) && near(priced.sale_price, 44.2), JSON.stringify(priced));
+  }
+
+  // ------------------------------------------------------ status transitions
+  {
+    const deactivate = await post(`/products/${copyId}/deactivate`, {});
+    const inactive = await one('SELECT status FROM products WHERE id = ?', [copyId]);
+    const activate = await post(`/products/${copyId}/activate`, {});
+    const active = await one('SELECT status FROM products WHERE id = ?', [copyId]);
+    ok('product can be deactivated from the list', deactivate.status === 302 && inactive && inactive.status === 'inactive', `${deactivate.status} ${JSON.stringify(inactive)}`);
+    ok('product can be activated again', activate.status === 302 && active && active.status === 'active', `${activate.status} ${JSON.stringify(active)}`);
+  }
 } catch (error) {
   failures += 1;
   console.log('FAIL uncaught', error.stack || error.message);

@@ -58,12 +58,14 @@
           <a href="<%= resource.basePath %>/<%= row.id %>/edit" class="btn btn-secondary btn-sm">
             <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> Edit
           </a>
-          <form action="<%= resource.basePath %>/<%= row.id %>/delete" method="POST" data-confirm="<%= t('Delete {item}? This cannot be undone.', { item: resource.singularLower }) %>">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button type="submit" class="btn btn-danger btn-sm">
-              <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %> Delete
-            </button>
-          </form>
+          <% if (resource.key !== 'products' || (currentUser && currentUser.role === 'admin')) { %>
+            <form action="<%= resource.basePath %>/<%= row.id %>/delete" method="POST" data-confirm="<%= t('Delete {item}? This cannot be undone.', { item: resource.singularLower }) %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn btn-danger btn-sm">
+                <%- include('/partials/icon', { name: 'trash', className: 'h-4 w-4' }) %> Delete
+              </button>
+            </form>
+          <% } %>
         </div>
       </div>
 

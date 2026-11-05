@@ -3,6 +3,7 @@
 const express = require('express');
 const { makeResourceRouter } = require('./resource');
 const { query, one, getPool } = require('../db');
+const { requireRole } = require('../middleware/web');
 const { analyzeBarcode, barcodeFilename, renderBarcodeSvg } = require('../lib/barcodes');
 
 const typeOptions = [
@@ -20,6 +21,11 @@ const statusOptions = [
 
 async function brandOptions() {
   const rows = await query('SELECT id, name FROM brands ORDER BY name');
+  return rows.map((r) => ({ value: String(r.id), label: r.name }));
+}
+
+async function categoryOptions() {
+  const rows = await query('SELECT id, name FROM product_categories ORDER BY name');
   return rows.map((r) => ({ value: String(r.id), label: r.name }));
 }
 
@@ -172,10 +178,7 @@ const fields = [
   { name: 'old_id', label: 'Old ID', type: 'number', min: 0, integer: true, section: 'Product', help: 'Optional ID from the previous database, used for product data migration.' },
   { name: 'status', label: 'Status', type: 'select', options: statusOptions, default: 'active', section: 'Product' },
   { name: 'name', label: 'Product name', type: 'text', required: true, full: true, section: 'Product' },
-  { name: 'category_id', label: 'Category', type: 'select', section: 'Product', optionsFrom: async () => {
-    const rows = await query('SELECT id, name FROM product_categories ORDER BY name');
-    return rows.map((r) => ({ value: String(r.id), label: r.name }));
-  } },
+  { name: 'category_id', label: 'Category', type: 'select', section: 'Product', optionsFrom: categoryOptions },
   { name: 'brand_id', label: 'Brand', type: 'select', section: 'Product', optionsFrom: brandOptions },
   { name: 'type', label: 'Product type', type: 'select', options: typeOptions, default: 'finished_good', section: 'Product', help: 'Raw materials are purchased but not sold. Finished goods are produced from a BOM. For Sale products are purchased and resold.' },
   { name: 'unit', label: 'Unit of measure', type: 'text', default: 'pcs', section: 'Product', help: 'Used as the quantity label, e.g. pcs, pack, kg or m.' },
@@ -220,6 +223,7 @@ const resourceRouter = makeResourceRouter({
   searchFields: ['t.sku', 't.name', 't.description', 't.ean13', 't.dun14', 't.plu', 'pc.name', 'b.name'],
   filters: [
     { name: 'type', label: 'Type', options: typeOptions },
+    { name: 'category_id', label: 'Category', optionsFrom: categoryOptions },
     { name: 'brand_id', label: 'Brand', optionsFrom: brandOptions },
     { name: 'status', label: 'Status', options: statusOptions },
   ],
@@ -352,7 +356,7 @@ router.get('/:id/duplicate', async (req, res, next) => {
   try {
     const product = await one('SELECT * FROM products WHERE id = ?', [req.params.id]);
     if (!product) {
-      const err = new Error('Product not found');
+      const err = new Error(req.t('Product not found.'));
       err.status = 404;
       return next(err);
     }
@@ -372,6 +376,90 @@ router.get('/:id/duplicate', async (req, res, next) => {
     return next(err);
   }
 });
+
+async function setProductStatus(req, res, next, status) {
+  try {
+    const product = await one('SELECT id FROM products WHERE id = ?', [req.params.id]);
+    if (!product) {
+      const err = new Error(req.t('Product not found.'));
+      err.status = 404;
+      return next(err);
+    }
+
+    await getPool().query('UPDATE products SET status = ? WHERE id = ?', [status, product.id]);
+    req.flash('success', '{item} updated successfully.', { item: req.t('Product') });
+    return res.redirect('/products');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+router.post('/:id(\\d+)/deactivate', (req, res, next) => setProductStatus(req, res, next, 'inactive'));
+router.post('/:id(\\d+)/activate', (req, res, next) => setProductStatus(req, res, next, 'active'));
+
+router.post('/:id(\\d+)/prices', requireRole('admin', 'manager'), async (req, res, next) => {
+  const rawReturn = String(req.body.return_to || '');
+  const returnTo = /^\/products(?:\?.*)?$/.test(rawReturn) ? rawReturn : '/products';
+
+  try {
+    const product = await one('SELECT id FROM products WHERE id = ?', [req.params.id]);
+    if (!product) {
+      const err = new Error(req.t('Product not found.'));
+      err.status = 404;
+      return next(err);
+    }
+
+    const errors = [];
+    const readValue = (name, label, { max } = {}) => {
+      const raw = String(req.body[name] ?? '').trim();
+      const value = Number(raw.replace(/,/g, ''));
+      if (!raw || !Number.isFinite(value)) {
+        errors.push(req.t('{label} must be a valid number.', { label: req.t(label) }));
+        return 0;
+      }
+      if (value < 0) {
+        errors.push(req.t('{label} must be at least {min}.', { label: req.t(label), min: 0 }));
+        return value;
+      }
+      if (max !== undefined && value > max) {
+        errors.push(req.t('{label} must not exceed {max}.', { label: req.t(label), max }));
+        return value;
+      }
+      return value;
+    };
+
+    const costGross = readValue('cost_gross_price', 'Cost gross price');
+    const costVat = readValue('cost_vat_rate', 'Cost VAT rate (%)', { max: 100 });
+    const costLevy = readValue('cost_levy_rate', 'Supplier levy rate (%)', { max: 100 });
+    const saleGross = readValue('sale_gross_price', 'Sale gross price');
+    const saleVat = readValue('sale_vat_rate', 'Sale VAT rate (%)', { max: 100 });
+
+    if (errors.length) {
+      req.flash('error', errors[0]);
+      return res.redirect(returnTo);
+    }
+
+    const costPrice = netCost(costGross, costVat, costLevy);
+    const salePrice = netSale(saleGross, saleVat);
+
+    await getPool().query(
+      `UPDATE products
+          SET cost_gross_price = ?, cost_vat_rate = ?, cost_levy_rate = ?, cost_price = ?,
+              sale_gross_price = ?, sale_vat_rate = ?, sale_price = ?
+        WHERE id = ?`,
+      [costGross, costVat, costLevy, costPrice, saleGross, saleVat, salePrice, product.id],
+    );
+
+    req.flash('success', 'Prices updated successfully.');
+    return res.redirect(returnTo);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Only administrators may delete products. Other roles must deactivate them
+// from the product list instead.
+router.post('/:id(\\d+)/delete', requireRole('admin'), (req, res, next) => next());
 
 router.use(resourceRouter);
 
