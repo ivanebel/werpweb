@@ -344,6 +344,35 @@ router.get('/barcode', (req, res) => {
   return res.send(rendered.svg);
 });
 
+// Fields that must never be carried into a duplicated product. The SKU is
+// generated again on save, identifiers must stay unique and stock starts at 0.
+const duplicateSkipFields = new Set(['sku', 'old_id', 'ean13', 'dun14', 'plu', 'stock_qty']);
+
+router.get('/:id/duplicate', async (req, res, next) => {
+  try {
+    const product = await one('SELECT * FROM products WHERE id = ?', [req.params.id]);
+    if (!product) {
+      const err = new Error('Product not found');
+      err.status = 404;
+      return next(err);
+    }
+
+    const params = new URLSearchParams();
+    for (const field of fields) {
+      if (duplicateSkipFields.has(field.name)) continue;
+      const value = product[field.name];
+      if (value === null || value === undefined || value === '') continue;
+      params.set(field.name, String(value));
+    }
+    params.set('stock_qty', '0');
+    params.set('duplicated', '1');
+
+    return res.redirect(`/products/new?${params.toString()}`);
+  } catch (err) {
+    return next(err);
+  }
+});
+
 router.use(resourceRouter);
 
 module.exports = router;

@@ -312,10 +312,12 @@
   }
 
   // New products start with the company default VAT rate; it stays editable
-  // so zero-rated or exempt items can be created as well.
+  // so zero-rated or exempt items can be created as well. A duplicated product
+  // keeps the source rate, including a deliberate 0%.
   const isCreate = <%= mode === 'create' ? 'true' : 'false' %>;
+  const isDuplicate = <%= typeof isDuplicate !== 'undefined' && isDuplicate ? 'true' : 'false' %>;
   const saleVat = field('sale_vat_rate');
-  if (isCreate && saleVat && Number(saleVat.value || 0) === 0) {
+  if (isCreate && !isDuplicate && saleVat && Number(saleVat.value || 0) === 0) {
     saleVat.value = Number('<%= Number(settings.default_tax_rate || 0) %>').toFixed(2);
   }
 

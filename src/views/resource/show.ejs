@@ -50,6 +50,11 @@
               <%- include('/partials/icon', { name: 'banknotes', className: 'h-4 w-4' }) %> <%= t('New supplier payment') %>
             </a>
           <% } %>
+          <% if (resource.key === 'products') { %>
+            <a href="<%= resource.basePath %>/<%= row.id %>/duplicate" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'copy', className: 'h-4 w-4' }) %> <%= t('Duplicate') %>
+            </a>
+          <% } %>
           <a href="<%= resource.basePath %>/<%= row.id %>/edit" class="btn btn-secondary btn-sm">
             <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> Edit
           </a>

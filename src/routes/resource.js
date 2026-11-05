@@ -281,6 +281,7 @@ function makeResourceRouter(config) {
         errors: {},
         mode: 'create',
         action: basePath,
+        isDuplicate: req.query.duplicated === '1',
       });
     } catch (err) {
       next(err);
