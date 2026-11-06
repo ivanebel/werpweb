@@ -17,7 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/app.css?v=<%= assetVersion %>">
   <style>
-    @page { size: A4 portrait; margin: 12mm; }
+    @page { size: A4 portrait; margin: 0; }
     body { background: #fff; color: #1d2939; }
     .report-table { width: 100%; border-collapse: collapse; }
     .report-table th,
@@ -42,7 +42,7 @@
     </div>
   </div>
 
-  <div class="mx-auto my-6 max-w-[900px] bg-white p-8 shadow-theme-lg print:my-0 print:max-w-none print:p-0 print:shadow-none sm:p-10">
+  <div class="print-sheet mx-auto my-6 max-w-[900px] bg-white p-8 shadow-theme-lg print:my-0 print:max-w-none print:shadow-none sm:p-10">
     <div class="flex flex-wrap items-start justify-between gap-6 border-b border-gray-200 pb-5">
       <div>
         <div class="flex items-center gap-3">

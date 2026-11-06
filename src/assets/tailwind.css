@@ -275,4 +275,12 @@
   body {
     background: #fff !important;
   }
+  /* Keep a consistent printable margin even when the browser print dialog
+     uses "None" or ignores @page margins. Cloning the decoration repeats the
+     padding on every page fragment. */
+  .print-sheet {
+    padding: 20mm !important;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
 }
