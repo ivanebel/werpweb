@@ -1463,9 +1463,12 @@ function makeDocumentRouter(config) {
                     WHERE l.production_order_id = po.id
                     ORDER BY l.sort_order, l.id LIMIT 1) AS first_product_name
              FROM production_orders po
-            WHERE po.sales_order_id = ?
+            WHERE po.sales_order_id = ? OR EXISTS (
+              SELECT 1 FROM production_order_sales_orders poso
+               WHERE poso.production_order_id = po.id AND poso.sales_order_id = ?
+            )
             ORDER BY po.id DESC`,
-          [row.id],
+          [row.id, row.id],
         );
       }
       if (config.kind === 'purchase_order') {

@@ -1481,6 +1481,11 @@ async function main() {
         notes: null,
         created_by: adminId,
       });
+      await insert(conn, 'production_order_sales_orders', {
+        production_order_id: productionId,
+        sales_order_id: order.id,
+        sort_order: 0,
+      });
       const productionLot = lotFromDate(startDate);
       const productionExpiry = addDays(dueDate, 365);
       await insert(conn, 'production_order_lines', {

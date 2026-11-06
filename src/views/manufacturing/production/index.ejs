@@ -124,7 +124,10 @@
                   </td>
                   <td class="table-td text-right font-medium"><%= h.formatNumber(row.line_count, 0) %></td>
                   <td class="table-td">
-                    <% if (row.order_no) { %><a href="/sales-orders/<%= row.sales_order_id %>" class="link"><%= row.order_no %></a><% } else { %><span class="text-gray-400">—</span><% } %>
+                    <% if (row.order_no) { %>
+                      <a href="/sales-orders/<%= row.sales_order_id %>" class="link" title="<%= row.order_nos || row.order_no %>"><%= row.order_no %></a>
+                      <% if (Number(row.sales_order_count) > 1) { %><span class="ml-1 text-xs text-gray-400">+<%= Number(row.sales_order_count) - 1 %></span><% } %>
+                    <% } else { %><span class="text-gray-400">—</span><% } %>
                   </td>
                   <td class="table-td text-gray-500 dark:text-gray-400"><%= h.formatDate(row.start_date) %></td>
                   <td class="table-td <%= row.due_date && row.status !== 'completed' && row.status !== 'cancelled' && String(row.due_date).slice(0, 10) < new Date().toISOString().slice(0, 10) ? 'text-error-600 dark:text-error-400 font-medium' : 'text-gray-500 dark:text-gray-400' %>"><%= h.formatDate(row.due_date) %></td>

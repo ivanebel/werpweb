@@ -527,6 +527,15 @@ async function upgradeSchema(conn, dbName) {
     );
   }
 
+  // Backfill the multi-sales-order reference table for production orders that
+  // used the legacy single sales_order_id column.
+  await conn.query(
+    `INSERT IGNORE INTO production_order_sales_orders (production_order_id, sales_order_id, sort_order)
+     SELECT id, sales_order_id, 0
+       FROM production_orders
+      WHERE sales_order_id IS NOT NULL`,
+  );
+
   // Production component quantities keep four decimals through BOM definition,
   // production requirements, floor consumption and stock.
   const quantityColumns = [

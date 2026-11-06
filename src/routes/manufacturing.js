@@ -964,15 +964,69 @@ async function bomOptions(productionOrderId = null) {
   );
 }
 
-async function productionFormOptions(productionOrderId = null) {
+async function productionFormOptions(productionOrderId = null, selectedSalesOrderIds = []) {
   const boms = await bomOptions(productionOrderId);
+  const selected = [...new Set((selectedSalesOrderIds || []).map(Number).filter((id) => id > 0))];
+  const salesOrderFilter = selected.length
+    ? `(so.status IN ('confirmed','partially_delivered') OR so.id IN (${selected.map(() => '?').join(',')}))`
+    : "so.status IN ('confirmed','partially_delivered')";
   const salesOrders = await query(
     `SELECT so.id, so.order_no, so.expected_date, c.company_name FROM sales_orders so
        JOIN customers c ON c.id = so.customer_id
-      WHERE so.status IN ('confirmed','partially_delivered')
-      ORDER BY so.order_date DESC LIMIT 100`,
+      WHERE ${salesOrderFilter}
+      ORDER BY so.order_date DESC LIMIT 250`,
+    selected,
   );
   return { boms, salesOrders };
+}
+
+function parseSalesOrderIds(body, allowedOptions = null) {
+  const allowed = allowedOptions
+    ? new Set(allowedOptions.map((option) => Number(option.id)))
+    : null;
+  const ids = [];
+  for (const value of arr(body.sales_order_ids)) {
+    const id = Number.parseInt(value, 10);
+    if (id > 0 && (!allowed || allowed.has(id)) && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+async function loadProductionSalesOrderIds(productionOrderId) {
+  const rows = await query(
+    `SELECT sales_order_id FROM production_order_sales_orders
+      WHERE production_order_id = ?
+      ORDER BY sort_order, sales_order_id`,
+    [productionOrderId],
+  );
+  if (rows.length) return rows.map((row) => Number(row.sales_order_id));
+  const legacy = await one(
+    'SELECT sales_order_id FROM production_orders WHERE id = ? AND sales_order_id IS NOT NULL LIMIT 1',
+    [productionOrderId],
+  );
+  return legacy ? [Number(legacy.sales_order_id)] : [];
+}
+
+async function loadProductionSalesOrders(productionOrderId) {
+  const rows = await query(
+    `SELECT so.id, so.order_no, so.expected_date, c.company_name
+       FROM production_order_sales_orders poso
+       JOIN sales_orders so ON so.id = poso.sales_order_id
+       JOIN customers c ON c.id = so.customer_id
+      WHERE poso.production_order_id = ?
+      ORDER BY poso.sort_order, so.id`,
+    [productionOrderId],
+  );
+  if (rows.length) return rows;
+  const legacy = await one(
+    `SELECT so.id, so.order_no, so.expected_date, c.company_name
+       FROM production_orders po
+       JOIN sales_orders so ON so.id = po.sales_order_id
+       JOIN customers c ON c.id = so.customer_id
+      WHERE po.id = ? AND po.sales_order_id IS NOT NULL LIMIT 1`,
+    [productionOrderId],
+  );
+  return legacy ? [legacy] : [];
 }
 
 function defaultProductionLine(startDate, bomId = '') {
@@ -1154,11 +1208,15 @@ router.get('/production-orders', async (req, res, next) => {
     const params = [];
     if (search) {
       where.push(`(po.production_no LIKE ? OR so.order_no LIKE ? OR EXISTS (
+        SELECT 1 FROM production_order_sales_orders poso
+          JOIN sales_orders sos ON sos.id = poso.sales_order_id
+         WHERE poso.production_order_id = po.id AND sos.order_no LIKE ?
+      ) OR EXISTS (
         SELECT 1 FROM production_order_lines l JOIN products p ON p.id = l.product_id
          WHERE l.production_order_id = po.id
            AND (p.name LIKE ? OR p.sku LIKE ? OR l.lot_number LIKE ?)
       ))`);
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
     if (status) {
       where.push('po.status = ?');
@@ -1186,6 +1244,12 @@ router.get('/production-orders', async (req, res, next) => {
               (SELECT GROUP_CONCAT(DISTINCT l.lot_number ORDER BY l.lot_number SEPARATOR ', ')
                  FROM production_order_lines l
                 WHERE l.production_order_id = po.id AND l.lot_number IS NOT NULL AND l.lot_number <> '') AS lot_summary,
+              (SELECT COUNT(*) FROM production_order_sales_orders poso
+                WHERE poso.production_order_id = po.id) AS sales_order_count,
+              (SELECT GROUP_CONCAT(sos.order_no ORDER BY poso.sort_order, sos.id SEPARATOR ', ')
+                 FROM production_order_sales_orders poso
+                 JOIN sales_orders sos ON sos.id = poso.sales_order_id
+                WHERE poso.production_order_id = po.id) AS order_nos,
               (SELECT MIN(l.expiry_date) FROM production_order_lines l
                 WHERE l.production_order_id = po.id AND l.expiry_date IS NOT NULL) AS next_expiry
          FROM production_orders po
@@ -1222,10 +1286,12 @@ router.get('/production-orders', async (req, res, next) => {
 
 router.get('/production-orders/new', async (req, res, next) => {
   try {
-    const options = await productionFormOptions();
+    const initialSalesOrderId = Number.parseInt(req.query.sales_order_id, 10);
+    const selectedSalesOrderIds = initialSalesOrderId > 0 ? [initialSalesOrderId] : [];
+    const options = await productionFormOptions(null, selectedSalesOrderIds);
     const today = todayISO();
     const row = {
-      sales_order_id: req.query.sales_order_id || '',
+      sales_order_ids: selectedSalesOrderIds,
       start_date: today,
       due_date: addDaysISO(today, 14),
       notes: '',
@@ -1246,7 +1312,9 @@ router.get('/production-orders/new', async (req, res, next) => {
 
 router.post('/production-orders', async (req, res, next) => {
   try {
-    const options = await productionFormOptions();
+    const requestedSalesOrderIds = parseSalesOrderIds(req.body);
+    const options = await productionFormOptions(null, requestedSalesOrderIds);
+    const selectedSalesOrderIds = parseSalesOrderIds(req.body, options.salesOrders);
     const { rows, lines, errors: lineErrors } = collectProductionLines(req.body, options.boms, req.t);
     const errors = {};
     const startDate = String(req.body.start_date || '').slice(0, 10);
@@ -1260,7 +1328,12 @@ router.post('/production-orders', async (req, res, next) => {
     if (!errors.start_date && !errors.due_date && dueDate && dueDate < startDate) {
       errors.due_date = req.t('Due date cannot be before the start date.');
     }
-    const row = { ...req.body, start_date: startDate, due_date: dueDate };
+    const row = {
+      ...req.body,
+      start_date: startDate,
+      due_date: dueDate,
+      sales_order_ids: selectedSalesOrderIds,
+    };
 
     if (Object.keys(errors).length || lineErrors.length) {
       return res.status(422).render('manufacturing/production/form', productionFormLocals(req, {
@@ -1289,13 +1362,21 @@ router.post('/production-orders', async (req, res, next) => {
          VALUES (?, ?, ?, ?, 'planned', ?, ?)`,
         [
           productionNo,
-          Number.parseInt(req.body.sales_order_id, 10) || null,
+          selectedSalesOrderIds[0] || null,
           startDate,
           dueDate || null,
           (req.body.notes || '').slice(0, 5000) || null,
           req.session.user.id,
         ],
       );
+      for (const [index, salesOrderId] of selectedSalesOrderIds.entries()) {
+        await conn.query(
+          `INSERT INTO production_order_sales_orders
+             (production_order_id, sales_order_id, sort_order)
+           VALUES (?, ?, ?)`,
+          [result.insertId, salesOrderId, index],
+        );
+      }
       let sort = 0;
       for (const line of lines) {
         await conn.query(
@@ -1334,6 +1415,7 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
     const lines = await loadProductionLines(order.id);
     const requirements = await loadProductionRequirements(order.id);
     const allocations = await loadProductionMaterials(order.id);
+    const salesOrders = await loadProductionSalesOrders(order.id);
     const reserved = await reservedForOrder(order.id);
     for (const allocation of allocations) {
       allocation.reserved_other = reserved.get(Number(allocation.component_id)) || 0;
@@ -1381,6 +1463,7 @@ router.get('/production-orders/:id(\\d+)', async (req, res, next) => {
       requirements,
       allocations,
       materials: allocations,
+      salesOrders,
       shortage,
       actions,
     });
@@ -1646,16 +1729,23 @@ router.get('/production-orders/:id(\\d+)/edit', async (req, res, next) => {
       req.flash('error', 'Only planned production orders can be edited.');
       return res.redirect(`/manufacturing/production-orders/${order.id}`);
     }
-    const options = await productionFormOptions(order.id);
+    const selectedSalesOrderIds = await loadProductionSalesOrderIds(order.id);
+    const formOptions = await productionFormOptions(order.id, selectedSalesOrderIds);
     let lines = await loadProductionLines(order.id);
     if (!lines.length) lines = [defaultProductionLine(order.start_date || todayISO())];
     res.render('manufacturing/production/form', productionFormLocals(req, {
       title: req.t('Edit {number}', { number: order.production_no }),
       mode: 'edit',
       action: `/manufacturing/production-orders/${order.id}`,
-      row: { ...order, start_date: order.start_date || todayISO(), due_date: order.due_date || '', notes: order.notes || '' },
+      row: {
+        ...order,
+        start_date: order.start_date || todayISO(),
+        due_date: order.due_date || '',
+        notes: order.notes || '',
+        sales_order_ids: selectedSalesOrderIds,
+      },
       lines,
-      ...options,
+      ...formOptions,
     }));
   } catch (err) {
     next(err);
@@ -1672,7 +1762,9 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
       req.flash('error', 'Only planned production orders can be edited.');
       return res.redirect(`/manufacturing/production-orders/${order.id}`);
     }
-    const options = await productionFormOptions(order.id);
+    const requestedSalesOrderIds = parseSalesOrderIds(req.body);
+    const options = await productionFormOptions(order.id, requestedSalesOrderIds);
+    const selectedSalesOrderIds = parseSalesOrderIds(req.body, options.salesOrders);
     const { rows, lines, errors: lineErrors } = collectProductionLines(req.body, options.boms, req.t);
     const errors = {};
     const startDate = String(req.body.start_date || '').slice(0, 10);
@@ -1692,7 +1784,13 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
         title: req.t('Edit {number}', { number: order.production_no }),
         mode: 'edit',
         action: `/manufacturing/production-orders/${order.id}`,
-        row: { ...order, ...req.body, start_date: startDate, due_date: dueDate },
+        row: {
+          ...order,
+          ...req.body,
+          start_date: startDate,
+          due_date: dueDate,
+          sales_order_ids: selectedSalesOrderIds,
+        },
         lines: rows.length ? rows : [defaultProductionLine(startDate)],
         errors,
         lineErrors,
@@ -1714,13 +1812,22 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
                 bom_id = NULL, product_id = NULL, quantity = NULL, lot_number = NULL, expiry_date = NULL
           WHERE id = ?`,
         [
-          Number.parseInt(req.body.sales_order_id, 10) || null,
+          selectedSalesOrderIds[0] || null,
           startDate,
           dueDate || null,
           (req.body.notes || '').slice(0, 5000) || null,
           order.id,
         ],
       );
+      await conn.query('DELETE FROM production_order_sales_orders WHERE production_order_id = ?', [order.id]);
+      for (const [index, salesOrderId] of selectedSalesOrderIds.entries()) {
+        await conn.query(
+          `INSERT INTO production_order_sales_orders
+             (production_order_id, sales_order_id, sort_order)
+           VALUES (?, ?, ?)`,
+          [order.id, salesOrderId, index],
+        );
+      }
       await conn.query('DELETE FROM production_order_lines WHERE production_order_id = ?', [order.id]);
       let sort = 0;
       for (const line of lines) {

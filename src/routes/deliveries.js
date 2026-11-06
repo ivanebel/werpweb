@@ -222,11 +222,14 @@ async function loadProductionLotDefaults(delivery) {
     `SELECT l.product_id, l.lot_number, l.expiry_date
        FROM production_order_lines l
        JOIN production_orders po ON po.id = l.production_order_id
-      WHERE po.sales_order_id = ?
+      WHERE (po.sales_order_id = ? OR EXISTS (
+              SELECT 1 FROM production_order_sales_orders poso
+               WHERE poso.production_order_id = po.id AND poso.sales_order_id = ?
+            ))
         AND po.status <> 'cancelled'
         AND (l.lot_number IS NOT NULL OR l.expiry_date IS NOT NULL)
       ORDER BY (po.status = 'completed') DESC, po.id DESC, l.id DESC`,
-    [delivery.sales_order_id],
+    [delivery.sales_order_id, delivery.sales_order_id],
   );
   for (const row of rows) {
     const key = String(row.product_id);

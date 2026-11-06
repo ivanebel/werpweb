@@ -11,6 +11,7 @@
         const currentStep = steps.indexOf(order.status);
         const missingBatch = lines.filter((line) => !line.lot_number || !line.expiry_date);
         const activeOrder = ['planned', 'released', 'in_progress'].includes(order.status);
+        const linkedSalesOrders = typeof salesOrders !== 'undefined' ? salesOrders : [];
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -23,7 +24,12 @@
             <%= lines.length %> <%= t('BOM lines') %>
             · <%= t('Start') %> <%= h.formatDate(order.start_date) %>
             · <%= t('Due') %> <%= h.formatDate(order.due_date) %>
-            <% if (order.order_no) { %>· <%= t('for') %> <a href="/sales-orders/<%= order.sales_order_id %>" class="link"><%= order.order_no %></a><% } %>
+            <% if (linkedSalesOrders.length) { %>
+              · <%= t('for') %>
+              <% linkedSalesOrders.forEach((linked, index) => { %>
+                <a href="/sales-orders/<%= linked.id %>" class="link"><%= linked.order_no %></a><% if (index < linkedSalesOrders.length - 1) { %>, <% } %>
+              <% }) %>
+            <% } %>
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -301,8 +307,15 @@
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('BOM lines') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= lines.length %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Start date') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.start_date) %></dd></div>
               <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Due date') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDate(order.due_date) %></dd></div>
-              <% if (order.order_no) { %>
-                <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Sales order') %></dt><dd><a href="/sales-orders/<%= order.sales_order_id %>" class="link"><%= order.order_no %></a></dd></div>
+              <% if (linkedSalesOrders.length) { %>
+                <div class="flex justify-between gap-3">
+                  <dt class="text-gray-500 dark:text-gray-400"><%= linkedSalesOrders.length === 1 ? t('Sales order') : t('Sales orders') %></dt>
+                  <dd class="space-y-1 text-right">
+                    <% linkedSalesOrders.forEach((linked) => { %>
+                      <div><a href="/sales-orders/<%= linked.id %>" class="link"><%= linked.order_no %></a></div>
+                    <% }) %>
+                  </dd>
+                </div>
               <% } %>
               <% if (order.completed_at) { %>
                 <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Completed') %></dt><dd class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(order.completed_at) %></dd></div>

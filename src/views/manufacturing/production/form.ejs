@@ -7,6 +7,9 @@
       <%
         const backUrl = mode === 'edit' ? `/manufacturing/production-orders/${row.id}` : '/manufacturing/production-orders';
         const errorList = [...Object.values(errors || {}), ...(lineErrors || [])];
+        const selectedSalesOrderIds = Array.isArray(row.sales_order_ids)
+          ? row.sales_order_ids.map(String)
+          : [];
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -45,14 +48,13 @@
               </div>
               <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
                 <div class="md:col-span-2">
-                  <label for="sales_order_id" class="form-label"><%= t('Sales order') %></label>
-                  <select id="sales_order_id" name="sales_order_id" class="form-select">
-                    <option value=""><%= t('No linked sales order') %></option>
+                  <label for="sales_order_ids" class="form-label"><%= t('Sales orders') %></label>
+                  <select id="sales_order_ids" name="sales_order_ids[]" multiple class="form-input h-auto min-h-[150px]">
                     <% salesOrders.forEach(opt => { %>
-                      <option value="<%= opt.id %>" <%= String(row.sales_order_id || '') === String(opt.id) ? 'selected' : '' %>><%= opt.order_no %> — <%= opt.company_name %></option>
+                      <option value="<%= opt.id %>" <%= selectedSalesOrderIds.includes(String(opt.id)) ? 'selected' : '' %>><%= opt.order_no %> — <%= opt.company_name %></option>
                     <% }) %>
                   </select>
-                  <p class="form-help"><%= t('Optional link for traceability.') %></p>
+                  <p class="form-help"><%= t('Optional reference for choosing BOMs. Hold Ctrl/Cmd to select more than one.') %></p>
                 </div>
                 <div>
                   <label for="start_date" class="form-label"><%= t('Start date') %> <span class="text-error-500">*</span></label>

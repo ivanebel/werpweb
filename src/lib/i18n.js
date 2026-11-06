@@ -1044,6 +1044,8 @@ const ES = {
   'Order notes': 'Notas de la orden',
   'Work centre, shift, special instructions…': 'Centro de trabajo, turno, instrucciones especiales…',
   'BOM lines': 'Líneas de BOM',
+  'Optional reference for choosing BOMs. Hold Ctrl/Cmd to select more than one.':
+    'Referencia opcional para elegir las BOM. Mantené Ctrl/Cmd para seleccionar más de una.',
   'BOM line': 'Línea de BOM',
   'Each BOM line produces one product. Shared materials are combined in the final material list.':
     'Cada línea de BOM produce un producto. Los materiales compartidos se combinan en la lista final.',

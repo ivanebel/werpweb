@@ -1465,6 +1465,18 @@ CREATE TABLE IF NOT EXISTS production_orders (
     REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS production_order_sales_orders (
+  production_order_id INT UNSIGNED NOT NULL,
+  sales_order_id      INT UNSIGNED NOT NULL,
+  sort_order          INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (production_order_id, sales_order_id),
+  KEY idx_poso_sales_order (sales_order_id),
+  CONSTRAINT fk_poso_production_order FOREIGN KEY (production_order_id)
+    REFERENCES production_orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_poso_sales_order FOREIGN KEY (sales_order_id)
+    REFERENCES sales_orders (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS production_order_lines (
   id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
   production_order_id INT UNSIGNED NOT NULL,

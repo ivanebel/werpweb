@@ -293,6 +293,12 @@ async function createProductionFromSalesOrder(salesOrderId, userId) {
         userId,
       ],
     );
+    await conn.query(
+      `INSERT INTO production_order_sales_orders
+         (production_order_id, sales_order_id, sort_order)
+       VALUES (?, ?, 0)`,
+      [result.insertId, salesOrderId],
+    );
 
     let sort = 0;
     for (const line of lines) {
