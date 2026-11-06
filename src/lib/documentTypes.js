@@ -25,7 +25,7 @@ const salesOrder = {
   defaultDueDays: 14,
   statuses: ['draft', 'confirmed', 'partially_delivered', 'delivered', 'cancelled'],
   defaultStatus: 'draft',
-  productWhere: "p.is_sellable = 1 AND p.status = 'active'",
+  productWhere: "p.is_sellable = 1 AND p.status = 'active' AND p.type IN ('finished_good', 'service')",
   priceField: 'sale_price',
   openStatuses: ['draft', 'confirmed', 'partially_delivered'],
   lockedStatuses: ['partially_delivered', 'delivered', 'cancelled'],

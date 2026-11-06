@@ -654,12 +654,33 @@ async function loadWarehouseOptions() {
 function normalizeDateTime(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
-  const match = raw.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})(?::(\d{2}))?$/);
-  if (!match) return null;
-  const hour = Number(match[2].slice(0, 2));
-  const minute = Number(match[2].slice(3, 5));
-  if (hour > 23 || minute > 59) return null;
-  return `${match[1]} ${match[2]}:${match[3] || '00'}`;
+
+  let date;
+  let time;
+  let seconds = '00';
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (match) {
+    date = `${match[1]}-${match[2]}-${match[3]}`;
+    time = `${match[4]}:${match[5]}`;
+    seconds = match[6] || '00';
+  } else {
+    match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) return null;
+    const day = match[1].padStart(2, '0');
+    const month = match[2].padStart(2, '0');
+    date = `${match[3]}-${month}-${day}`;
+    time = `${match[4].padStart(2, '0')}:${match[5]}`;
+    seconds = match[6] || '00';
+  }
+
+  const hour = Number(time.slice(0, 2));
+  const minute = Number(time.slice(3, 5));
+  const second = Number(seconds);
+  if (hour > 23 || minute > 59 || second > 59) return null;
+
+  const parsed = new Date(`${date}T${time}:${seconds}Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
+  return `${date} ${time}:${seconds}`;
 }
 
 async function ensureWarehouseForCustomer(conn, customerId) {

@@ -19,6 +19,13 @@
           if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return h.formatDate(raw.slice(0, 10));
           return raw;
         };
+        const displayDateTimeInput = (value) => {
+          const raw = String(value || '').trim();
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}$/.test(raw)) return raw;
+          const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+          if (match) return `${match[3]}/${match[2]}/${match[1]} ${match[4]}:${match[5]}`;
+          return raw;
+        };
         const levyRows = typeof levies !== 'undefined' && levies ? levies : [];
         const levyOptionList = typeof levyOptions !== 'undefined' && levyOptions ? levyOptions : [];
       %>
@@ -226,7 +233,7 @@
               </div>
               <div>
                 <label for="reception_at" class="form-label"><%= doc.customerOrder.receptionLabel %></label>
-                <input id="reception_at" name="<%= doc.customerOrder.receptionField %>" type="datetime-local" value="<%= String(row[doc.customerOrder.receptionField] || '').slice(0, 16).replace(' ', 'T') %>" class="form-input <%= errors[doc.customerOrder.receptionField] ? 'border-error-500' : '' %>">
+                <input id="reception_at" name="<%= doc.customerOrder.receptionField %>" type="text" autocomplete="off" maxlength="16" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4} [0-9]{2}:[0-9]{2}" placeholder="dd/mm/yyyy HH:mm" value="<%= displayDateTimeInput(row[doc.customerOrder.receptionField]) %>" class="form-input <%= errors[doc.customerOrder.receptionField] ? 'border-error-500' : '' %>">
                 <% if (errors[doc.customerOrder.receptionField]) { %><p class="form-error"><%= errors[doc.customerOrder.receptionField] %></p><% } %>
               </div>
             </div>
