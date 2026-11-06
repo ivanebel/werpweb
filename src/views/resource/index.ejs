@@ -183,6 +183,11 @@
                           <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %>
                         </a>
                       <% } %>
+                      <% if (resource.key === 'employees') { %>
+                        <a href="<%= resource.basePath %>/<%= row.id %>/report" class="btn-icon" title="<%= t('Attendance report') %>">
+                          <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %>
+                        </a>
+                      <% } %>
                       <a href="<%= resource.basePath %>/<%= row.id %>" class="btn-icon" title="View">
                         <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
                       </a>

@@ -1,8 +1,27 @@
 'use strict';
 
+const express = require('express');
 const { makeResourceRouter } = require('./resource');
 const { query, one } = require('../db');
-const { formatDuration, formatTime } = require('../lib/helpers');
+const { formatDuration, formatTime, todayISO } = require('../lib/helpers');
+const { buildEmployeeReport } = require('../lib/employeeReport');
+
+const router = express.Router();
+const basePath = '/employees';
+
+function validDate(value) {
+  const raw = String(value || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) && !Number.isNaN(new Date(`${raw}T00:00:00Z`).getTime());
+}
+
+function resolveRange(req) {
+  const today = todayISO();
+  const defaultFrom = `${today.slice(0, 7)}-01`;
+  let from = validDate(req.query.from) ? String(req.query.from).slice(0, 10) : defaultFrom;
+  let to = validDate(req.query.to) ? String(req.query.to).slice(0, 10) : today;
+  if (from > to) [from, to] = [to, from];
+  return { from, to };
+}
 
 async function validateClockId(data, req, existingId = 0) {
   if (!data.clock_id) return {};
@@ -40,7 +59,7 @@ const fields = [
   { name: 'notes', label: 'Notes', type: 'textarea', full: true, section: 'Notes' },
 ];
 
-module.exports = makeResourceRouter({
+const resourceRouter = makeResourceRouter({
   key: 'employees',
   basePath: '/employees',
   title: 'Employees',
@@ -135,3 +154,46 @@ module.exports = makeResourceRouter({
     ];
   },
 });
+
+async function renderEmployeeReport(req, res, next, { print = false } = {}) {
+  try {
+    const { from, to } = resolveRange(req);
+    const report = await buildEmployeeReport(req.params.id, from, to);
+    if (!report) {
+      return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t('Employee') })), { status: 404 }));
+    }
+
+    const printQuery = new URLSearchParams({ from, to }).toString();
+    const printUrl = `${basePath}/${report.employee.id}/report/print?${printQuery}`;
+
+    if (print) {
+      return res.render('employees/report-print', {
+        title: `${req.t('Attendance report')} · ${report.employee.full_name}`,
+        report,
+      });
+    }
+
+    return res.render('employees/report', {
+      title: req.t('Attendance report'),
+      active: 'employees',
+      breadcrumbs: [
+        { label: req.t('Employees'), href: basePath },
+        { label: report.employee.full_name, href: `${basePath}/${report.employee.id}` },
+        { label: req.t('Attendance report') },
+      ],
+      report,
+      from,
+      to,
+      printUrl,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+router.get('/:id(\\d+)/report', (req, res, next) => renderEmployeeReport(req, res, next));
+router.get('/:id(\\d+)/report/print', (req, res, next) => renderEmployeeReport(req, res, next, { print: true }));
+
+router.use(resourceRouter);
+
+module.exports = router;

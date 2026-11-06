@@ -55,6 +55,11 @@
               <%- include('/partials/icon', { name: 'copy', className: 'h-4 w-4' }) %> <%= t('Duplicate') %>
             </a>
           <% } %>
+          <% if (resource.key === 'employees') { %>
+            <a href="<%= resource.basePath %>/<%= row.id %>/report" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %> <%= t('Attendance report') %>
+            </a>
+          <% } %>
           <a href="<%= resource.basePath %>/<%= row.id %>/edit" class="btn btn-secondary btn-sm">
             <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> Edit
           </a>

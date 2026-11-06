@@ -1,0 +1,164 @@
+<%
+  const employmentLabels = {
+    full_time: t('Full time'),
+    part_time: t('Part time'),
+    contract: t('Contract'),
+    intern: t('Intern'),
+  };
+%>
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= t('Attendance report') %> · <%= report.employee.full_name %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css?v=<%= assetVersion %>">
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    body { background: #fff; color: #1d2939; }
+    .report-table { width: 100%; border-collapse: collapse; }
+    .report-table th,
+    .report-table td { border-bottom: 1px solid #e5e7eb; padding: 4px 6px; text-align: left; }
+    .report-table th { background: #f5f2e9; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .report-table td { font-size: 10px; }
+    .report-table td.num { text-align: right; }
+    @media print {
+      .no-print { display: none !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-outfit text-gray-800" data-locale="<%= locale %>">
+  <div class="no-print sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
+    <a href="/employees/<%= report.employee.id %>/report?from=<%= encodeURIComponent(report.from) %>&to=<%= encodeURIComponent(report.to) %>" class="btn btn-secondary btn-sm"><%= t('Back to report') %></a>
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-gray-500"><%= report.employee.full_name %> · <%= h.formatDate(report.from) %> – <%= h.formatDate(report.to) %></span>
+      <button type="button" onclick="window.print()" class="btn btn-primary btn-sm"><%= t('Print / Save PDF') %></button>
+    </div>
+  </div>
+
+  <div class="mx-auto my-6 max-w-[900px] bg-white p-8 shadow-theme-lg print:my-0 print:max-w-none print:p-0 print:shadow-none sm:p-10">
+    <div class="flex flex-wrap items-start justify-between gap-6 border-b border-gray-200 pb-5">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-white"><%= (settings.company_name || 'W').charAt(0) %></span>
+          <div>
+            <p class="text-lg font-bold text-gray-900"><%= settings.company_name %></p>
+            <p class="text-xs text-gray-500"><%= settings.company_email %><%= settings.company_phone ? ' · ' + settings.company_phone : '' %></p>
+          </div>
+        </div>
+        <div class="mt-4 whitespace-pre-line text-xs leading-relaxed text-gray-500"><%= settings.company_address %></div>
+      </div>
+      <div class="text-right">
+        <p class="text-2xl font-semibold uppercase tracking-wide text-brand-600"><%= t('Attendance report') %></p>
+        <p class="mt-1 text-sm font-medium text-gray-700"><%= report.employee.full_name %></p>
+        <p class="text-xs text-gray-500"><%= report.employee.employee_no %><%= report.employee.clock_id ? ' · ' + t('Clock ID') + ' ' + report.employee.clock_id : '' %></p>
+        <p class="mt-2 text-xs text-gray-500"><%= t('Period') %>: <%= h.formatDate(report.from) %> – <%= h.formatDate(report.to) %></p>
+        <p class="text-xs text-gray-500"><%= t('Generated on') %> <%= h.formatDate(h.todayISO()) %></p>
+      </div>
+    </div>
+
+    <div class="mt-5 grid grid-cols-2 gap-x-8 gap-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs sm:grid-cols-4">
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Job title') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= report.employee.job_title || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Department') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= report.employee.department || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Employment type') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= employmentLabels[report.employee.employment_type] || h.humanize(report.employee.employment_type) %></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Status') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= h.statusInfo(report.employee.status).label %></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Hire date') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= report.employee.hire_date ? h.formatDate(report.employee.hire_date) : '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Email') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= report.employee.email || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Phone') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= report.employee.phone || '—' %></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Report period') %></p>
+        <p class="mt-0.5 font-medium text-gray-800"><%= h.formatDate(report.from) %> – <%= h.formatDate(report.to) %></p>
+      </div>
+    </div>
+
+    <div class="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Hours worked') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= h.formatDuration(report.workedMinutes) %></p>
+        <p class="text-[10px] text-gray-500"><%= t('of {hours} scheduled', { hours: h.formatDuration(report.expectedMinutes) }) %></p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Days registered') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= report.daysRegistered %> / <%= report.scheduledDays %></p>
+        <p class="text-[10px] text-gray-500"><%= report.calendarDays %> <%= t('calendar days') %></p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Tardiness') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= h.formatDuration(report.lateMinutes) %></p>
+        <p class="text-[10px] text-gray-500"><%= report.lateCount %> <%= t('late arrivals') %></p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <p class="text-[10px] uppercase tracking-wide text-gray-400"><%= t('Absences') %></p>
+        <p class="mt-1 font-semibold text-gray-900"><%= report.absentDays %></p>
+        <p class="text-[10px] text-gray-500"><%= t('Scheduled days without a record') %></p>
+      </div>
+    </div>
+
+    <div class="mt-5">
+      <div class="mb-2 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-800"><%= t('Attendance detail') %></h2>
+        <span class="text-[10px] text-gray-500"><%= report.records.length %> <%= t('records') %></span>
+      </div>
+      <% if (report.records.length) { %>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th><%= t('Date') %></th>
+              <th><%= t('Clock in') %></th>
+              <th><%= t('Clock out') %></th>
+              <th class="num"><%= t('Hours worked') %></th>
+              <th><%= t('Punctuality') %></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% report.records.forEach((record) => { %>
+              <tr>
+                <td><%= h.formatDate(record.work_date) %></td>
+                <td><%= h.formatTime(record.clock_in) || '—' %></td>
+                <td><%= record.clock_out ? h.formatTime(record.clock_out) : '—' %></td>
+                <td class="num"><%= record.worked_minutes !== null ? h.formatDuration(record.worked_minutes) : '—' %></td>
+                <td>
+                  <%= h.statusInfo(record.punctuality).label %>
+                  <% if (Number(record.late_minutes) > Number(record.grace_minutes)) { %> · +<%= h.formatDuration(record.late_minutes) %><% } %>
+                  <% if (Number(record.early_leave_minutes) > Number(record.early_leave_grace_minutes)) { %> · -<%= h.formatDuration(record.early_leave_minutes) %><% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } else { %>
+        <p class="py-8 text-center text-xs text-gray-400"><%= t('No attendance records in this period.') %></p>
+      <% } %>
+    </div>
+
+    <p class="mt-5 border-t border-gray-200 pt-3 text-[10px] text-gray-400"><%= t('Expected hours come from the shift assignments for scheduled work days in the period. Absences count scheduled days before today without a record.') %></p>
+  </div>
+</body>
+</html>
