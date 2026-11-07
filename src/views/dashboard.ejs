@@ -171,12 +171,26 @@
         </div>
 
         <div class="card xl:col-span-4">
-          <div class="card-header">
+          <div class="card-header flex-wrap gap-3">
             <div>
               <h2 class="card-title">Stock alerts</h2>
               <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">At or below reorder level</p>
             </div>
-            <a href="/products" class="btn btn-secondary btn-sm">Products</a>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-800" role="group" aria-label="<%= t('Product type') %>">
+                <a
+                  href="/dashboard?stock=raw_material"
+                  class="rounded-md px-3 py-1.5 text-xs font-semibold transition <%= stockType === 'raw_material' ? 'bg-white text-gray-900 shadow-theme-sm dark:bg-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' %>"
+                  aria-current="<%= stockType === 'raw_material' ? 'page' : 'false' %>"
+                ><%= t('Raw materials') %></a>
+                <a
+                  href="/dashboard?stock=for_sale"
+                  class="rounded-md px-3 py-1.5 text-xs font-semibold transition <%= stockType === 'for_sale' ? 'bg-white text-gray-900 shadow-theme-sm dark:bg-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200' %>"
+                  aria-current="<%= stockType === 'for_sale' ? 'page' : 'false' %>"
+                ><%= t('For Sale') %></a>
+              </div>
+              <a href="/products" class="btn btn-secondary btn-sm">Products</a>
+            </div>
           </div>
           <div class="divide-y divide-gray-100 dark:divide-gray-800">
             <% lowStock.forEach(p => { %>
@@ -195,7 +209,7 @@
                 <span class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
                   <%- include('/partials/icon', { name: 'check', className: 'h-5 w-5' }) %>
                 </span>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Everything is above its reorder level.</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400"><%= stockType === 'for_sale' ? t('No for-sale stock alerts.') : t('No raw material stock alerts.') %></p>
               </div>
             <% } %>
           </div>

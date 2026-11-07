@@ -22,6 +22,7 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
     const prevMonth = iso(monthStart(-1));
     const chartStart = iso(monthStart(-5));
     const ninetyDaysAgo = iso(new Date(Date.now() - 90 * 86400000));
+    const stockType = req.query.stock === 'for_sale' ? 'for_sale' : 'raw_material';
 
     const [
       revenueMonth,
@@ -124,8 +125,10 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
       query(
         `SELECT id, sku, name, stock_qty, reorder_level, unit
            FROM products
-          WHERE track_stock = 1 AND status = 'active' AND stock_qty <= reorder_level
+          WHERE track_stock = 1 AND status = 'active' AND type = ?
+            AND stock_qty <= reorder_level
           ORDER BY (stock_qty - reorder_level) ASC, name ASC LIMIT 6`,
+        [stockType],
       ),
       query(
         `SELECT sm.id, sm.movement_type, sm.quantity, sm.notes, sm.created_at, p.sku, p.name
@@ -192,6 +195,7 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
       charts,
       recentOrders,
       lowStock,
+      stockType,
       activity,
       greetingName: (req.session.user.name || 'there').split(' ')[0],
     });
