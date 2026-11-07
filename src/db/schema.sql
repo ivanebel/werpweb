@@ -772,6 +772,39 @@ CREATE TABLE IF NOT EXISTS tax_levies (
   KEY idx_tax_levies_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS withholdings (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code        VARCHAR(30) NOT NULL,
+  name        VARCHAR(150) NOT NULL,
+  type        ENUM('tax','commercial','administrative','other') NOT NULL DEFAULT 'other',
+  notes       VARCHAR(500) NULL,
+  status      ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_withholdings_code (code),
+  KEY idx_withholdings_type (type),
+  KEY idx_withholdings_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS customer_withholdings (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  customer_id    INT UNSIGNED NOT NULL,
+  withholding_id INT UNSIGNED NOT NULL,
+  percentage     DECIMAL(7,4) NOT NULL DEFAULT 0,
+  status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_customer_withholding (customer_id, withholding_id),
+  KEY idx_customer_withholdings_customer (customer_id),
+  KEY idx_customer_withholdings_withholding (withholding_id),
+  CONSTRAINT fk_customer_withholdings_customer FOREIGN KEY (customer_id)
+    REFERENCES customers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_customer_withholdings_withholding FOREIGN KEY (withholding_id)
+    REFERENCES withholdings (id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS purchase_invoices (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   bill_no           VARCHAR(30) NOT NULL,

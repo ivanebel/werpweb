@@ -1,0 +1,93 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const typeLabel = (value) => t((withholdingTypes.find((item) => item.value === value) || { label: 'Other' }).label);
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[760px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= row.id ? t('Edit customer withholding') : t('New customer withholding') %></h1>
+          <p class="page-subtitle"><%= t('Choose a customer and a withholding, then set the percentage of gross sales.') %></p>
+        </div>
+        <a href="/finance/customer-withholdings" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back to customer withholdings') %>
+        </a>
+      </div>
+
+      <% if (!customers.length || !withholdings.length) { %>
+        <div class="mb-5 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+          <%= !customers.length
+            ? t('Create at least one customer before assigning withholdings.')
+            : t('Create at least one withholding before assigning it to a customer.') %>
+        </div>
+      <% } %>
+
+      <% if (Object.keys(errors || {}).length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <%= t('Please review the highlighted fields.') %>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= row.id ? `/finance/customer-withholdings/${row.id}` : '/finance/customer-withholdings' %>" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Customer withholding details') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The percentage applies to the gross sale amount.') %></p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <div class="md:col-span-2">
+            <label for="customer-withholding-customer" class="form-label"><%= t('Customer') %> <span class="text-error-500">*</span></label>
+            <select id="customer-withholding-customer" name="customer_id" class="form-select <%= errors.customer_id ? 'form-input-error' : '' %>" required>
+              <option value=""><%= t('Select a customer') %></option>
+              <% customers.forEach((customer) => { %>
+                <option value="<%= customer.id %>" <%= String(row.customer_id || '') === String(customer.id) ? 'selected' : '' %>>
+                  <%= customer.company_name %><%= customer.status === 'inactive' ? ` (${t('Inactive')})` : '' %>
+                </option>
+              <% }) %>
+            </select>
+            <% if (errors.customer_id) { %><p class="form-error"><%= errors.customer_id %></p><% } %>
+          </div>
+          <div class="md:col-span-2">
+            <label for="customer-withholding-withholding" class="form-label"><%= t('Withholding') %> <span class="text-error-500">*</span></label>
+            <select id="customer-withholding-withholding" name="withholding_id" class="form-select <%= errors.withholding_id ? 'form-input-error' : '' %>" required>
+              <option value=""><%= t('Select a withholding') %></option>
+              <% withholdings.forEach((withholding) => { %>
+                <option value="<%= withholding.id %>" <%= String(row.withholding_id || '') === String(withholding.id) ? 'selected' : '' %>>
+                  <%= withholding.code %> — <%= withholding.name %> (<%= typeLabel(withholding.type) %>)<%= withholding.status === 'inactive' ? ` (${t('Inactive')})` : '' %>
+                </option>
+              <% }) %>
+            </select>
+            <% if (errors.withholding_id) { %><p class="form-error"><%= errors.withholding_id %></p><% } %>
+          </div>
+          <div>
+            <label for="customer-withholding-percentage" class="form-label"><%= t('Percentage of gross sales') %> <span class="text-error-500">*</span></label>
+            <div class="relative">
+              <input id="customer-withholding-percentage" name="percentage" type="number" min="0" max="100" step="0.0001" value="<%= Number(row.percentage) || 0 %>" class="form-input pr-8 text-right <%= errors.percentage ? 'form-input-error' : '' %>" required>
+              <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">%</span>
+            </div>
+            <% if (errors.percentage) { %><p class="form-error"><%= errors.percentage %></p><% } %>
+            <p class="form-help"><%= t('The customer deducts this percentage from the gross sale amount.') %></p>
+          </div>
+          <div>
+            <label for="customer-withholding-status" class="form-label"><%= t('Status') %></label>
+            <select id="customer-withholding-status" name="status" class="form-select">
+              <option value="active" <%= row.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+              <option value="inactive" <%= row.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+            </select>
+            <p class="form-help"><%= t('Inactive assignments are kept for history but are not applied.') %></p>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">
+          <a href="/finance/customer-withholdings" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary" <%= (!customers.length || !withholdings.length) ? 'disabled' : '' %>><%= row.id ? t('Save changes') : t('Create') %></button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

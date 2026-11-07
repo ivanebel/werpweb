@@ -3477,6 +3477,66 @@ const ES = {
   'Name is required.': 'El nombre es obligatorio.',
   'Use up to 20 letters, numbers, dots, hyphens or underscores.':
     'Usá hasta 20 letras, números, puntos, guiones o guiones bajos.',
+  'Manage the deductions customers apply to payments, such as tax withholdings, commercial agreements and administrative charges.':
+    'Gestioná las deducciones que los clientes aplican a los pagos, como retenciones impositivas, acuerdos comerciales y cargos administrativos.',
+  'Withholding registry': 'Registro de retenciones',
+  'Create the concepts first, then assign them to customers with a percentage of gross sales.':
+    'Creá primero los conceptos y luego asignálos a los clientes con un porcentaje sobre ventas brutas.',
+  'Assigned customers': 'Clientes asignados',
+  '{count} customers': '{count} clientes',
+  'Delete this withholding?': '¿Eliminar esta retención?',
+  'No withholdings configured yet.': 'Todavía no hay retenciones configuradas.',
+  'New withholding': 'Nueva retención',
+  'Edit withholding': 'Editar retención',
+  'Define a deduction concept that can later be assigned to customers.':
+    'Definí un concepto de deducción que luego se pueda asignar a los clientes.',
+  'Back to withholdings': 'Volver a retenciones',
+  'Withholding details': 'Datos de la retención',
+  'The percentage is configured per customer in the customer withholding page.':
+    'El porcentaje se configura por cliente en la página de retenciones de clientes.',
+  'e.g. SUPERMARKET-2': 'ej. SUPERMERCADO-2',
+  'Short internal identifier. Letters, numbers, hyphens and underscores.':
+    'Identificador interno corto. Letras, números, guiones y guiones bajos.',
+  'e.g. Supermarket promotion fee': 'ej. Cargo por promoción en supermercado',
+  'Classify the deduction for reporting and management.': 'Clasificá la deducción para informes y gestión.',
+  'Optional notes or agreement reference': 'Notas opcionales o referencia del acuerdo',
+  'Commercial': 'Comercial',
+  'Administrative': 'Administrativo',
+  'A withholding with this code already exists.': 'Ya existe una retención con este código.',
+  'Withholding created.': 'Retención creada.',
+  'Withholding updated.': 'Retención actualizada.',
+  'Withholding deleted.': 'Retención eliminada.',
+  'This withholding is assigned to customers. Remove the assignments first or mark it inactive.':
+    'Esta retención está asignada a clientes. Eliminá las asignaciones primero o marcala como inactiva.',
+  'Customer withholdings': 'Retenciones de clientes',
+  'Assign deductions to customers and define the percentage of gross sales they represent.':
+    'Asigná deducciones a los clientes y definí el porcentaje sobre ventas brutas que representan.',
+  'New customer withholding': 'Nueva retención de cliente',
+  'Customer withholding assignments': 'Asignaciones de retenciones a clientes',
+  'A customer can have as many withholdings as needed.': 'Un cliente puede tener todas las retenciones que necesite.',
+  'Remove this customer withholding?': '¿Quitar esta retención del cliente?',
+  'No customer withholdings assigned yet.': 'Todavía no hay retenciones asignadas a clientes.',
+  'Edit customer withholding': 'Editar retención de cliente',
+  'Choose a customer and a withholding, then set the percentage of gross sales.':
+    'Elegí un cliente y una retención, y definí el porcentaje sobre ventas brutas.',
+  'Back to customer withholdings': 'Volver a retenciones de clientes',
+  'Create at least one customer before assigning withholdings.': 'Creá al menos un cliente antes de asignar retenciones.',
+  'Create at least one withholding before assigning it to a customer.':
+    'Creá al menos una retención antes de asignarla a un cliente.',
+  'Customer withholding details': 'Datos de la retención del cliente',
+  'The percentage applies to the gross sale amount.': 'El porcentaje se aplica al importe bruto de la venta.',
+  'Select a withholding': 'Seleccioná una retención',
+  'Percentage of gross sales': 'Porcentaje sobre ventas brutas',
+  'The customer deducts this percentage from the gross sale amount.':
+    'El cliente deduce este porcentaje del importe bruto de la venta.',
+  'Inactive assignments are kept for history but are not applied.':
+    'Las asignaciones inactivas se conservan para el historial pero no se aplican.',
+  'Percentage must be between 0 and 100.': 'El porcentaje debe estar entre 0 y 100.',
+  'This customer already has this withholding assigned.': 'Este cliente ya tiene asignada esta retención.',
+  'Customer withholding created.': 'Retención de cliente creada.',
+  'Customer withholding updated.': 'Retención de cliente actualizada.',
+  'Customer withholding removed.': 'Retención de cliente eliminada.',
+  'Customer withholding not found.': 'No se encontró la retención del cliente.',
   'Enter a percentage between 0 and 100.': 'Ingresá un porcentaje entre 0 y 100.',
   'Enter a valid expiry date.': 'Ingresá una fecha de vencimiento válida.',
   'e.g. 212': 'ej. 212',

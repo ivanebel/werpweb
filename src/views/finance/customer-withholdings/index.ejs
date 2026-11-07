@@ -1,0 +1,85 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<%
+  const typeLabel = (value) => t((withholdingTypes.find((item) => item.value === value) || { label: 'Other' }).label);
+%>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Customer withholdings') %></h1>
+          <p class="page-subtitle"><%= t('Assign deductions to customers and define the percentage of gross sales they represent.') %></p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="/finance/withholdings" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back to withholdings') %>
+          </a>
+          <a href="/finance/customer-withholdings/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('New customer withholding') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Customer withholding assignments') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('A customer can have as many withholdings as needed.') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} records', { count: rows.length }) %></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[950px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Customer') %></th>
+                <th class="table-th"><%= t('Withholding') %></th>
+                <th class="table-th"><%= t('Type') %></th>
+                <th class="table-th text-right"><%= t('Percentage') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach((row) => { %>
+                <tr class="table-row">
+                  <td class="table-td">
+                    <p class="font-medium text-gray-900 dark:text-white/90"><%= row.company_name %></p>
+                    <p class="mt-0.5 font-mono text-xs text-gray-400"><%= row.customer_no %></p>
+                  </td>
+                  <td class="table-td">
+                    <p class="font-medium text-gray-900 dark:text-white/90"><%= row.withholding_name %></p>
+                    <p class="mt-0.5 font-mono text-xs text-gray-400"><%= row.withholding_code %></p>
+                  </td>
+                  <td class="table-td text-sm text-gray-600 dark:text-gray-300"><%= typeLabel(row.withholding_type) %></td>
+                  <td class="table-td text-right font-semibold text-gray-900 dark:text-white/90"><%= h.formatNumber(row.percentage, 4) %>%</td>
+                  <td class="table-td"><%- statusBadge(row.status) %></td>
+                  <td class="table-td text-right">
+                    <div class="flex justify-end gap-1">
+                      <a href="/finance/customer-withholdings/<%= row.id %>/edit" class="btn btn-secondary btn-sm"><%= t('Edit') %></a>
+                      <form method="POST" action="/finance/customer-withholdings/<%= row.id %>/delete" data-confirm="<%= t('Remove this customer withholding?') %>">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <button type="submit" class="btn btn-danger btn-sm"><%= t('Remove') %></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!rows.length) { %>
+                <tr>
+                  <td colspan="6" class="px-6 py-12 text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400"><%= t('No customer withholdings assigned yet.') %></p>
+                    <a href="/finance/customer-withholdings/new" class="btn btn-primary btn-sm mt-4"><%= t('New customer withholding') %></a>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

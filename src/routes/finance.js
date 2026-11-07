@@ -9,6 +9,14 @@ const { parseCsv, toCsv } = require('../lib/csv');
 
 const router = express.Router();
 const basePath = '/finance/costs';
+const withholdingsPath = '/finance/withholdings';
+const customerWithholdingsPath = '/finance/customer-withholdings';
+const WITHHOLDING_TYPES = [
+  { value: 'tax', label: 'Tax' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'administrative', label: 'Administrative' },
+  { value: 'other', label: 'Other' },
+];
 const actualsUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 },
@@ -965,6 +973,322 @@ router.post('/costs/actuals/import', async (req, res, next) => {
     res.redirect(`${basePath}/actuals?period=${validRows[0].period}`);
   } catch (err) {
     next(err);
+  }
+});
+
+// --------------------------------------------------------- withholdings
+function normalizeWithholding(body) {
+  return {
+    code: String(body.code || '').trim().toUpperCase(),
+    name: String(body.name || '').trim().slice(0, 150),
+    type: WITHHOLDING_TYPES.some((option) => option.value === body.type) ? body.type : 'other',
+    notes: String(body.notes || '').trim().slice(0, 500) || null,
+    status: body.status === 'inactive' ? 'inactive' : 'active',
+  };
+}
+
+function validateWithholding(values, req) {
+  const errors = {};
+  if (!/^[A-Z0-9_-]{2,30}$/.test(values.code)) {
+    errors.code = req.t('Use 2-30 letters, numbers, hyphens or underscores.');
+  }
+  if (!values.name) errors.name = req.t('Name is required.');
+  else if (values.name.length > 150) errors.name = req.t('Name must be 150 characters or fewer.');
+  return errors;
+}
+
+function renderWithholdingForm(req, res, { row, errors = {}, status = 200 } = {}) {
+  return res.status(status).render('finance/withholdings/form', {
+    title: row.id ? req.t('Edit withholding') : req.t('New withholding'),
+    active: 'finance-withholdings',
+    breadcrumbs: [
+      { label: req.t('Withholdings'), href: withholdingsPath },
+      { label: row.id ? req.t('Edit') : req.t('New') },
+    ],
+    row,
+    errors,
+    withholdingTypes: WITHHOLDING_TYPES,
+  });
+}
+
+router.get('/withholdings', async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT w.*,
+              (SELECT COUNT(*) FROM customer_withholdings cw WHERE cw.withholding_id = w.id) AS customer_count
+         FROM withholdings w
+        ORDER BY w.status = 'inactive', w.name`,
+    );
+    return res.render('finance/withholdings/index', {
+      title: req.t('Withholdings'),
+      active: 'finance-withholdings',
+      breadcrumbs: [{ label: req.t('Withholdings') }],
+      rows,
+      withholdingTypes: WITHHOLDING_TYPES,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.get('/withholdings/new', (req, res) => renderWithholdingForm(req, res, {
+  row: { id: null, code: '', name: '', type: 'other', notes: '', status: 'active' },
+}));
+
+router.post('/withholdings', async (req, res, next) => {
+  try {
+    const values = normalizeWithholding(req.body);
+    const errors = validateWithholding(values, req);
+    if (!errors.code) {
+      const duplicate = await one('SELECT id FROM withholdings WHERE code = ? LIMIT 1', [values.code]);
+      if (duplicate) errors.code = req.t('A withholding with this code already exists.');
+    }
+    if (Object.keys(errors).length) {
+      return renderWithholdingForm(req, res, { row: { ...values, id: null }, errors, status: 422 });
+    }
+    await query(
+      `INSERT INTO withholdings (code, name, type, notes, status)
+       VALUES (?, ?, ?, ?, ?)`,
+      [values.code, values.name, values.type, values.notes, values.status],
+    );
+    req.flash('success', 'Withholding created.');
+    return res.redirect(withholdingsPath);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.get('/withholdings/:id(\\d+)/edit', async (req, res, next) => {
+  try {
+    const row = await one('SELECT * FROM withholdings WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!row) return next(Object.assign(new Error(req.t('Withholding not found.')), { status: 404 }));
+    return renderWithholdingForm(req, res, { row });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/withholdings/:id(\\d+)', async (req, res, next) => {
+  try {
+    const existing = await one('SELECT * FROM withholdings WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) return next(Object.assign(new Error(req.t('Withholding not found.')), { status: 404 }));
+    const values = normalizeWithholding(req.body);
+    const errors = validateWithholding(values, req);
+    if (!errors.code) {
+      const duplicate = await one(
+        'SELECT id FROM withholdings WHERE code = ? AND id <> ? LIMIT 1',
+        [values.code, existing.id],
+      );
+      if (duplicate) errors.code = req.t('A withholding with this code already exists.');
+    }
+    if (Object.keys(errors).length) {
+      return renderWithholdingForm(req, res, {
+        row: { ...existing, ...values },
+        errors,
+        status: 422,
+      });
+    }
+    await query(
+      `UPDATE withholdings
+          SET code = ?, name = ?, type = ?, notes = ?, status = ?
+        WHERE id = ?`,
+      [values.code, values.name, values.type, values.notes, values.status, existing.id],
+    );
+    req.flash('success', 'Withholding updated.');
+    return res.redirect(withholdingsPath);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/withholdings/:id(\\d+)/delete', async (req, res, next) => {
+  try {
+    const existing = await one('SELECT id FROM withholdings WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) return next(Object.assign(new Error(req.t('Withholding not found.')), { status: 404 }));
+    const usage = await one(
+      'SELECT COUNT(*) AS count FROM customer_withholdings WHERE withholding_id = ?',
+      [existing.id],
+    );
+    if (Number(usage.count) > 0) {
+      req.flash('error', 'This withholding is assigned to customers. Remove the assignments first or mark it inactive.');
+      return res.redirect(withholdingsPath);
+    }
+    await query('DELETE FROM withholdings WHERE id = ?', [existing.id]);
+    req.flash('success', 'Withholding deleted.');
+    return res.redirect(withholdingsPath);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// ------------------------------------------- customer withholding assignments
+async function customerWithholdingOptions(includeWithholdingId = null) {
+  const customers = await query(
+    `SELECT id, customer_no, company_name, status
+       FROM customers
+      ORDER BY company_name`,
+  );
+  const params = [];
+  let where = "status = 'active'";
+  if (includeWithholdingId) {
+    where += ' OR id = ?';
+    params.push(includeWithholdingId);
+  }
+  const withholdings = await query(
+    `SELECT id, code, name, type, status
+       FROM withholdings
+      WHERE ${where}
+      ORDER BY name`,
+    params,
+  );
+  return { customers, withholdings };
+}
+
+async function renderCustomerWithholdingForm(req, res, { row, errors = {}, status = 200 } = {}) {
+  const { customers, withholdings } = await customerWithholdingOptions(row.withholding_id || null);
+  return res.status(status).render('finance/customer-withholdings/form', {
+    title: row.id ? req.t('Edit customer withholding') : req.t('New customer withholding'),
+    active: 'finance-withholdings',
+    breadcrumbs: [
+      { label: req.t('Withholdings'), href: withholdingsPath },
+      { label: req.t('Customer withholdings'), href: customerWithholdingsPath },
+      { label: row.id ? req.t('Edit') : req.t('New') },
+    ],
+    row,
+    errors,
+    customers,
+    withholdings,
+    withholdingTypes: WITHHOLDING_TYPES,
+  });
+}
+
+async function validateCustomerWithholding(body, existingId, req) {
+  const percentageRaw = String(body.percentage ?? '').trim();
+  const percentage = Number(percentageRaw);
+  const values = {
+    customer_id: Number.parseInt(body.customer_id, 10) || 0,
+    withholding_id: Number.parseInt(body.withholding_id, 10) || 0,
+    percentage: Number.isFinite(percentage) ? percentage : 0,
+    status: body.status === 'inactive' ? 'inactive' : 'active',
+  };
+  const errors = {};
+  const customer = values.customer_id
+    ? await one('SELECT id FROM customers WHERE id = ? LIMIT 1', [values.customer_id])
+    : null;
+  if (!customer) errors.customer_id = req.t('Select a customer.');
+  const withholding = values.withholding_id
+    ? await one('SELECT id FROM withholdings WHERE id = ? LIMIT 1', [values.withholding_id])
+    : null;
+  if (!withholding) errors.withholding_id = req.t('Select a withholding.');
+  if (!percentageRaw || !Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+    errors.percentage = req.t('Percentage must be between 0 and 100.');
+  }
+  if (!errors.customer_id && !errors.withholding_id) {
+    const duplicate = await one(
+      `SELECT id FROM customer_withholdings
+        WHERE customer_id = ? AND withholding_id = ?${existingId ? ' AND id <> ?' : ''}
+        LIMIT 1`,
+      existingId ? [values.customer_id, values.withholding_id, existingId] : [values.customer_id, values.withholding_id],
+    );
+    if (duplicate) errors.withholding_id = req.t('This customer already has this withholding assigned.');
+  }
+  return { values, errors };
+}
+
+router.get('/customer-withholdings', async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT cw.*, c.customer_no, c.company_name,
+              w.code AS withholding_code, w.name AS withholding_name,
+              w.type AS withholding_type
+         FROM customer_withholdings cw
+         JOIN customers c ON c.id = cw.customer_id
+         JOIN withholdings w ON w.id = cw.withholding_id
+        ORDER BY c.company_name, w.name`,
+    );
+    return res.render('finance/customer-withholdings/index', {
+      title: req.t('Customer withholdings'),
+      active: 'finance-withholdings',
+      breadcrumbs: [
+        { label: req.t('Withholdings'), href: withholdingsPath },
+        { label: req.t('Customer withholdings') },
+      ],
+      rows,
+      withholdingTypes: WITHHOLDING_TYPES,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.get('/customer-withholdings/new', (req, res, next) => {
+  renderCustomerWithholdingForm(req, res, {
+    row: { id: null, customer_id: '', withholding_id: '', percentage: 0, status: 'active' },
+  }).catch(next);
+});
+
+router.post('/customer-withholdings', async (req, res, next) => {
+  try {
+    const { values, errors } = await validateCustomerWithholding(req.body, 0, req);
+    if (Object.keys(errors).length) {
+      return await renderCustomerWithholdingForm(req, res, { row: { ...values, id: null }, errors, status: 422 });
+    }
+    await query(
+      `INSERT INTO customer_withholdings (customer_id, withholding_id, percentage, status)
+       VALUES (?, ?, ?, ?)`,
+      [values.customer_id, values.withholding_id, values.percentage, values.status],
+    );
+    req.flash('success', 'Customer withholding created.');
+    return res.redirect(customerWithholdingsPath);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.get('/customer-withholdings/:id(\\d+)/edit', async (req, res, next) => {
+  try {
+    const row = await one('SELECT * FROM customer_withholdings WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!row) return next(Object.assign(new Error(req.t('Customer withholding not found.')), { status: 404 }));
+    return await renderCustomerWithholdingForm(req, res, { row });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/customer-withholdings/:id(\\d+)', async (req, res, next) => {
+  try {
+    const existing = await one('SELECT * FROM customer_withholdings WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) return next(Object.assign(new Error(req.t('Customer withholding not found.')), { status: 404 }));
+    const { values, errors } = await validateCustomerWithholding(req.body, existing.id, req);
+    if (Object.keys(errors).length) {
+      return await renderCustomerWithholdingForm(req, res, {
+        row: { ...existing, ...values },
+        errors,
+        status: 422,
+      });
+    }
+    await query(
+      `UPDATE customer_withholdings
+          SET customer_id = ?, withholding_id = ?, percentage = ?, status = ?
+        WHERE id = ?`,
+      [values.customer_id, values.withholding_id, values.percentage, values.status, existing.id],
+    );
+    req.flash('success', 'Customer withholding updated.');
+    return res.redirect(customerWithholdingsPath);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/customer-withholdings/:id(\\d+)/delete', async (req, res, next) => {
+  try {
+    const existing = await one('SELECT id FROM customer_withholdings WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) return next(Object.assign(new Error(req.t('Customer withholding not found.')), { status: 404 }));
+    await query('DELETE FROM customer_withholdings WHERE id = ?', [existing.id]);
+    req.flash('success', 'Customer withholding removed.');
+    return res.redirect(customerWithholdingsPath);
+  } catch (err) {
+    return next(err);
   }
 });
 

@@ -1,0 +1,72 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[760px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= row.id ? t('Edit withholding') : t('New withholding') %></h1>
+          <p class="page-subtitle"><%= t('Define a deduction concept that can later be assigned to customers.') %></p>
+        </div>
+        <a href="/finance/withholdings" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back to withholdings') %>
+        </a>
+      </div>
+
+      <% if (Object.keys(errors || {}).length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <%= t('Please review the highlighted fields.') %>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= row.id ? `/finance/withholdings/${row.id}` : '/finance/withholdings' %>" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Withholding details') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The percentage is configured per customer in the customer withholding page.') %></p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <div>
+            <label for="withholding-code" class="form-label"><%= t('Code') %> <span class="text-error-500">*</span></label>
+            <input id="withholding-code" name="code" type="text" maxlength="30" value="<%= row.code || '' %>" class="form-input font-mono uppercase <%= errors.code ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. SUPERMARKET-2') %>" required>
+            <% if (errors.code) { %><p class="form-error"><%= errors.code %></p><% } %>
+            <p class="form-help"><%= t('Short internal identifier. Letters, numbers, hyphens and underscores.') %></p>
+          </div>
+          <div>
+            <label for="withholding-name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+            <input id="withholding-name" name="name" type="text" maxlength="150" value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Supermarket promotion fee') %>" required>
+            <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+          </div>
+          <div>
+            <label for="withholding-type" class="form-label"><%= t('Type') %></label>
+            <select id="withholding-type" name="type" class="form-select">
+              <% withholdingTypes.forEach((option) => { %>
+                <option value="<%= option.value %>" <%= row.type === option.value ? 'selected' : '' %>><%= t(option.label) %></option>
+              <% }) %>
+            </select>
+            <p class="form-help"><%= t('Classify the deduction for reporting and management.') %></p>
+          </div>
+          <div>
+            <label for="withholding-status" class="form-label"><%= t('Status') %></label>
+            <select id="withholding-status" name="status" class="form-select">
+              <option value="active" <%= row.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+              <option value="inactive" <%= row.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+            </select>
+          </div>
+          <div class="md:col-span-2">
+            <label for="withholding-notes" class="form-label"><%= t('Notes') %></label>
+            <textarea id="withholding-notes" name="notes" rows="3" maxlength="500" class="form-input" placeholder="<%= t('Optional notes or agreement reference') %>"><%= row.notes || '' %></textarea>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">
+          <a href="/finance/withholdings" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary"><%= row.id ? t('Save changes') : t('Create') %></button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>
