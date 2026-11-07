@@ -40,6 +40,7 @@ const STATUS = {
   available: { label: 'Available', tone: 'info' },
   deposited: { label: 'Deposited', tone: 'warning' },
   endorsed: { label: 'Endorsed', tone: 'purple' },
+  negotiated: { label: 'Negotiated', tone: 'success' },
   rejected: { label: 'Rejected', tone: 'error' },
   expired: { label: 'Expired', tone: 'gray' },
   issued: { label: 'Issued', tone: 'purple' },

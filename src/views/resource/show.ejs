@@ -108,7 +108,7 @@
                         <%- statusBadge(value) %>
                       <% } else if (f.type === 'select') { %>
                         <%= (f.options || []).find(o => String(o.value) === String(value))?.label || h.humanize(value) %>
-                      <% } else if (f.type === 'date') { %>
+                      <% } else if (f.type === 'date' || f.type === 'date_dmy') { %>
                         <%= h.formatDate(value) %>
                       <% } else if (moneyFields.includes(f.name)) { %>
                         <span class="font-medium"><%= money(value) %></span>

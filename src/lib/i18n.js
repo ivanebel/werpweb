@@ -1860,11 +1860,14 @@ const ES = {
   'Drawer / issuer': 'Librador / emisor',
   'Bank': 'Banco',
   'Issue date': 'Fecha de emisión',
+  'Payment due date': 'Fecha de Pago',
+  'Create Next': 'Crear siguiente',
   'Received / given date': 'Fecha de recepción / entrega',
   'Parties': 'Terceros',
   'Supplier / endorsee': 'Proveedor / endosatario',
   'Deposited': 'Depositado',
   'Endorsed': 'Endosado',
+  'Negotiated': 'Negociado',
   'Rejected': 'Rechazado',
   'Expired': 'Vencido',
   'Deposited bank': 'Banco de depósito',
@@ -1873,8 +1876,8 @@ const ES = {
   'Settled date': 'Fecha de liquidación',
   'Open check value': 'Valor de cheques abiertos',
   'Available, deposited and endorsed': 'Disponibles, depositados y endosados',
-  'Track received, deposited, endorsed, paid, rejected and expired checks.':
-    'Seguimiento de cheques recibidos, depositados, endosados, pagados, rechazados y vencidos.',
+  'Track received, deposited, endorsed, negotiated, paid, rejected and expired checks.':
+    'Seguimiento de cheques recibidos, depositados, endosados, negociados, pagados, rechazados y vencidos.',
   'Change status': 'Cambiar estado',
   'Move the check through its lifecycle. Every change is recorded in the history below.':
     'Avanzá el cheque por su ciclo de vida. Cada cambio queda registrado en el historial.',

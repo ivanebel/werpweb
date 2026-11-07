@@ -16,6 +16,14 @@
         </a>
       </div>
 
+      <%
+        const displayDateValue = (value) => {
+          const raw = String(value || '').trim();
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) return raw;
+          if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return h.formatDate(raw.slice(0, 10));
+          return raw;
+        };
+      %>
       <% const errorList = Object.entries(errors); %>
       <% if (errorList.length) { %>
         <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
@@ -62,7 +70,7 @@
                   <% } else { %>
                     <div class="<%= f.full ? 'md:col-span-2' : '' %>">
                       <label for="field-<%= f.name %>" class="form-label">
-                        <%= f.label %><% if (f.required) { %> <span class="text-error-500">*</span><% } %>
+                        <%= resource.key === 'checks' && f.name === 'due_date' ? t('Payment due date') : f.label %><% if (f.required) { %> <span class="text-error-500">*</span><% } %>
                       </label>
                       <% if (f.type === 'textarea') { %>
                         <textarea id="field-<%= f.name %>" name="<%= f.name %>" rows="4" class="form-textarea <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.readonly ? 'readonly' : '' %>><%= value %></textarea>
@@ -73,6 +81,8 @@
                             <option value="<%= opt.value %>"<% Object.entries(opt.data || {}).forEach(([key, val]) => { %> data-<%= key %>="<%= val %>"<% }) %> <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
                           <% }) %>
                         </select>
+                      <% } else if (f.type === 'date_dmy') { %>
+                        <input id="field-<%= f.name %>" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" name="<%= f.name %>" value="<%= displayDateValue(value) %>" class="form-input <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.readonly ? 'readonly' : '' %>>
                       <% } else if (f.type === 'date') { %>
                         <input id="field-<%= f.name %>" type="date" name="<%= f.name %>" value="<%= String(value).slice(0, 10) %>" class="form-input <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.readonly ? 'readonly' : '' %>>
                       <% } else { %>
@@ -141,6 +151,12 @@
             <%- include('/partials/icon', { name: 'check', className: 'h-4 w-4' }) %>
             <%= mode === 'create' ? t('Create') : t('Save changes') %>
           </button>
+          <% if (resource.key === 'checks' && mode === 'create') { %>
+            <button type="submit" name="create_next" value="1" class="btn btn-secondary">
+              <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
+              <%= t('Create Next') %>
+            </button>
+          <% } %>
         </div>
       </form>
     </div>

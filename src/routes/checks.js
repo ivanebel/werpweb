@@ -1,5 +1,6 @@
 'use strict';
 
+const express = require('express');
 const { makeResourceRouter } = require('./resource');
 const { query, one, withTransaction } = require('../db');
 const { todayISO } = require('../lib/helpers');
@@ -72,9 +73,9 @@ const fields = [
   { name: 'bank_name', label: 'Bank', type: 'text', section: 'Check', maxLength: 120 },
   { name: 'drawer_name', label: 'Drawer / issuer', type: 'text', section: 'Check', maxLength: 150 },
   { name: 'amount', label: 'Amount', type: 'decimal', required: true, min: 0.01, section: 'Check' },
-  { name: 'issue_date', label: 'Issue date', type: 'date', section: 'Check' },
-  { name: 'due_date', label: 'Due date', type: 'date', section: 'Check' },
-  { name: 'received_date', label: 'Received / given date', type: 'date', section: 'Check' },
+  { name: 'issue_date', label: 'Issue date', type: 'date_dmy', section: 'Check' },
+  { name: 'due_date', label: 'Payment due date', type: 'date_dmy', section: 'Check' },
+  { name: 'received_date', label: 'Received / given date', type: 'date_dmy', section: 'Check' },
   {
     name: 'customer_id',
     label: 'Customer',
@@ -100,9 +101,9 @@ const fields = [
     section: 'Status',
   },
   { name: 'deposited_bank', label: 'Deposited bank', type: 'text', section: 'Status', maxLength: 120 },
-  { name: 'deposited_date', label: 'Deposited date', type: 'date', section: 'Status' },
-  { name: 'endorsed_date', label: 'Endorsed date', type: 'date', section: 'Status' },
-  { name: 'settled_date', label: 'Settled date', type: 'date', section: 'Status' },
+  { name: 'deposited_date', label: 'Deposited date', type: 'date_dmy', section: 'Status' },
+  { name: 'endorsed_date', label: 'Endorsed date', type: 'date_dmy', section: 'Status' },
+  { name: 'settled_date', label: 'Settled date', type: 'date_dmy', section: 'Status' },
   { name: 'notes', label: 'Notes', type: 'textarea', section: 'Notes', full: true, maxLength: 5000 },
 ];
 
@@ -114,7 +115,7 @@ function applyStatusDefaults(data) {
 
   if (data.status === 'deposited' && !data.deposited_date) data.deposited_date = fallback;
   if (data.status === 'endorsed' && !data.endorsed_date) data.endorsed_date = fallback;
-  if (['paid', 'rejected', 'expired'].includes(data.status) && !data.settled_date) {
+  if (['paid', 'rejected', 'expired', 'negotiated'].includes(data.status) && !data.settled_date) {
     data.settled_date = fallback;
   }
 
@@ -157,14 +158,14 @@ function validateCheck(data, t) {
   return errors;
 }
 
-const router = makeResourceRouter({
+const resourceRouter = makeResourceRouter({
   key: 'checks',
   basePath: '/checks',
   title: 'Checks',
   singular: 'Check',
   table: 'checks',
   titleField: 'check_no',
-  indexSubtitle: 'Track received, deposited, endorsed, paid, rejected and expired checks.',
+  indexSubtitle: 'Track received, deposited, endorsed, negotiated, paid, rejected and expired checks.',
   number: { prefix: 'CHK', year: true, pad: 4 },
   numberField: 'check_no',
   searchFields: [
@@ -205,7 +206,7 @@ const router = makeResourceRouter({
     { key: 'party_name', label: 'Party' },
     { key: 'bank_name', label: 'Bank' },
     { key: 'issue_date', label: 'Issue date', type: 'date' },
-    { key: 'due_date', label: 'Due date', type: 'date' },
+    { key: 'due_date', label: 'Payment due date', type: 'date' },
     { key: 'amount', label: 'Amount', type: 'money', align: 'right' },
     { key: 'status', label: 'Status', type: 'status' },
   ],
@@ -225,6 +226,9 @@ const router = makeResourceRouter({
       userId: req.session.user.id,
     });
   },
+  afterCreateRedirect: (id, data, req) => (
+    req.body.create_next === '1' ? createNextCheckUrl(data) : null
+  ),
   beforeUpdate: async (data, req, existing) => {
     applyStatusDefaults(data);
     const errors = validateCheck(data, req.t);
@@ -335,6 +339,30 @@ const router = makeResourceRouter({
   },
 });
 
+function nextCheckNumber(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(.*?)(\d+)$/);
+  if (!match) return raw;
+  return `${match[1]}${String(Number(match[2]) + 1).padStart(match[2].length, '0')}`;
+}
+
+function createNextCheckUrl(data) {
+  const params = new URLSearchParams();
+  for (const field of fields) {
+    if (field.name === 'check_no' || field.name === 'check_number') continue;
+    const value = data[field.name];
+    if (value === null || value === undefined || value === '') continue;
+    params.set(field.name, String(value));
+  }
+  const nextNumber = nextCheckNumber(data.check_number);
+  if (nextNumber) params.set('check_number', nextNumber);
+  return `/checks/new?${params.toString()}`;
+}
+
+const router = express.Router();
+
+router.use(resourceRouter);
+
 router.post('/:id(\\d+)/status', async (req, res, next) => {
   try {
     const check = await one('SELECT * FROM checks WHERE id = ? LIMIT 1', [req.params.id]);
@@ -400,7 +428,7 @@ router.post('/:id(\\d+)/status', async (req, res, next) => {
       updates.deposited_date = null;
       updates.settled_date = null;
       if (supplierId) updates.supplier_id = supplierId;
-    } else if (['paid', 'rejected', 'expired'].includes(status)) {
+    } else if (['paid', 'rejected', 'expired', 'negotiated'].includes(status)) {
       updates.settled_date = statusDate;
     }
 

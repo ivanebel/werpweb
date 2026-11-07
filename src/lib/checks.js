@@ -10,6 +10,7 @@ const STATUSES = [
   { value: 'available', label: 'Available' },
   { value: 'deposited', label: 'Deposited' },
   { value: 'endorsed', label: 'Endorsed' },
+  { value: 'negotiated', label: 'Negotiated' },
   { value: 'paid', label: 'Paid' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'expired', label: 'Expired' },
@@ -27,6 +28,7 @@ const STATUS_EVENTS = {
   available: 'reopened',
   deposited: 'deposited',
   endorsed: 'endorsed',
+  negotiated: 'negotiated',
   paid: 'paid',
   rejected: 'rejected',
   expired: 'expired',
@@ -220,8 +222,8 @@ async function reversePaymentChecks(conn, paymentId, userId = null) {
 
     // A check that was created by this payment and has not moved any further
     // is removed together with the reversed payment. Checks that have been
-    // deposited, endorsed, paid, rejected or expired are kept for the audit
-    // trail, but detached from the reversed payment.
+    // deposited, endorsed, negotiated, paid, rejected or expired are kept for
+    // the audit trail, but detached from the reversed payment.
     if (check.source === 'payment' && onlyThisPayment && check.status === (check.entry_type === 'issued' ? 'endorsed' : 'available')) {
       await conn.query('DELETE FROM checks WHERE id = ?', [check.id]);
       continue;

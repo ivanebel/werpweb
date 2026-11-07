@@ -536,6 +536,30 @@ async function upgradeSchema(conn, dbName) {
       WHERE sales_order_id IS NOT NULL`,
   );
 
+  // Add the negotiated state to checks and their audit history.
+  const [checkStatusColumns] = await conn.query(
+    `SELECT COLUMN_TYPE AS column_type
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'checks' AND COLUMN_NAME = 'status'
+      LIMIT 1`,
+    [dbName],
+  );
+  if (checkStatusColumns.length && !String(checkStatusColumns[0].column_type || checkStatusColumns[0].COLUMN_TYPE).includes("'negotiated'")) {
+    await conn.query(
+      "ALTER TABLE checks MODIFY COLUMN status ENUM('available','deposited','endorsed','negotiated','paid','rejected','expired') NOT NULL DEFAULT 'available'",
+    );
+    await conn.query(
+      "ALTER TABLE check_history MODIFY COLUMN event ENUM('created','updated','deposited','endorsed','negotiated','paid','rejected','expired','reopened','linked','unlinked') NOT NULL",
+    );
+    await conn.query(
+      "ALTER TABLE check_history MODIFY COLUMN from_status ENUM('available','deposited','endorsed','negotiated','paid','rejected','expired') NULL",
+    );
+    await conn.query(
+      "ALTER TABLE check_history MODIFY COLUMN to_status ENUM('available','deposited','endorsed','negotiated','paid','rejected','expired') NULL",
+    );
+    console.log('[migrate] added negotiated check status');
+  }
+
   // Production component quantities keep four decimals through BOM definition,
   // production requirements, floor consumption and stock.
   const quantityColumns = [

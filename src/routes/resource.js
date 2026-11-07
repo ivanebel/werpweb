@@ -138,12 +138,28 @@ function collect(fields, body, existing = null, t = (value) => value) {
       continue;
     }
 
-    if (f.type === 'date') {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    if (f.type === 'date' || f.type === 'date_dmy') {
+      let iso = null;
+      if (f.type === 'date_dmy') {
+        const match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+        if (match) {
+          const candidate = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+          const date = new Date(`${candidate}T00:00:00Z`);
+          if (!Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === candidate) iso = candidate;
+        }
+        if (!iso && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const date = new Date(`${raw}T00:00:00Z`);
+          if (!Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === raw) iso = raw;
+        }
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const date = new Date(`${raw}T00:00:00Z`);
+        if (!Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === raw) iso = raw;
+      }
+      if (!iso) {
         errors[f.name] = t('{label} must be a valid date.', { label: f.label });
         data[f.name] = raw;
       } else {
-        data[f.name] = raw;
+        data[f.name] = iso;
       }
       continue;
     }
@@ -336,6 +352,12 @@ function makeResourceRouter(config) {
       }
 
       req.flash('success', '{item} created successfully.', { item: lc.singular });
+
+      if (typeof config.afterCreateRedirect === 'function') {
+        const destination = await config.afterCreateRedirect(result.insertId, data, req);
+        if (destination) return res.redirect(destination);
+      }
+
       res.redirect(`${basePath}/${result.insertId}`);
     } catch (err) {
       const message = duplicateMessage(err, req.t);
