@@ -2595,6 +2595,31 @@ const ES = {
   'Cost items': 'Ítems de costo',
   'Monthly actuals': 'Costos reales mensuales',
   'Cost setup': 'Configuración de costos',
+  'Costs & Margins': 'Costos y márgenes',
+  'Simulate sale prices, costs and customer withholdings to see the real margin per product.':
+    'Simulá precios de venta, costos y retenciones del cliente para ver el margen real por producto.',
+  'Select a customer to load withholding percentages.': 'Seleccioná un cliente para cargar los porcentajes de retención.',
+  'Withholding percentages are loaded from the customer withholding assignments.':
+    'Los porcentajes de retención se cargan desde las retenciones asignadas al cliente.',
+  'Withholdings for this customer': 'Retenciones de este cliente',
+  'Percentages are editable for this simulation and are not saved.':
+    'Los porcentajes se pueden editar para esta simulación y no se guardan.',
+  'Products & margins': 'Productos y márgenes',
+  'Add finished goods and adjust quantities and gross prices to see their real margin.':
+    'Agregá productos terminados y ajustá cantidades y precios brutos para ver su margen real.',
+  'Add product': 'Agregar producto',
+  'Select a customer and add products to start.': 'Seleccioná un cliente y agregá productos para comenzar.',
+  'All values are shown without taxes. Withholdings are calculated on total sales without taxes.':
+    'Todos los valores se muestran sin impuestos. Las retenciones se calculan sobre las ventas totales sin impuestos.',
+  'Gross sale price': 'Precio bruto de venta',
+  'Gross cost price': 'Precio bruto de costo',
+  'Gross margin': 'Margen bruto',
+  'Total benefit': 'Beneficio total',
+  'Final margin': 'Margen final',
+  'Select product': 'Seleccioná un producto',
+  'Select a customer to load withholdings.': 'Seleccioná un cliente para cargar las retenciones.',
+  'This customer has no withholdings assigned.': 'Este cliente no tiene retenciones asignadas.',
+  'Withheld': 'Retenido',
   'Analysis period': 'Período de análisis',
   'All analytical amounts are net of recoverable VAT.':
     'Todos los importes analíticos son netos de IVA recuperable.',

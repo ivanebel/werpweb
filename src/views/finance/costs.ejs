@@ -14,6 +14,10 @@
           <p class="page-subtitle"><%= t('Understand fixed and variable costs, contribution margin and the revenue needed to break even.') %></p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <a href="/finance/costs/margins" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'scale', className: 'h-4 w-4' }) %>
+            <%= t('Costs & Margins') %>
+          </a>
           <a href="/finance/costs/items/new" class="btn btn-primary btn-sm">
             <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
             <%= t('New cost item') %>

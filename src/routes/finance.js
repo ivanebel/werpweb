@@ -338,6 +338,89 @@ router.get('/costs', async (req, res, next) => {
   }
 });
 
+router.get('/costs/margins', async (req, res, next) => {
+  try {
+    const [customers, products, customerWithholdings] = await Promise.all([
+      query(
+        `SELECT id, customer_no, company_name, status
+           FROM customers
+          ORDER BY company_name`,
+      ),
+      query(
+        `SELECT p.id, p.sku, p.name, p.unit, p.sold_by_weight, p.weight_kg,
+                p.sale_gross_price, p.cost_gross_price, b.name AS brand_name
+           FROM products p
+           LEFT JOIN brands b ON b.id = p.brand_id
+          WHERE p.status = 'active' AND p.type = 'finished_good'
+          ORDER BY COALESCE(b.name, ''), p.name`,
+      ),
+      query(
+        `SELECT cw.customer_id, cw.percentage,
+                w.id AS withholding_id, w.code, w.name, w.type
+           FROM customer_withholdings cw
+           JOIN withholdings w ON w.id = cw.withholding_id
+          WHERE cw.status = 'active' AND w.status = 'active'
+          ORDER BY cw.customer_id, w.name`,
+      ),
+    ]);
+
+    const withholdingTypeLabels = Object.fromEntries(
+      WITHHOLDING_TYPES.map((option) => [option.value, req.t(option.label)]),
+    );
+    const marginsData = {
+      currency: res.locals.currency || 'USD',
+      locale: req.locale,
+      labels: {
+        product: req.t('Product'),
+        quantity: req.t('Quantity'),
+        grossSalePrice: req.t('Gross sale price'),
+        grossCostPrice: req.t('Gross cost price'),
+        totalSales: req.t('Total sales'),
+        totalCost: req.t('Total cost'),
+        grossMargin: req.t('Gross margin'),
+        totalBenefit: req.t('Total benefit'),
+        finalMargin: req.t('Final margin'),
+        totals: req.t('Totals'),
+        remove: req.t('Remove'),
+        selectProduct: req.t('Select product'),
+        selectCustomer: req.t('Select a customer to load withholdings.'),
+        noWithholdings: req.t('This customer has no withholdings assigned.'),
+        withheld: req.t('Withheld'),
+      },
+      products: products.map((product) => ({
+        id: String(product.id),
+        label: product.brand_name ? `${product.brand_name} - ${product.name}` : product.name,
+        sku: product.sku,
+        unit: product.unit || 'unit',
+        sale: Number(product.sale_gross_price) || 0,
+        cost: Number(product.cost_gross_price) || 0,
+      })),
+      customerWithholdings: customerWithholdings.map((withholding) => ({
+        customer_id: String(withholding.customer_id),
+        withholding_id: String(withholding.withholding_id),
+        code: withholding.code,
+        name: withholding.name,
+        type: withholding.type,
+        typeLabel: withholdingTypeLabels[withholding.type] || withholding.type,
+        percentage: Number(withholding.percentage) || 0,
+      })),
+    };
+
+    res.render('finance/costs-margins', {
+      title: req.t('Costs & Margins'),
+      active: 'finance-costs',
+      breadcrumbs: [
+        { label: req.t('Costs & profitability'), href: '/finance/costs' },
+        { label: req.t('Costs & Margins') },
+      ],
+      customers,
+      marginsData,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ---------------------------------------------------------------- cost items
 router.get('/costs/items', async (req, res, next) => {
   try {

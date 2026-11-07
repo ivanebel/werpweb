@@ -1,0 +1,79 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1800px]">
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Costs & Margins') %></h1>
+          <p class="page-subtitle"><%= t('Simulate sale prices, costs and customer withholdings to see the real margin per product.') %></p>
+        </div>
+        <a href="/finance/costs" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Costs & profitability') %>
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-4">
+        <div class="card xl:col-span-1">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Customer') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Select a customer to load withholding percentages.') %></p>
+            </div>
+          </div>
+          <div class="p-5">
+            <label for="margins-customer" class="form-label"><%= t('Customer') %></label>
+            <select id="margins-customer" class="form-select">
+              <option value=""><%= t('Select a customer') %></option>
+              <% customers.forEach((customer) => { %>
+                <option value="<%= customer.id %>"><%= customer.company_name %><%= customer.status === 'inactive' ? ` (${t('Inactive')})` : '' %></option>
+              <% }) %>
+            </select>
+            <p class="form-help"><%= t('Withholding percentages are loaded from the customer withholding assignments.') %></p>
+          </div>
+        </div>
+
+        <div class="card xl:col-span-3">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Withholdings for this customer') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Percentages are editable for this simulation and are not saved.') %></p>
+            </div>
+          </div>
+          <div id="margins-withholdings" class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            <p class="text-sm text-gray-400"><%= t('Select a customer to load withholdings.') %></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-5">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Products & margins') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Add finished goods and adjust quantities and gross prices to see their real margin.') %></p>
+          </div>
+          <button type="button" id="add-margin-product" class="btn btn-primary btn-sm" disabled>
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('Add product') %>
+          </button>
+        </div>
+        <div class="table-wrap overflow-x-auto">
+          <table class="table-base min-w-[1500px]">
+            <thead id="margins-head"></thead>
+            <tbody id="margins-body"></tbody>
+            <tfoot id="margins-foot"></tfoot>
+          </table>
+        </div>
+        <div id="margins-empty" class="px-5 py-12 text-center text-sm text-gray-400">
+          <%= t('Select a customer and add products to start.') %>
+        </div>
+      </div>
+
+      <p class="mt-4 text-xs text-gray-400"><%= t('All values are shown without taxes. Withholdings are calculated on total sales without taxes.') %></p>
+    </div>
+  </main>
+  <script type="application/json" id="costs-margins-data"><%- JSON.stringify(marginsData).replace(/</g, '\\u003c') %></script>
+  <script src="/js/costs-margins.js?v=<%= assetVersion %>"></script>
+  <%- include('/layouts/footer') %>
+</div>
