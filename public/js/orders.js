@@ -58,6 +58,10 @@
     }
   }
 
+  function roundQty(value) {
+    return Number((Number(value) || 0).toFixed(3));
+  }
+
   function normalizeProductText(value) {
     return String(value || '')
       .normalize('NFD')
@@ -386,6 +390,13 @@
     return new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) === iso ? iso : '';
   }
 
+  function formatDateDisplay(value) {
+    const iso = parseDateOnly(value);
+    if (!iso) return '';
+    const [year, month, day] = iso.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
   function addDays(dateValue, days) {
     const iso = parseDateOnly(dateValue);
     if (!iso) return '';
@@ -516,21 +527,136 @@
     }
   });
 
+  function addDocumentLine() {
+    const html = template.innerHTML.replace(/__INDEX__/g, container.querySelectorAll('[data-line]').length);
+    const wrapper = document.createElement('tbody');
+    wrapper.innerHTML = html.trim();
+    const row = wrapper.firstElementChild;
+    container.appendChild(row);
+    initProductCombobox(row);
+    const tax = row.querySelector('[data-tax]');
+    if (tax && !tax.value) tax.value = defaultTax;
+    renumber();
+    updateAllCustomerCodes();
+    recalcAll();
+    return row;
+  }
+
   const addBtn = document.getElementById('add-line');
   if (addBtn) {
     addBtn.addEventListener('click', () => {
-      const html = template.innerHTML.replace(/__INDEX__/g, container.querySelectorAll('[data-line]').length);
-      const wrapper = document.createElement('tbody');
-      wrapper.innerHTML = html.trim();
-      const row = wrapper.firstElementChild;
-      container.appendChild(row);
-      initProductCombobox(row);
-      const tax = row.querySelector('[data-tax]');
-      if (tax && !tax.value) tax.value = defaultTax;
-      renumber();
-      updateAllCustomerCodes();
-      recalcAll();
+      const row = addDocumentLine();
       row.querySelector('[data-product-search]')?.focus();
+    });
+  }
+
+  const importPackingButton = document.getElementById('load-packing-slip-items');
+  const packingImportStatus = document.getElementById('packing-slip-import-status');
+  if (deliverySelect && importPackingButton) {
+    const setImportStatus = (message, tone = 'muted') => {
+      if (!packingImportStatus) return;
+      packingImportStatus.textContent = message || '';
+      packingImportStatus.className = 'text-xs';
+      if (tone === 'success') packingImportStatus.classList.add('text-success-600', 'dark:text-success-400');
+      else if (tone === 'warning') packingImportStatus.classList.add('text-warning-600', 'dark:text-warning-400');
+      else if (tone === 'error') packingImportStatus.classList.add('text-error-600', 'dark:text-error-400');
+      else packingImportStatus.classList.add('text-gray-500', 'dark:text-gray-400');
+    };
+
+    const productOptionFor = (productId) => {
+      const select = container.querySelector('[data-product-select]');
+      if (!select) return null;
+      return [...select.options].find((option) => option.value === String(productId)) || null;
+    };
+
+    const lineForProduct = (productId) => [...container.querySelectorAll('[data-line]')]
+      .find((row) => row.querySelector('[data-product-select]')?.value === String(productId)) || null;
+
+    const emptyLine = () => [...container.querySelectorAll('[data-line]')]
+      .find((row) => !row.querySelector('[data-product-select]')?.value) || null;
+
+    const setLineProduct = (row, productId) => {
+      const select = row.querySelector('[data-product-select]');
+      const option = select ? [...select.options].find((opt) => opt.value === String(productId)) : null;
+      if (!select || !option) return false;
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      syncProductCombobox(row);
+      return true;
+    };
+
+    const setLineQuantity = (row, quantity, merge = false) => {
+      const qty = row.querySelector('[data-qty]');
+      if (!qty) return;
+      const current = merge ? Number(qty.value || 0) : 0;
+      qty.value = String(roundQty(current + Number(quantity || 0)));
+      qty.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const countMessage = (template, count) => String(template || '').replace('{count}', String(count));
+
+    importPackingButton.addEventListener('click', async () => {
+      const selectedIds = [...deliverySelect.selectedOptions].map((option) => option.value).filter(Boolean);
+      if (!selectedIds.length) {
+        setImportStatus(importPackingButton.dataset.emptyMessage || '', 'warning');
+        return;
+      }
+
+      const url = importPackingButton.dataset.importUrl || '/sales/deliveries/items';
+      setImportStatus(importPackingButton.dataset.loadingMessage || '', 'muted');
+      importPackingButton.disabled = true;
+      try {
+        const response = await fetch(`${url}?ids=${encodeURIComponent(selectedIds.join(','))}`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        if (!items.length) {
+          setImportStatus(importPackingButton.dataset.noItemsMessage || '', 'muted');
+          return;
+        }
+
+        let loaded = 0;
+        let skipped = 0;
+        for (const item of items) {
+          const quantity = roundQty(item.quantity);
+          if (quantity <= 0) continue;
+          if (!productOptionFor(item.product_id)) {
+            skipped += 1;
+            continue;
+          }
+          let row = lineForProduct(item.product_id);
+          if (row) {
+            setLineQuantity(row, quantity, true);
+            loaded += 1;
+            continue;
+          }
+          row = emptyLine() || addDocumentLine();
+          if (!setLineProduct(row, item.product_id)) {
+            skipped += 1;
+            continue;
+          }
+          setLineQuantity(row, quantity, false);
+          loaded += 1;
+        }
+
+        recalcAll();
+        const loadedMessage = loaded
+          ? countMessage(importPackingButton.dataset.loadedMessage, loaded)
+          : '';
+        const skippedMessage = skipped
+          ? countMessage(importPackingButton.dataset.skippedMessage, skipped)
+          : '';
+        setImportStatus(
+          [loadedMessage, skippedMessage].filter(Boolean).join(' ') || (importPackingButton.dataset.noItemsMessage || ''),
+          loaded ? (skipped ? 'warning' : 'success') : 'warning',
+        );
+      } catch (err) {
+        setImportStatus(importPackingButton.dataset.errorMessage || '', 'error');
+      } finally {
+        importPackingButton.disabled = false;
+      }
     });
   }
 
@@ -562,7 +688,7 @@
   if (caeInput && caeExpiry && documentDate) {
     caeInput.addEventListener('input', () => {
       if (caeInput.value.trim() && !caeExpiry.value) {
-        caeExpiry.value = addDays(documentDate.value, 10);
+        caeExpiry.value = formatDateDisplay(addDays(documentDate.value, 10));
       }
     });
   }

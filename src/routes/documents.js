@@ -457,9 +457,10 @@ async function validateFiscalFields(config, body, req, existing = null) {
         values.cae = cae;
       }
     }
-    const caeExpiry = String(body.cae_expiry_date || '').slice(0, 10);
-    if (caeExpiry) {
-      if (!validDateValue(caeExpiry)) {
+    const caeExpiryRaw = String(body.cae_expiry_date || '').trim();
+    const caeExpiry = caeExpiryRaw ? parseDateInput(caeExpiryRaw) : null;
+    if (caeExpiryRaw) {
+      if (!caeExpiry) {
         errors.cae_expiry_date = req.t('Enter a valid CAE expiry date.');
       } else {
         values.cae_expiry_date = caeExpiry;
@@ -890,6 +891,42 @@ function canTransition(kind, from, to) {
 function makeDocumentRouter(config) {
   const router = express.Router();
   const basePath = config.basePath;
+
+  if (config.kind === 'sales_invoice') {
+    router.get('/deliveries/items', async (req, res, next) => {
+      try {
+        const ids = parseIdList(String(req.query.ids || '').split(','));
+        if (!ids.length) return res.json({ items: [] });
+        const placeholders = ids.map(() => '?').join(',');
+        const rows = await query(
+          `SELECT di.delivery_id, di.product_id, di.quantity,
+                  COALESCE(di.description, p.name) AS description,
+                  p.name, p.sku, COALESCE(di.unit, p.unit) AS unit
+             FROM delivery_items di
+             JOIN deliveries d ON d.id = di.delivery_id
+             JOIN products p ON p.id = di.product_id
+            WHERE d.id IN (${placeholders})
+              AND d.status <> 'cancelled'
+              AND di.product_id IS NOT NULL
+            ORDER BY d.id, di.id`,
+          ids,
+        );
+        return res.json({
+          items: rows.map((row) => ({
+            delivery_id: Number(row.delivery_id),
+            product_id: String(row.product_id),
+            quantity: Number(row.quantity) || 0,
+            unit: row.unit || '',
+            description: row.description || row.name || '',
+            name: row.name || '',
+            sku: row.sku || '',
+          })),
+        });
+      } catch (err) {
+        return next(err);
+      }
+    });
+  }
 
   async function applyPurchaseStock(conn, invoiceId, direction, label) {
     const [rows] = await conn.query(

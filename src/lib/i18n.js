@@ -2509,6 +2509,14 @@ const ES = {
   'Packing slips (remitos)': 'Remitos',
   'Only packing slips for the selected customer are listed. Hold Ctrl/Cmd to select more than one.':
     'Solo se listan los remitos del cliente seleccionado. Mantené Ctrl/Cmd para seleccionar más de uno.',
+  'Load packing slip items': 'Cargar productos del remito',
+  'Select at least one packing slip first.': 'Seleccioná al menos un remito.',
+  'Loading packing slip items…': 'Cargando productos del remito…',
+  '{count} items loaded.': '{count} productos cargados.',
+  '{count} items skipped because they are not available for this invoice.':
+    '{count} productos omitidos porque no están disponibles para esta factura.',
+  'No items found in the selected packing slips.': 'No se encontraron productos en los remitos seleccionados.',
+  'Could not load packing slip items.': 'No se pudieron cargar los productos del remito.',
   'Related invoices': 'Facturas relacionadas',
   'Only regular invoices for the selected party are listed. This section applies to credit and debit notes.':
     'Solo se listan facturas regulares del mismo tercero. Esta sección aplica a notas de crédito y débito.',

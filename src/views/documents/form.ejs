@@ -144,7 +144,7 @@
               </div>
               <div>
                 <label for="cae_expiry_date" class="form-label"><%= t('CAE expiry date') %></label>
-                <input id="cae_expiry_date" name="cae_expiry_date" type="date" value="<%= String(row.cae_expiry_date || '').slice(0,10) %>" class="form-input <%= errors.cae_expiry_date ? 'form-input-error' : '' %>">
+                <input id="cae_expiry_date" name="cae_expiry_date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" value="<%= displayDateInput(row.cae_expiry_date) %>" class="form-input <%= errors.cae_expiry_date ? 'form-input-error' : '' %>">
                 <% if (errors.cae_expiry_date) { %><p class="form-error"><%= errors.cae_expiry_date %></p><% } %>
               </div>
             <% } %>
@@ -184,6 +184,23 @@
                   </select>
                   <% if (errors.delivery_ids) { %><p class="form-error"><%= errors.delivery_ids %></p><% } %>
                   <p class="form-help"><%= t('Only packing slips for the selected customer are listed. Hold Ctrl/Cmd to select more than one.') %></p>
+                  <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      id="load-packing-slip-items"
+                      class="btn btn-secondary btn-sm"
+                      data-import-url="/sales/deliveries/items"
+                      data-empty-message="<%= t('Select at least one packing slip first.') %>"
+                      data-loading-message="<%= t('Loading packing slip items…') %>"
+                      data-loaded-message="<%= t('{count} items loaded.') %>"
+                      data-skipped-message="<%= t('{count} items skipped because they are not available for this invoice.') %>"
+                      data-no-items-message="<%= t('No items found in the selected packing slips.') %>"
+                      data-error-message="<%= t('Could not load packing slip items.') %>"
+                    >
+                      <%- include('/partials/icon', { name: 'download', className: 'h-4 w-4' }) %> <%= t('Load packing slip items') %>
+                    </button>
+                    <span id="packing-slip-import-status" class="text-xs text-gray-500 dark:text-gray-400" role="status" aria-live="polite"></span>
+                  </div>
                 </div>
               <% } %>
               <div id="note-invoices-section" class="<%= isNoteDoc ? '' : 'hidden ' %>md:col-span-2">
