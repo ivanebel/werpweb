@@ -238,6 +238,8 @@ const ES = {
   'Close sidebar': 'Cerrar barra lateral',
   'Search anything…': 'Buscar en todo…',
   'Toggle dark mode': 'Cambiar modo oscuro',
+  'Preferences': 'Preferencias',
+  'Theme': 'Tema',
   'Light mode': 'Modo claro',
   'Dark mode': 'Modo oscuro',
   'Palette': 'Paleta',
