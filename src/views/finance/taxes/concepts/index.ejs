@@ -1,0 +1,71 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1000px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Purchase concepts') %></h1>
+          <p class="page-subtitle"><%= t('Manage the ARCA concepts available on purchase invoices.') %></p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="/finance/taxes" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back to taxes') %>
+          </a>
+          <a href="/finance/taxes/concepts/new" class="btn btn-primary btn-sm">
+            <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> <%= t('New purchase concept') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Purchase concept registry') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('The concept identifies the type of purchase for ARCA (renting, bank charges, supplies, and so on).') %></p>
+          </div>
+          <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} records', { count: rows.length }) %></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[700px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Code') %></th>
+                <th class="table-th"><%= t('Name') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+                <th class="table-th"><%= t('Used by') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach((row) => { %>
+                <tr class="table-row">
+                  <td class="table-td font-mono text-sm font-medium text-gray-900 dark:text-white/90"><%= row.code %></td>
+                  <td class="table-td font-medium text-gray-900 dark:text-white/90"><%= row.name %></td>
+                  <td class="table-td"><%- statusBadge(row.status) %></td>
+                  <td class="table-td text-sm text-gray-500 dark:text-gray-400"><%= Number(row.usage_count) ? t('{count} purchase invoices', { count: row.usage_count }) : '—' %></td>
+                  <td class="table-td text-right">
+                    <div class="flex justify-end gap-1">
+                      <a href="/finance/taxes/concepts/<%= row.id %>/edit" class="btn btn-secondary btn-sm"><%= t('Edit') %></a>
+                      <% if (!Number(row.usage_count)) { %>
+                        <form method="POST" action="/finance/taxes/concepts/<%= row.id %>/delete" data-confirm="<%= t('Delete this purchase concept?') %>">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <button type="submit" class="btn btn-danger btn-sm"><%= t('Delete') %></button>
+                        </form>
+                      <% } %>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!rows.length) { %>
+                <tr><td colspan="5" class="px-6 py-12 text-center text-sm text-gray-400"><%= t('No purchase concepts configured yet.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

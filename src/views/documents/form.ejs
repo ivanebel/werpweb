@@ -150,6 +150,22 @@
             <% } %>
             <% if (doc.kind === 'purchase_invoice') { %>
               <div class="md:col-span-2">
+                <div class="flex items-center justify-between gap-2">
+                  <label for="concept_id" class="form-label"><%= t('Concept') %></label>
+                  <% if (currentUser && currentUser.role === 'admin') { %>
+                    <a href="/finance/taxes/concepts" class="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"><%= t('Manage concepts') %></a>
+                  <% } %>
+                </div>
+                <select id="concept_id" name="concept_id" class="form-select <%= errors.concept_id ? 'form-input-error' : '' %>">
+                  <option value=""><%= t('No concept') %></option>
+                  <% (conceptOptions || []).forEach((concept) => { %>
+                    <option value="<%= concept.id %>" <%= String(row.concept_id || '') === String(concept.id) ? 'selected' : '' %>><%= concept.code %> — <%= concept.name %><%= concept.status === 'inactive' ? ` (${t('inactive')})` : '' %></option>
+                  <% }) %>
+                </select>
+                <% if (errors.concept_id) { %><p class="form-error"><%= errors.concept_id %></p><% } %>
+                <p class="form-help"><%= t('Optional ARCA concept that classifies the purchase.') %></p>
+              </div>
+              <div class="md:col-span-2">
                 <label for="packing_slip_no" class="form-label"><%= t('Supplier remito no.') %></label>
                 <input id="packing_slip_no" name="packing_slip_no" type="text" maxlength="30" value="<%= row.packing_slip_no || '' %>" class="form-input" placeholder="<%= t('Optional supplier packing slip reference') %>">
               </div>

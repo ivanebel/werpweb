@@ -83,6 +83,7 @@
             <% if (row.payment_expiry_date) { %><div><span class="font-medium text-gray-700"><%= t('Payment expiry date') %>:</span> <%= h.formatDate(row.payment_expiry_date) %></div><% } %>
           <% } else { %>
             <div><span class="font-medium text-gray-700"><%= t('Supplier remito no.') %>:</span> <%= row.packing_slip_no || '—' %></div>
+            <% if (row.concept_id) { %><div><span class="font-medium text-gray-700"><%= t('Concept') %>:</span> <span class="font-mono"><%= row.concept_code %></span> <%= row.concept_name %></div><% } %>
           <% } %>
         </div>
         <% if (caePending) { %>

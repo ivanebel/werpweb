@@ -251,6 +251,9 @@
                   <% if (row.payment_expiry_date) { %><div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Payment expiry date') %></dt><dd class="text-gray-700 dark:text-gray-300"><%= h.formatDate(row.payment_expiry_date) %></dd></div><% } %>
                 <% } else { %>
                   <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Supplier remito no.') %></dt><dd class="text-gray-700 dark:text-gray-300"><%= row.packing_slip_no || '—' %></dd></div>
+                  <% if (row.concept_id) { %>
+                    <div class="flex justify-between gap-3"><dt class="text-gray-500 dark:text-gray-400"><%= t('Concept') %></dt><dd class="text-right text-gray-700 dark:text-gray-300"><span class="font-mono text-xs text-gray-500 dark:text-gray-400"><%= row.concept_code %></span> <%= row.concept_name %></dd></div>
+                  <% } %>
                 <% } %>
               </dl>
             </div>

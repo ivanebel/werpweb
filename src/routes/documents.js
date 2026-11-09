@@ -151,6 +151,18 @@ async function loadLevyOptions(includeIds = []) {
   );
 }
 
+async function loadPurchaseConcepts(includeIds = []) {
+  const ids = [...new Set(includeIds.map((id) => Number(id)).filter((id) => id > 0))];
+  const includeSql = ids.length ? ` OR id IN (${ids.map(() => '?').join(',')})` : '';
+  return query(
+    `SELECT id, code, name, status
+       FROM purchase_concepts
+      WHERE (status = 'active'${includeSql})
+      ORDER BY code, name`,
+    ids,
+  );
+}
+
 async function loadPurchaseInvoiceLevies(invoiceId) {
   return query(
     `SELECT id, invoice_id, levy_id, code, name, tax_type, jurisdiction_id,
@@ -315,6 +327,7 @@ async function loadInvoiceFormOptions(config, { existing = null, posted = null }
       selectedNoteInvoiceIds: [],
       levyOptions: [],
       levies: [],
+      conceptOptions: [],
     };
   }
   const postedType = posted ? Number.parseInt(posted.document_type_code, 10) : null;
@@ -337,7 +350,12 @@ async function loadInvoiceFormOptions(config, { existing = null, posted = null }
 
   let levyOptions = [];
   let levies = [];
+  let conceptOptions = [];
   if (config.kind === 'purchase_invoice') {
+    conceptOptions = await loadPurchaseConcepts([
+      existing ? existing.concept_id : null,
+      posted ? posted.concept_id : null,
+    ]);
     const saved = existing ? await loadPurchaseInvoiceLevies(existing.id) : [];
     const postedSelections = posted ? parseLevySelections(posted) : { rows: [] };
     levyOptions = await loadLevyOptions([
@@ -375,6 +393,7 @@ async function loadInvoiceFormOptions(config, { existing = null, posted = null }
     selectedNoteInvoiceIds,
     levyOptions,
     levies,
+    conceptOptions,
   };
 }
 
@@ -415,6 +434,7 @@ async function validateFiscalFields(config, body, req, existing = null) {
         transfer_option: null,
         payment_expiry_date: null,
         packing_slip_no: null,
+        concept_id: null,
       },
     };
   }
@@ -428,6 +448,7 @@ async function validateFiscalFields(config, body, req, existing = null) {
     transfer_option: null,
     payment_expiry_date: null,
     packing_slip_no: null,
+    concept_id: null,
   };
 
   const rawType = String(body.document_type_code || '').trim();
@@ -495,6 +516,21 @@ async function validateFiscalFields(config, body, req, existing = null) {
   if (config.kind === 'purchase_invoice') {
     const packingSlip = String(body.packing_slip_no || '').trim().slice(0, 30);
     values.packing_slip_no = packingSlip || null;
+
+    const rawConcept = String(body.concept_id || '').trim();
+    if (rawConcept) {
+      const conceptId = Number.parseInt(rawConcept, 10);
+      const concept = conceptId > 0
+        ? await one('SELECT id, status FROM purchase_concepts WHERE id = ? LIMIT 1', [conceptId])
+        : null;
+      if (!concept) {
+        errors.concept_id = req.t('Select a valid purchase concept.');
+      } else if (concept.status !== 'active' && (!existing || Number(existing.concept_id) !== conceptId)) {
+        errors.concept_id = req.t('This purchase concept is not active.');
+      } else {
+        values.concept_id = conceptId;
+      }
+    }
   }
 
   return { errors, values };
@@ -727,15 +763,22 @@ async function findDoc(config, id) {
   const fiscalJoin = config.isInvoice
     ? 'LEFT JOIN fiscal_document_types fdt ON fdt.code = t.document_type_code'
     : '';
+  const conceptSelect = config.kind === 'purchase_invoice'
+    ? ', pc.code AS concept_code, pc.name AS concept_name'
+    : '';
+  const conceptJoin = config.kind === 'purchase_invoice'
+    ? 'LEFT JOIN purchase_concepts pc ON pc.id = t.concept_id'
+    : '';
   return one(
     `SELECT t.*, party.company_name AS party_name, party.contact_name AS party_contact,
             party.email AS party_email, party.phone AS party_phone, party.address_line1 AS party_address,
             party.city AS party_city, party.state AS party_state, party.postal_code AS party_postal,
-            party.country AS party_country, party.tax_id AS party_tax_id${warehouseSelect}${fiscalSelect}
+            party.country AS party_country, party.tax_id AS party_tax_id${warehouseSelect}${fiscalSelect}${conceptSelect}
        FROM \`${config.table}\` t
        JOIN \`${config.party.table}\` party ON party.id = t.\`${config.party.field}\`
        ${warehouseJoin}
        ${fiscalJoin}
+       ${conceptJoin}
       WHERE t.id = ? LIMIT 1`,
     [id],
   );
@@ -1009,6 +1052,7 @@ function makeDocumentRouter(config) {
       }
       if (config.kind === 'purchase_invoice') {
         defaults.packing_slip_no = '';
+        defaults.concept_id = '';
       }
     }
     if (config.customerOrder) {
@@ -1333,10 +1377,10 @@ function makeDocumentRouter(config) {
           : '';
         const customerOrderPlaceholders = config.customerOrder ? ', ?, ?, ?, ?' : '';
         const fiscalColumns = config.isInvoice
-          ? `, document_type_code${config.kind === 'sales_invoice' ? ', cae, cae_expiry_date, cbu, transfer_option, payment_expiry_date' : ''}${config.kind === 'purchase_invoice' ? ', packing_slip_no' : ''}`
+          ? `, document_type_code${config.kind === 'sales_invoice' ? ', cae, cae_expiry_date, cbu, transfer_option, payment_expiry_date' : ''}${config.kind === 'purchase_invoice' ? ', packing_slip_no, concept_id' : ''}`
           : '';
         const fiscalPlaceholders = config.isInvoice
-          ? `, ?${config.kind === 'sales_invoice' ? ', ?, ?, ?, ?, ?' : ''}${config.kind === 'purchase_invoice' ? ', ?' : ''}`
+          ? `, ?${config.kind === 'sales_invoice' ? ', ?, ?, ?, ?, ?' : ''}${config.kind === 'purchase_invoice' ? ', ?, ?' : ''}`
           : '';
         const levyColumns = config.kind === 'purchase_invoice' ? ', levy_total' : '';
         const levyPlaceholders = config.kind === 'purchase_invoice' ? ', ?' : '';
@@ -1377,7 +1421,7 @@ function makeDocumentRouter(config) {
                   fiscal.values.payment_expiry_date,
                 ]
               : []),
-            ...(config.kind === 'purchase_invoice' ? [fiscal.values.packing_slip_no] : []),
+            ...(config.kind === 'purchase_invoice' ? [fiscal.values.packing_slip_no, fiscal.values.concept_id] : []),
           ],
         );
         const id = result.insertId;
@@ -1780,7 +1824,7 @@ function makeDocumentRouter(config) {
           : '';
         const numberSet = config.isInvoice ? `, \`${config.numberField}\` = ?` : '';
         const fiscalSet = config.isInvoice
-          ? `, document_type_code = ?${config.kind === 'sales_invoice' ? ', cae = ?, cae_expiry_date = ?, cbu = ?, transfer_option = ?, payment_expiry_date = ?' : ''}${config.kind === 'purchase_invoice' ? ', packing_slip_no = ?' : ''}`
+          ? `, document_type_code = ?${config.kind === 'sales_invoice' ? ', cae = ?, cae_expiry_date = ?, cbu = ?, transfer_option = ?, payment_expiry_date = ?' : ''}${config.kind === 'purchase_invoice' ? ', packing_slip_no = ?, concept_id = ?' : ''}`
           : '';
         const levySet = config.kind === 'purchase_invoice' ? ', levy_total = ?' : '';
         await conn.query(
@@ -1824,7 +1868,7 @@ function makeDocumentRouter(config) {
                   fiscal.values.payment_expiry_date,
                 ]
               : []),
-            ...(config.kind === 'purchase_invoice' ? [fiscal.values.packing_slip_no] : []),
+            ...(config.kind === 'purchase_invoice' ? [fiscal.values.packing_slip_no, fiscal.values.concept_id] : []),
             existing.id,
           ],
         );

@@ -1,0 +1,60 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[760px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= row.id ? t('Edit purchase concept') : t('New purchase concept') %></h1>
+          <p class="page-subtitle"><%= t('Define the ARCA concept code and description used on purchase invoices.') %></p>
+        </div>
+        <a href="/finance/taxes/concepts" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %> <%= t('Back') %>
+        </a>
+      </div>
+
+      <% if (Object.keys(errors || {}).length) { %>
+        <div class="mb-5 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <%= t('Please review the highlighted fields.') %>
+        </div>
+      <% } %>
+
+      <form method="POST" action="<%= row.id ? `/finance/taxes/concepts/${row.id}` : '/finance/taxes/concepts' %>" class="card">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><%= t('Purchase concept') %></h2>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Concepts are optional on purchase invoices and can be left blank.') %></p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
+          <div>
+            <label for="concept-code" class="form-label"><%= t('Code') %> <span class="text-error-500">*</span></label>
+            <input id="concept-code" name="code" type="text" maxlength="10" value="<%= row.code || '' %>" class="form-input font-mono <%= errors.code ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. 08') %>" required>
+            <% if (errors.code) { %><p class="form-error"><%= errors.code %></p><% } %>
+            <p class="form-help"><%= t('The ARCA concept code. Leading zeros are preserved.') %></p>
+          </div>
+          <div>
+            <label for="concept-name" class="form-label"><%= t('Name') %> <span class="text-error-500">*</span></label>
+            <input id="concept-name" name="name" type="text" maxlength="150" value="<%= row.name || '' %>" class="form-input <%= errors.name ? 'form-input-error' : '' %>" placeholder="<%= t('e.g. Rent') %>" required>
+            <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
+          </div>
+          <div>
+            <label for="concept-status" class="form-label"><%= t('Status') %></label>
+            <select id="concept-status" name="status" class="form-select">
+              <option value="active" <%= row.status !== 'inactive' ? 'selected' : '' %>><%= t('Active') %></option>
+              <option value="inactive" <%= row.status === 'inactive' ? 'selected' : '' %>><%= t('Inactive') %></option>
+            </select>
+            <p class="form-help"><%= t('Inactive concepts are not offered on new purchase invoices.') %></p>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-gray-100 px-5 py-4 dark:border-gray-800 md:px-6">
+          <a href="/finance/taxes/concepts" class="btn btn-secondary"><%= t('Cancel') %></a>
+          <button type="submit" class="btn btn-primary"><%= row.id ? t('Save changes') : t('Create') %></button>
+        </div>
+      </form>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

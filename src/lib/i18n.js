@@ -3483,6 +3483,37 @@ const ES = {
   'Optional. The date from which this concept is no longer valid.':
     'Opcional. La fecha desde la cual este concepto deja de ser válido.',
   'Optional notes or legal reference': 'Notas opcionales o referencia legal',
+  'Concept': 'Concepto',
+  'No concept': 'Sin concepto',
+  'Manage concepts': 'Gestionar conceptos',
+  'Optional ARCA concept that classifies the purchase.':
+    'Concepto opcional de ARCA que clasifica la compra.',
+  'Purchase concepts': 'Conceptos de compra',
+  'Manage the ARCA concepts available on purchase invoices.':
+    'Gestioná los conceptos de ARCA disponibles en las facturas de compra.',
+  'New purchase concept': 'Nuevo concepto de compra',
+  'Purchase concept registry': 'Registro de conceptos de compra',
+  'The concept identifies the type of purchase for ARCA (renting, bank charges, supplies, and so on).':
+    'El concepto identifica el tipo de compra para ARCA (alquileres, gastos bancarios, insumos, etc.).',
+  'No purchase concepts configured yet.': 'Todavía no hay conceptos de compra configurados.',
+  'Delete this purchase concept?': '¿Eliminar este concepto de compra?',
+  'Edit purchase concept': 'Editar concepto de compra',
+  'Define the ARCA concept code and description used on purchase invoices.':
+    'Definí el código y la descripción del concepto de ARCA usado en las facturas de compra.',
+  'Purchase concept': 'Concepto de compra',
+  'Concepts are optional on purchase invoices and can be left blank.':
+    'Los conceptos son opcionales en las facturas de compra y se pueden dejar en blanco.',
+  'The ARCA concept code. Leading zeros are preserved.':
+    'El código de concepto de ARCA. Se conservan los ceros iniciales.',
+  'Inactive concepts are not offered on new purchase invoices.':
+    'Los conceptos inactivos no se ofrecen en nuevas facturas de compra.',
+  'Enter a concept code.': 'Ingresá un código de concepto.',
+  'The code can only contain letters, numbers, dots and hyphens.':
+    'El código solo puede contener letras, números, puntos y guiones.',
+  'Enter a concept name.': 'Ingresá un nombre de concepto.',
+  'Purchase concept not found.': 'Concepto de compra no encontrado.',
+  'This purchase concept is not active.': 'Este concepto de compra no está activo.',
+  'Select a valid purchase concept.': 'Seleccioná un concepto de compra válido.',
   'Please review the highlighted fields.': 'Revisá los campos marcados.',
   'Levy': 'Percepción',
   'Withholding': 'Retención',

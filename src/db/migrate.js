@@ -340,6 +340,19 @@ async function upgradeSchema(conn, dbName) {
     );
   }
 
+  // --------------------------------------------- purchase invoice concepts
+  await addColumn(conn, dbName, 'purchase_invoices', 'concept_id', 'INT UNSIGNED NULL AFTER document_type_code');
+  await addIndex(conn, dbName, 'purchase_invoices', 'idx_purchase_invoices_concept', 'KEY `idx_purchase_invoices_concept` (`concept_id`)');
+  await addConstraint(conn, dbName, 'purchase_invoices', 'fk_purchase_invoices_concept',
+    'FOREIGN KEY (`concept_id`) REFERENCES `purchase_concepts` (`id`) ON DELETE SET NULL');
+  const { PURCHASE_CONCEPTS } = require('../lib/purchaseConcepts');
+  if (PURCHASE_CONCEPTS.length) {
+    await conn.query(
+      'INSERT IGNORE INTO purchase_concepts (code, name) VALUES ?',
+      [PURCHASE_CONCEPTS.map((concept) => [concept.code, concept.name])],
+    );
+  }
+
   // ------------------------------------------------------- pallet slips
   await addColumn(conn, dbName, 'delivery_items', 'lot_number', 'VARCHAR(60) NULL AFTER slip_weight_kg');
   await addColumn(conn, dbName, 'delivery_items', 'expiry_date', 'DATE NULL AFTER lot_number');

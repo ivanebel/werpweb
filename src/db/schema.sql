@@ -805,10 +805,23 @@ CREATE TABLE IF NOT EXISTS customer_withholdings (
     REFERENCES withholdings (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS purchase_concepts (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code        VARCHAR(10) NOT NULL,
+  name        VARCHAR(150) NOT NULL,
+  status      ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_purchase_concepts_code (code),
+  KEY idx_purchase_concepts_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS purchase_invoices (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   bill_no           VARCHAR(30) NOT NULL,
   document_type_code SMALLINT UNSIGNED NULL,
+  concept_id        INT UNSIGNED NULL,
   packing_slip_no   VARCHAR(30) NULL,
   purchase_order_id INT UNSIGNED NULL,
   supplier_id       INT UNSIGNED NOT NULL,
@@ -834,12 +847,15 @@ CREATE TABLE IF NOT EXISTS purchase_invoices (
   KEY idx_purchase_invoices_status (status),
   KEY idx_purchase_invoices_date (invoice_date),
   KEY idx_purchase_invoices_fiscal_type (document_type_code),
+  KEY idx_purchase_invoices_concept (concept_id),
   CONSTRAINT fk_purchase_invoices_order FOREIGN KEY (purchase_order_id)
     REFERENCES purchase_orders (id) ON DELETE SET NULL,
   CONSTRAINT fk_purchase_invoices_supplier FOREIGN KEY (supplier_id)
     REFERENCES suppliers (id) ON DELETE RESTRICT,
   CONSTRAINT fk_purchase_invoices_fiscal_type FOREIGN KEY (document_type_code)
-    REFERENCES fiscal_document_types (code) ON DELETE SET NULL
+    REFERENCES fiscal_document_types (code) ON DELETE SET NULL,
+  CONSTRAINT fk_purchase_invoices_concept FOREIGN KEY (concept_id)
+    REFERENCES purchase_concepts (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS purchase_invoice_relations (

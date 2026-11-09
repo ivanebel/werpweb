@@ -698,6 +698,155 @@ router.post('/levies/:id(\\d+)/delete', manageTaxes, async (req, res, next) => {
   }
 });
 
+// ------------------------------------------------------------ concept registry
+function conceptDefaults() {
+  return { code: '', name: '', status: 'active' };
+}
+
+function normalizeConcept(body) {
+  return {
+    code: String(body.code || '').trim().slice(0, 10),
+    name: String(body.name || '').trim().slice(0, 150),
+    status: body.status === 'inactive' ? 'inactive' : 'active',
+  };
+}
+
+function validateConcept(values, req) {
+  const errors = {};
+  if (!values.code) {
+    errors.code = req.t('Enter a concept code.');
+  } else if (!/^[0-9A-Za-z.-]+$/.test(values.code)) {
+    errors.code = req.t('The code can only contain letters, numbers, dots and hyphens.');
+  }
+  if (!values.name) errors.name = req.t('Enter a concept name.');
+  return errors;
+}
+
+async function renderConceptForm(req, res, { status = 200, row = null, errors = {} } = {}) {
+  return res.status(status).render('finance/taxes/concepts/form', {
+    title: row && row.id ? req.t('Edit purchase concept') : req.t('New purchase concept'),
+    active: 'finance-taxes',
+    breadcrumbs: [
+      { label: req.t('Taxes'), href: basePath },
+      { label: req.t('Purchase concepts'), href: `${basePath}/concepts` },
+      { label: row && row.id ? req.t('Edit') : req.t('New') },
+    ],
+    row: { ...conceptDefaults(), ...(row || {}) },
+    errors,
+  });
+}
+
+router.get('/concepts', adminOnly, async (req, res, next) => {
+  try {
+    const rows = await query(
+      `SELECT c.*,
+              (SELECT COUNT(*) FROM purchase_invoices pi WHERE pi.concept_id = c.id) AS usage_count
+         FROM purchase_concepts c
+        ORDER BY c.code, c.name`,
+    );
+    res.render('finance/taxes/concepts/index', {
+      title: req.t('Purchase concepts'),
+      active: 'finance-taxes',
+      breadcrumbs: [
+        { label: req.t('Taxes'), href: basePath },
+        { label: req.t('Purchase concepts') },
+      ],
+      rows,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/concepts/new', adminOnly, async (req, res, next) => {
+  try {
+    return renderConceptForm(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/concepts', adminOnly, async (req, res, next) => {
+  try {
+    const values = normalizeConcept(req.body);
+    const errors = validateConcept(values, req);
+    const duplicate = await one('SELECT id FROM purchase_concepts WHERE code = ? LIMIT 1', [values.code]);
+    if (duplicate) errors.code = req.t('This code is already in use.');
+    if (Object.keys(errors).length) {
+      return renderConceptForm(req, res, { status: 422, row: values, errors });
+    }
+    await query(
+      'INSERT INTO purchase_concepts (code, name, status) VALUES (?, ?, ?)',
+      [values.code, values.name, values.status],
+    );
+    req.flash('success', 'Purchase concept created.');
+    return res.redirect(`${basePath}/concepts`);
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'This code is already in use.');
+      return res.redirect(`${basePath}/concepts/new`);
+    }
+    next(error);
+  }
+});
+
+router.get('/concepts/:id(\\d+)/edit', adminOnly, async (req, res, next) => {
+  try {
+    const row = await one('SELECT * FROM purchase_concepts WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!row) return next(Object.assign(new Error(req.t('Purchase concept not found.')), { status: 404 }));
+    return renderConceptForm(req, res, { row });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/concepts/:id(\\d+)', adminOnly, async (req, res, next) => {
+  try {
+    const existing = await one('SELECT * FROM purchase_concepts WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing) return next(Object.assign(new Error(req.t('Purchase concept not found.')), { status: 404 }));
+    const values = normalizeConcept(req.body);
+    const errors = validateConcept(values, req);
+    const duplicate = await one(
+      'SELECT id FROM purchase_concepts WHERE code = ? AND id <> ? LIMIT 1',
+      [values.code, existing.id],
+    );
+    if (duplicate) errors.code = req.t('This code is already in use.');
+    if (Object.keys(errors).length) {
+      return renderConceptForm(req, res, { status: 422, row: { ...values, id: existing.id }, errors });
+    }
+    await query(
+      'UPDATE purchase_concepts SET code = ?, name = ?, status = ? WHERE id = ?',
+      [values.code, values.name, values.status, existing.id],
+    );
+    req.flash('success', 'Purchase concept updated.');
+    return res.redirect(`${basePath}/concepts`);
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      req.flash('error', 'This code is already in use.');
+      return res.redirect(`${basePath}/concepts/${req.params.id}/edit`);
+    }
+    next(error);
+  }
+});
+
+router.post('/concepts/:id(\\d+)/delete', adminOnly, async (req, res, next) => {
+  try {
+    const used = await one(
+      'SELECT COUNT(*) AS total FROM purchase_invoices WHERE concept_id = ?',
+      [req.params.id],
+    );
+    if (Number(used.total) > 0) {
+      req.flash('error', 'This concept is used by purchase invoices. Mark it inactive instead of deleting it.');
+      return res.redirect(`${basePath}/concepts`);
+    }
+    await query('DELETE FROM purchase_concepts WHERE id = ?', [req.params.id]);
+    req.flash('success', 'Purchase concept deleted.');
+    return res.redirect(`${basePath}/concepts`);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // -------------------------------------------------------------------- settings
 router.get('/settings', adminOnly, async (req, res, next) => {
   try {
