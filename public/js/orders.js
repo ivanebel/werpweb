@@ -331,7 +331,7 @@
       setText('levy-display', fmt(levyTotal));
     }
     const total = subtotal - discount + levyTotal;
-    setText('subtotal-display', fmt(subtotal));
+    setText('subtotal-display', fmt(subtotal - taxTotal));
     setText('tax-display', fmt(taxTotal));
     setText('discount-display', `- ${fmt(discount)}`);
     setText('total-display', fmt(total));

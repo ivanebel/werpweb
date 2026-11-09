@@ -113,9 +113,9 @@
                   <tr style="background:#f9fafb;">
                     <th align="left" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;"><%= t('Item') %></th>
                     <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Qty') %></th>
-                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= netPrices ? t('Unit price (net)') : t('Unit price') %></th>
+                    <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= netPrices ? t('Unit price (gross)') : t('Unit price') %></th>
                     <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('VAT') %></th>
-                    <% if (netPrices) { %><th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Net price') %></th><% } %>
+                    <% if (netPrices) { %><th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Gross price') %></th><% } %>
                     <th align="right" style="font-size:11px;letter-spacing:0.6px;text-transform:uppercase;color:#667085;padding:10px 8px;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;white-space:nowrap;"><%= t('Amount') %></th>
                   </tr>
                 </thead>
@@ -148,8 +148,8 @@
             <td style="padding:18px 26px 6px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="right" style="min-width:280px;">
                 <tr>
-                  <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Subtotal (incl. VAT)') %></td>
-                  <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.subtotal) %></td>
+                  <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('Subtotal') %></td>
+                  <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;"><%= money(Number(row.subtotal) - Number(row.tax_total)) %></td>
                 </tr>
                 <% if (Number(row.discount_total) > 0) { %>
                   <tr>
@@ -158,7 +158,7 @@
                   </tr>
                 <% } %>
                 <tr>
-                  <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('VAT included') %></td>
+                  <td style="font-size:13px;color:#667085;padding:3px 0;"><%= t('VAT') %></td>
                   <td align="right" style="font-size:13px;color:#1d2939;font-weight:bold;padding:3px 0 3px 24px;"><%= money(row.tax_total) %></td>
                 </tr>
                 <% if (doc.kind === 'purchase_invoice' && levies && levies.length) { %>

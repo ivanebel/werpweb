@@ -107,9 +107,9 @@ function documentPlainText(email, message) {
     );
   }
   lines.push('');
-  lines.push(`${t('Subtotal (incl. VAT)')}: ${money(row.subtotal)}`);
+  lines.push(`${t('Subtotal')}: ${money(Number(row.subtotal) - Number(row.tax_total))}`);
   if (Number(row.discount_total) > 0) lines.push(`${t('Discount')}: -${money(row.discount_total)}`);
-  lines.push(`${t('VAT included')}: ${money(row.tax_total)}`);
+  lines.push(`${t('VAT')}: ${money(row.tax_total)}`);
   lines.push(`${t('Total')}: ${money(row.total)}`);
   if (doc.hasAmountPaid) {
     lines.push(`${t('Paid')}: ${money(row.amount_paid)}`);

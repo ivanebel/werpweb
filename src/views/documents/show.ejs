@@ -151,9 +151,9 @@
                   <% if (showCustomerCode) { %><th class="table-th">Customer code</th><% } %>
                   <th class="table-th text-right">Qty</th>
                   <% if (doc.showDelivered) { %><th class="table-th text-right"><%= doc.qtyLabel %></th><% } %>
-                  <th class="table-th text-right"><%= netPrices ? t('Unit price (net)') : t('Unit price') %></th>
+                  <th class="table-th text-right"><%= netPrices ? t('Unit price (gross)') : t('Unit price') %></th>
                   <th class="table-th text-right">VAT</th>
-                  <% if (netPrices) { %><th class="table-th text-right"><%= t('Net price') %></th><% } %>
+                  <% if (netPrices) { %><th class="table-th text-right"><%= t('Gross price') %></th><% } %>
                   <th class="table-th text-right">Amount</th>
                 </tr>
               </thead>
@@ -187,11 +187,11 @@
 
           <div class="flex flex-col items-end gap-2 border-t border-gray-100 px-6 py-5 dark:border-gray-800">
             <div class="w-full max-w-xs space-y-2 text-sm">
-              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Subtotal (incl. VAT)</span><span class="font-medium text-gray-700 dark:text-gray-300"><%= money(row.subtotal) %></span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Subtotal</span><span class="font-medium text-gray-700 dark:text-gray-300"><%= money(Number(row.subtotal) - Number(row.tax_total)) %></span></div>
               <% if (Number(row.discount_total) > 0) { %>
                 <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Discount</span><span class="font-medium text-gray-700 dark:text-gray-300">− <%= money(row.discount_total) %></span></div>
               <% } %>
-              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">VAT included</span><span class="font-medium text-gray-700 dark:text-gray-300"><%= money(row.tax_total) %></span></div>
+              <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">VAT</span><span class="font-medium text-gray-700 dark:text-gray-300"><%= money(row.tax_total) %></span></div>
               <% if (doc.kind === 'purchase_invoice' && levies && levies.length) { %>
                 <% levies.forEach((levy) => { %>
                   <div class="flex justify-between gap-3">
@@ -201,7 +201,7 @@
                 <% }) %>
               <% } %>
               <div class="flex justify-between border-t border-gray-100 pt-2 text-base dark:border-gray-800"><span class="font-semibold text-gray-800 dark:text-gray-200">Total</span><span class="font-bold text-gray-900 dark:text-white"><%= money(row.total) %></span></div>
-              <p class="pt-1 text-right text-[11px] text-gray-400">All prices include VAT.</p>
+              <p class="pt-1 text-right text-[11px] text-gray-400"><%= t('Subtotal is shown without VAT; line amounts and the total include VAT.') %></p>
               <% if (doc.hasAmountPaid) { %>
                 <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Paid</span><span class="font-medium text-success-600 dark:text-success-400"><%= money(row.amount_paid) %></span></div>
                 <div class="flex justify-between"><span class="text-gray-500 dark:text-gray-400">Balance due</span><span class="font-semibold <%= balance > 0.005 ? 'text-warning-600 dark:text-warning-400' : 'text-success-600 dark:text-success-400' %>"><%= money(balance) %></span></div>

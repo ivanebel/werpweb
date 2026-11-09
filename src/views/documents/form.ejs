@@ -278,7 +278,7 @@
             <div class="card-header">
               <div>
                 <h2 class="card-title">Line items</h2>
-                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= netLineEntry ? t('Unit prices are net of VAT. VAT and the gross line total are calculated automatically.') : t('Add products, quantities and prices. Unit prices are tax-inclusive; VAT is extracted for the totals.') %></p>
+                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= netLineEntry ? t('Unit prices are gross, without VAT. VAT and the line total are calculated automatically.') : t('Add products, quantities and prices. Unit prices are tax-inclusive; VAT is extracted for the totals.') %></p>
               </div>
               <button type="button" id="add-line" class="btn btn-secondary btn-sm">
                 <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %> Add line
@@ -293,9 +293,9 @@
                     <% if (!netLineEntry) { %><th class="table-th w-[160px]"><%= t('Description') %></th><% } %>
                     <th class="table-th <%= qtyWidthClass %> whitespace-normal text-right"><%= t('Qty') %></th>
                     <th class="table-th w-20 whitespace-normal text-right"><%= t('Weight / unit') %></th>
-                    <th class="table-th w-32 whitespace-normal text-right"><%= netLineEntry ? t('Unit price (net)') : t('Unit price') %></th>
+                    <th class="table-th w-32 whitespace-normal text-right"><%= netLineEntry ? t('Unit price (gross)') : t('Unit price') %></th>
                     <th class="table-th w-24 whitespace-normal text-right"><%= t('VAT %') %></th>
-                    <% if (netLineEntry) { %><th class="table-th w-32 whitespace-normal text-right"><%= t('Net price') %></th><% } %>
+                    <% if (netLineEntry) { %><th class="table-th w-32 whitespace-normal text-right"><%= t('Gross price') %></th><% } %>
                     <th class="table-th w-32 whitespace-normal text-right"><%= t('Line total') %></th>
                     <th class="table-th w-12"></th>
                   </tr>
@@ -415,11 +415,11 @@
               <h2 class="card-title">Summary</h2>
               <div class="mt-5 space-y-3 text-sm">
                 <div class="flex items-center justify-between">
-                  <span class="text-gray-500 dark:text-gray-400">Subtotal (incl. VAT)</span>
+                  <span class="text-gray-500 dark:text-gray-400"><%= t('Subtotal') %></span>
                   <span id="subtotal-display" class="font-medium text-gray-800 dark:text-gray-200">—</span>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-gray-500 dark:text-gray-400">VAT included</span>
+                  <span class="text-gray-500 dark:text-gray-400"><%= t('VAT') %></span>
                   <span id="tax-display" class="font-medium text-gray-800 dark:text-gray-200">—</span>
                 </div>
                 <div class="flex items-center justify-between gap-3">

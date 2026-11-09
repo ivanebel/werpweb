@@ -3610,6 +3610,12 @@ const ES = {
   'Total levies': 'Total percepciones',
   'Levies': 'Percepciones',
   'Unit price (net)': 'Precio unitario (neto)',
+  'Unit price (gross)': 'Precio unitario (bruto)',
+  'Gross price': 'Precio bruto',
+  'Unit prices are gross, without VAT. VAT and the line total are calculated automatically.':
+    'Los precios unitarios son brutos, sin IVA. El IVA y el total de la línea se calculan automáticamente.',
+  'Subtotal is shown without VAT; line amounts and the total include VAT.':
+    'El subtotal se muestra sin IVA; los importes de línea y el total incluyen IVA.',
   'Weight / unit': 'Peso / unidad',
   'Unit prices are net of VAT. VAT and the gross line total are calculated automatically.':
     'Los precios unitarios son netos de IVA. El IVA y el total bruto de la línea se calculan automáticamente.',
