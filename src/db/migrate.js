@@ -99,6 +99,8 @@ async function addConstraint(conn, dbName, table, constraintName, definition) {
 async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'suppliers', 'default_vat_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER payment_terms');
   await addColumn(conn, dbName, 'suppliers', 'default_levy_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER default_vat_rate');
+  await addColumn(conn, dbName, 'customers', 'vat_situation', "ENUM('RI','RM','EX') NOT NULL DEFAULT 'RI' AFTER tax_id");
+  await addColumn(conn, dbName, 'suppliers', 'vat_situation', "ENUM('RI','RM','EX') NOT NULL DEFAULT 'RI' AFTER tax_id");
 
   await addColumn(conn, dbName, 'products', 'brand_id', 'INT UNSIGNED NULL AFTER category_id');
   await addColumn(conn, dbName, 'products', 'supplier_id', 'INT UNSIGNED NULL AFTER brand_id');

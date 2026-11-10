@@ -11,6 +11,12 @@ const statusOptions = [
   { value: 'inactive', label: 'Inactive' },
 ];
 
+const vatSituationOptions = [
+  { value: 'RI', label: 'Responsable Inscripto (RI)' },
+  { value: 'RM', label: 'Responsable Monotributo (RM)' },
+  { value: 'EX', label: 'Responsable Exento (EX)' },
+];
+
 const fields = [
   { name: 'customer_no', label: 'Customer no.', type: 'text', section: 'Company', help: 'Leave blank to generate automatically.', maxLength: 30 },
   { name: 'status', label: 'Status', type: 'select', options: statusOptions, default: 'active', section: 'Company' },
@@ -26,6 +32,16 @@ const fields = [
   { name: 'postal_code', label: 'Postal code', type: 'text', section: 'Address' },
   { name: 'country', label: 'Country', type: 'text', section: 'Address' },
   { name: 'tax_id', label: 'Tax ID', type: 'text', section: 'Financial' },
+  {
+    name: 'vat_situation',
+    label: 'VAT situation',
+    type: 'select',
+    options: vatSituationOptions,
+    default: 'RI',
+    required: true,
+    section: 'Financial',
+    help: 'VAT condition used on fiscal documents.',
+  },
   {
     name: 'payment_terms',
     label: 'Payment terms',

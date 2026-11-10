@@ -10,6 +10,12 @@ const statusOptions = [
   { value: 'inactive', label: 'Inactive' },
 ];
 
+const vatSituationOptions = [
+  { value: 'RI', label: 'Responsable Inscripto (RI)' },
+  { value: 'RM', label: 'Responsable Monotributo (RM)' },
+  { value: 'EX', label: 'Responsable Exento (EX)' },
+];
+
 const fields = [
   { name: 'supplier_no', label: 'Supplier no.', type: 'text', section: 'Company', help: 'Leave blank to generate automatically.', maxLength: 30 },
   { name: 'status', label: 'Status', type: 'select', options: statusOptions, default: 'active', section: 'Company' },
@@ -25,6 +31,16 @@ const fields = [
   { name: 'postal_code', label: 'Postal code', type: 'text', section: 'Address' },
   { name: 'country', label: 'Country', type: 'text', section: 'Address' },
   { name: 'tax_id', label: 'Tax ID', type: 'text', section: 'Financial' },
+  {
+    name: 'vat_situation',
+    label: 'VAT situation',
+    type: 'select',
+    options: vatSituationOptions,
+    default: 'RI',
+    required: true,
+    section: 'Financial',
+    help: 'VAT condition used on fiscal documents.',
+  },
   { name: 'default_vat_rate', label: 'Default VAT rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Financial', help: 'Applied to product costs when this supplier is selected as the default supplier.' },
   { name: 'default_levy_rate', label: 'Default levy rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Financial', help: 'Supplier-specific levy, applied as a percentage of the cost gross price.' },
   {
