@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const { query, one, scalar } = require('../db');
 const { getSettings, updateSettings } = require('../lib/settings');
 const { requireRole } = require('../middleware/web');
+const { VAT_RATE_OPTIONS } = require('../lib/vatRates');
 const config = require('../config');
 const telegramLinks = require('../lib/telegram/links');
 const {
@@ -86,6 +87,8 @@ router.post('/settings', requireRole('admin', 'manager'), async (req, res, next)
     }
     if (Number.isNaN(Number(values.default_tax_rate)) || Number(values.default_tax_rate) < 0) {
       errors.default_tax_rate = req.t('Tax rate must be a positive number.');
+    } else if (!VAT_RATE_OPTIONS.some((option) => Number(option.value) === Number(values.default_tax_rate))) {
+      errors.default_tax_rate = req.t('Select a valid ARCA VAT rate.');
     }
     if (Object.keys(errors).length) {
       return res.status(422).render('settings/company', {

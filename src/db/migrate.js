@@ -342,6 +342,69 @@ async function upgradeSchema(conn, dbName) {
     );
   }
 
+  // --------------------------------------------------------------- VAT rates
+  const {
+    VAT_RATES,
+    DEFAULT_VAT_CODE,
+    DEFAULT_VAT_RATE,
+  } = require('../lib/vatRates');
+  await conn.query(
+    'INSERT IGNORE INTO vat_rates (code, rate, name, active, is_default) VALUES ?',
+    [VAT_RATES.map((vat) => [vat.code, vat.rate, vat.name, vat.active ? 1 : 0, vat.code === DEFAULT_VAT_CODE ? 1 : 0])],
+  );
+
+  const vatItemTables = [
+    'sales_order_items',
+    'purchase_order_items',
+    'sales_invoice_items',
+    'purchase_invoice_items',
+    'pos_sale_items',
+  ];
+  for (const table of vatItemTables) {
+    await addColumn(conn, dbName, table, 'vat_code', 'CHAR(4) NULL AFTER tax_rate');
+    await addIndex(conn, dbName, table, `idx_${table}_vat_code`, `KEY \`idx_${table}_vat_code\` (\`vat_code\`)`);
+    await addConstraint(
+      conn,
+      dbName,
+      table,
+      `fk_${table}_vat_code`,
+      'FOREIGN KEY (`vat_code`) REFERENCES `vat_rates` (`code`) ON DELETE SET NULL',
+    );
+    await conn.query(
+      `UPDATE \`${table}\`
+          SET vat_code = CASE ROUND(tax_rate, 2)
+            WHEN 0 THEN '0003'
+            WHEN 10.5 THEN '0004'
+            WHEN 21 THEN '0005'
+            WHEN 27 THEN '0006'
+            ELSE NULL
+          END
+        WHERE vat_code IS NULL
+          AND ROUND(tax_rate, 2) IN (0, 10.5, 21, 27)`,
+    );
+  }
+
+  // New documents should always default to 21% unless the company already
+  // selected another standard ARCA rate.
+  await conn.query(
+    `UPDATE settings
+        SET svalue = CASE
+          WHEN svalue REGEXP '^[0-9]+([.][0-9]+)?$' THEN
+            CASE ROUND(CAST(svalue AS DECIMAL(5,2)), 2)
+              WHEN 0 THEN '0.00'
+              WHEN 10.5 THEN '10.50'
+              WHEN 21 THEN '21.00'
+              WHEN 27 THEN '27.00'
+              ELSE ?
+            END
+          ELSE ?
+        END
+      WHERE skey = 'default_tax_rate'
+        AND svalue IS NOT NULL
+        AND svalue <> ''`,
+    [DEFAULT_VAT_RATE.toFixed(2), DEFAULT_VAT_RATE.toFixed(2)],
+  );
+
   // --------------------------------------------- purchase invoice concepts
   await addColumn(conn, dbName, 'purchase_invoices', 'concept_id', 'INT UNSIGNED NULL AFTER document_type_code');
   await addIndex(conn, dbName, 'purchase_invoices', 'idx_purchase_invoices_concept', 'KEY `idx_purchase_invoices_concept` (`concept_id`)');

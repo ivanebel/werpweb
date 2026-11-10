@@ -12,6 +12,10 @@
         const backUrl = mode === 'edit' ? `${doc.basePath}/${row.id}` : doc.basePath;
         const skipStockChecked = Boolean(row.skip_stock) || Number(row.stock_skipped) === 1;
         const netLineEntry = true;
+        const standardVatValues = (vatRateOptions || []).map((option) => String(option.value));
+        const defaultVatValue = standardVatValues.includes(Number(defaultTaxRate || 0).toFixed(2))
+          ? Number(defaultTaxRate || 0).toFixed(2)
+          : '21.00';
         const qtyWidthClass = doc.isInvoice ? 'w-36' : (doc.kind === 'purchase_order' ? 'w-28' : 'w-24');
         const displayDateInput = (value) => {
           const raw = String(value || '').trim();
@@ -304,6 +308,8 @@
                   <% (items.length ? items : [{}]).forEach((item, i) => {
                     const p = productById[String(item.product_id || '')];
                     const itemTax = item.tax_rate !== undefined ? Number(item.tax_rate) : Number(defaultTaxRate);
+                    const itemTaxValue = itemTax.toFixed(2);
+                    const itemHasStandardVat = standardVatValues.includes(itemTaxValue);
                     const itemGross = item.unit_price !== undefined ? Number(item.unit_price) : 0;
                     const itemNet = item.net_unit_price !== undefined ? Number(item.net_unit_price) : (itemTax > 0 ? itemGross / (1 + itemTax / 100) : itemGross);
                     const itemUnit = String(item.unit || p?.unit || '');
@@ -348,7 +354,14 @@
                         <span class="mt-0.5 block text-[11px] text-gray-400" data-price-unit><%= weightedRow ? '/kg' : (itemUnit ? `/${itemUnit}` : '') %></span>
                       </td>
                       <td class="table-td">
-                        <input name="item_tax_rate[<%= i %>]" data-tax type="number" min="0" step="0.01" value="<%= item.tax_rate !== undefined ? item.tax_rate : defaultTaxRate %>" class="form-input text-right">
+                        <select name="item_tax_rate[<%= i %>]" data-tax class="form-select text-right">
+                          <% (vatRateOptions || []).forEach((option) => { %>
+                            <option value="<%= option.value %>" <%= itemTaxValue === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+                          <% }) %>
+                          <% if (!itemHasStandardVat) { %>
+                            <option value="<%= itemTaxValue %>" selected><%= itemTaxValue %>% (<%= t('legacy') %>)</option>
+                          <% } %>
+                        </select>
                       </td>
                       <% if (netLineEntry) { %>
                         <td class="table-td text-right pt-7 text-gray-600 dark:text-gray-300" data-net-total><%= money(effectiveQty * itemNet) %></td>
@@ -398,7 +411,13 @@
                   <% } %>
                   <span class="mt-0.5 block text-[11px] text-gray-400" data-price-unit></span>
                 </td>
-                <td class="table-td"><input name="item_tax_rate[__INDEX__]" data-tax type="number" min="0" step="0.01" value="<%= defaultTaxRate %>" class="form-input text-right"></td>
+                <td class="table-td">
+                  <select name="item_tax_rate[__INDEX__]" data-tax class="form-select text-right">
+                    <% (vatRateOptions || []).forEach((option) => { %>
+                      <option value="<%= option.value %>" <%= defaultVatValue === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+                    <% }) %>
+                  </select>
+                </td>
                 <% if (netLineEntry) { %><td class="table-td pt-7 text-right text-gray-600 dark:text-gray-300" data-net-total></td><% } %>
                 <td class="table-td pt-7 text-right"><span class="font-medium" data-line-total></span><span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span></td>
                 <td class="table-td pt-4 text-right">

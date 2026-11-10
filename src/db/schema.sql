@@ -117,6 +117,18 @@ CREATE TABLE IF NOT EXISTS fiscal_document_types (
   PRIMARY KEY (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS vat_rates (
+  code       CHAR(4) NOT NULL,
+  rate       DECIMAL(5,2) NOT NULL,
+  name       VARCHAR(60) NOT NULL,
+  active     TINYINT(1) NOT NULL DEFAULT 1,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (code),
+  UNIQUE KEY uq_vat_rates_rate (rate)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS employees (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   employee_no     VARCHAR(30) NOT NULL,
@@ -487,13 +499,17 @@ CREATE TABLE IF NOT EXISTS sales_order_items (
   delivered_qty DECIMAL(14,3) NOT NULL DEFAULT 0,
   unit_price  DECIMAL(14,2) NOT NULL DEFAULT 0,
   tax_rate    DECIMAL(5,2) NOT NULL DEFAULT 0,
+  vat_code    CHAR(4) NULL,
   line_total  DECIMAL(14,2) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_sales_order_items_order (order_id),
+  KEY idx_sales_order_items_vat_code (vat_code),
   CONSTRAINT fk_soi_order FOREIGN KEY (order_id)
     REFERENCES sales_orders (id) ON DELETE CASCADE,
   CONSTRAINT fk_soi_product FOREIGN KEY (product_id)
-    REFERENCES products (id) ON DELETE RESTRICT
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_soi_vat_code FOREIGN KEY (vat_code)
+    REFERENCES vat_rates (code) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
@@ -533,13 +549,17 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
   received_qty DECIMAL(14,3) NOT NULL DEFAULT 0,
   unit_price   DECIMAL(14,2) NOT NULL DEFAULT 0,
   tax_rate     DECIMAL(5,2) NOT NULL DEFAULT 0,
+  vat_code     CHAR(4) NULL,
   line_total   DECIMAL(14,2) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_purchase_order_items_order (order_id),
+  KEY idx_purchase_order_items_vat_code (vat_code),
   CONSTRAINT fk_poi_order FOREIGN KEY (order_id)
     REFERENCES purchase_orders (id) ON DELETE CASCADE,
   CONSTRAINT fk_poi_product FOREIGN KEY (product_id)
-    REFERENCES products (id) ON DELETE RESTRICT
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_poi_vat_code FOREIGN KEY (vat_code)
+    REFERENCES vat_rates (code) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS carriers (
@@ -744,13 +764,17 @@ CREATE TABLE IF NOT EXISTS sales_invoice_items (
   total_weight    DECIMAL(14,3) NOT NULL DEFAULT 0,
   unit_price  DECIMAL(14,2) NOT NULL DEFAULT 0,
   tax_rate    DECIMAL(5,2) NOT NULL DEFAULT 0,
+  vat_code    CHAR(4) NULL,
   line_total  DECIMAL(14,2) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_sii_invoice (invoice_id),
+  KEY idx_sii_vat_code (vat_code),
   CONSTRAINT fk_sii_invoice FOREIGN KEY (invoice_id)
     REFERENCES sales_invoices (id) ON DELETE CASCADE,
   CONSTRAINT fk_sii_product FOREIGN KEY (product_id)
-    REFERENCES products (id) ON DELETE RESTRICT
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_sii_vat_code FOREIGN KEY (vat_code)
+    REFERENCES vat_rates (code) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS tax_levies (
@@ -882,13 +906,17 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_items (
   total_weight    DECIMAL(14,3) NOT NULL DEFAULT 0,
   unit_price  DECIMAL(14,2) NOT NULL DEFAULT 0,
   tax_rate    DECIMAL(5,2) NOT NULL DEFAULT 0,
+  vat_code    CHAR(4) NULL,
   line_total  DECIMAL(14,2) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_pii_invoice (invoice_id),
+  KEY idx_pii_vat_code (vat_code),
   CONSTRAINT fk_pii_invoice FOREIGN KEY (invoice_id)
     REFERENCES purchase_invoices (id) ON DELETE CASCADE,
   CONSTRAINT fk_pii_product FOREIGN KEY (product_id)
-    REFERENCES products (id) ON DELETE RESTRICT
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pii_vat_code FOREIGN KEY (vat_code)
+    REFERENCES vat_rates (code) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS purchase_invoice_levies (
@@ -1838,14 +1866,18 @@ CREATE TABLE IF NOT EXISTS pos_sale_items (
   quantity    DECIMAL(14,3) NOT NULL DEFAULT 0,
   unit_price  DECIMAL(14,2) NOT NULL DEFAULT 0,
   tax_rate    DECIMAL(5,2) NOT NULL DEFAULT 0,
+  vat_code    CHAR(4) NULL,
   line_total  DECIMAL(14,2) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_pos_sale_items_sale (sale_id),
   KEY idx_pos_sale_items_product (product_id),
+  KEY idx_pos_sale_items_vat_code (vat_code),
   CONSTRAINT fk_pos_sale_items_sale FOREIGN KEY (sale_id)
     REFERENCES pos_sales (id) ON DELETE CASCADE,
   CONSTRAINT fk_pos_sale_items_product FOREIGN KEY (product_id)
-    REFERENCES products (id) ON DELETE RESTRICT
+    REFERENCES products (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pos_sale_items_vat_code FOREIGN KEY (vat_code)
+    REFERENCES vat_rates (code) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

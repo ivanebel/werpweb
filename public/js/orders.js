@@ -18,6 +18,22 @@
   const levyTemplate = document.getElementById('levy-template');
   const currency = form.getAttribute('data-currency') || 'USD';
   const defaultTax = Number(form.getAttribute('data-default-tax') || 0);
+  const defaultTaxValue = Number(defaultTax || 0).toFixed(2);
+  const applyTaxRate = (select, rate) => {
+    if (!select) return Number(rate) || 0;
+    const value = Number(rate || 0).toFixed(2);
+    if ([...select.options].some((option) => option.value === value)) {
+      select.value = value;
+      return Number(value);
+    }
+    const preferred = [...select.options].find((option) => option.value === defaultTaxValue);
+    const fallback = preferred || [...select.options].find((option) => option.value === '21.00') || select.options[0];
+    if (fallback) {
+      select.value = fallback.value;
+      return Number(fallback.value);
+    }
+    return Number(rate) || 0;
+  };
   const netPrices = form.getAttribute('data-net-prices') === '1';
   const partySelect = document.getElementById('party_id');
   const warehouseSelect = document.getElementById('customer_warehouse_id');
@@ -468,13 +484,11 @@
     const optionTax = option && option.dataset.taxRate !== undefined
       ? Number(option.dataset.taxRate || 0)
       : Number(tax?.value || 0);
-    if (option && option.dataset.taxRate !== undefined && tax) {
-      tax.value = optionTax.toFixed(2);
-    }
+    const effectiveTax = option && tax ? applyTaxRate(tax, optionTax) : optionTax;
     if (option && option.dataset.price !== undefined) {
       const price = row.querySelector('input[data-price]');
       const grossPrice = Number(option.dataset.price || 0);
-      const displayPrice = netPrices && optionTax ? grossPrice / (1 + optionTax / 100) : grossPrice;
+      const displayPrice = netPrices && effectiveTax ? grossPrice / (1 + effectiveTax / 100) : grossPrice;
       if (price) price.value = displayPrice.toFixed(2);
     }
     const unit = row.querySelector('[data-unit]');
@@ -514,7 +528,7 @@
         if (sel) sel.selectedIndex = 0;
         syncProductCombobox(rows[0]);
         const tax = rows[0].querySelector('[data-tax]');
-        if (tax) tax.value = defaultTax;
+        if (tax) applyTaxRate(tax, defaultTax);
         recalcAll();
         return;
       }
@@ -535,7 +549,7 @@
     container.appendChild(row);
     initProductCombobox(row);
     const tax = row.querySelector('[data-tax]');
-    if (tax && !tax.value) tax.value = defaultTax;
+    if (tax && !tax.value) applyTaxRate(tax, defaultTax);
     renumber();
     updateAllCustomerCodes();
     recalcAll();

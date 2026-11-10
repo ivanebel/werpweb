@@ -14,12 +14,29 @@
   const saleGross = dialog.querySelector('[name="sale_gross_price"]');
   const saleVat = dialog.querySelector('[name="sale_vat_rate"]');
   const saleNet = dialog.querySelector('[data-price-net="sale"]');
+  let messages = {};
+  try {
+    messages = JSON.parse(document.body.getAttribute('data-i18n') || '{}');
+  } catch (e) {
+    messages = {};
+  }
+  const legacyLabel = messages.legacy || 'legacy';
 
   const num = (value) => {
     const parsed = Number(value || 0);
     return Number.isFinite(parsed) ? parsed : 0;
   };
   const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+  const setVatValue = (select, value) => {
+    const str = num(value).toFixed(2);
+    if (select.tagName === 'SELECT' && ![...select.options].some((option) => option.value === str)) {
+      const option = document.createElement('option');
+      option.value = str;
+      option.textContent = `${str}% (${legacyLabel})`;
+      select.appendChild(option);
+    }
+    select.value = str;
+  };
 
   function recalc() {
     const grossCost = num(costGross.value);
@@ -34,6 +51,7 @@
 
   [costGross, costVat, costLevy, saleGross, saleVat].forEach((input) => {
     input.addEventListener('input', recalc);
+    input.addEventListener('change', recalc);
   });
 
   document.querySelectorAll('[data-price-open]').forEach((button) => {
@@ -43,10 +61,10 @@
       if (productLabel) productLabel.textContent = button.dataset.productName || '';
 
       costGross.value = num(button.dataset.costGross).toFixed(2);
-      costVat.value = num(button.dataset.costVat).toFixed(2);
+      setVatValue(costVat, button.dataset.costVat);
       costLevy.value = num(button.dataset.costLevy).toFixed(2);
       saleGross.value = num(button.dataset.saleGross).toFixed(2);
-      saleVat.value = num(button.dataset.saleVat).toFixed(2);
+      setVatValue(saleVat, button.dataset.saleVat);
       recalc();
 
       dialog.showModal();

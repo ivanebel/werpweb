@@ -2,6 +2,7 @@
 
 const { makeResourceRouter } = require('./resource');
 const { query } = require('../db');
+const { VAT_RATE_OPTIONS, DEFAULT_VAT_RATE } = require('../lib/vatRates');
 const { renderAccountDashboard } = require('../lib/accountDashboard');
 const { renderAccountStatement } = require('../lib/accountStatement');
 
@@ -41,7 +42,7 @@ const fields = [
     section: 'Financial',
     help: 'VAT condition used on fiscal documents.',
   },
-  { name: 'default_vat_rate', label: 'Default VAT rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Financial', help: 'Applied to product costs when this supplier is selected as the default supplier.' },
+  { name: 'default_vat_rate', label: 'Default VAT rate', type: 'select', options: VAT_RATE_OPTIONS, default: DEFAULT_VAT_RATE.toFixed(2), allowLegacy: true, required: true, section: 'Financial', help: 'Applied to product costs when this supplier is selected as the default supplier.' },
   { name: 'default_levy_rate', label: 'Default levy rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Financial', help: 'Supplier-specific levy, applied as a percentage of the cost gross price.' },
   {
     name: 'payment_terms',

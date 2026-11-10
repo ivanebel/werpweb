@@ -13,6 +13,7 @@ const {
   isRegularInvoiceCode,
   invoiceTypeCodes,
 } = require('../lib/fiscalDocumentTypes');
+const { codeForRate } = require('../lib/vatRates');
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const round3 = (n) => Math.round((Number(n) + Number.EPSILON) * 1000) / 1000;
@@ -90,6 +91,7 @@ function parseItems(body, config, defaultTaxRate) {
       unit_price: round2(grossUnitPrice),
       net_unit_price: round2(netUnitPrice),
       tax_rate: taxRate,
+      vat_code: codeForRate(taxRate),
       line_total: round2(effectiveQuantity * grossUnitPrice),
     });
   }
@@ -1429,9 +1431,9 @@ function makeDocumentRouter(config) {
         for (let i = 0; i < items.length; i++) {
           const it = items[i];
           await conn.query(
-            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, weight_per_unit, total_weight, unit_price, tax_rate, line_total)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, it.product_id, it.description, it.quantity, it.weight_per_unit, it.total_weight, it.unit_price, it.tax_rate, it.line_total],
+            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, weight_per_unit, total_weight, unit_price, tax_rate, vat_code, line_total)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, it.product_id, it.description, it.quantity, it.weight_per_unit, it.total_weight, it.unit_price, it.tax_rate, it.vat_code, it.line_total],
           );
         }
         if (config.kind === 'purchase_invoice' && totals.levy_lines.length) {
@@ -1876,9 +1878,9 @@ function makeDocumentRouter(config) {
         await conn.query(`DELETE FROM \`${config.itemTable}\` WHERE \`${config.itemFk}\` = ?`, [existing.id]);
         for (const it of items) {
           await conn.query(
-            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, weight_per_unit, total_weight, unit_price, tax_rate, line_total)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [existing.id, it.product_id, it.description, it.quantity, it.weight_per_unit, it.total_weight, it.unit_price, it.tax_rate, it.line_total],
+            `INSERT INTO \`${config.itemTable}\` (\`${config.itemFk}\`, product_id, description, quantity, weight_per_unit, total_weight, unit_price, tax_rate, vat_code, line_total)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [existing.id, it.product_id, it.description, it.quantity, it.weight_per_unit, it.total_weight, it.unit_price, it.tax_rate, it.vat_code, it.line_total],
           );
         }
         if (config.kind === 'purchase_invoice') {

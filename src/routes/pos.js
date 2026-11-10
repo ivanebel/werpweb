@@ -4,6 +4,7 @@ const express = require('express');
 const { query, one, scalar, withTransaction } = require('../db');
 const { pagination, toNumber, todayISO, percentChange } = require('../lib/helpers');
 const { getSettings } = require('../lib/settings');
+const { codeForRate } = require('../lib/vatRates');
 
 const router = express.Router();
 
@@ -195,6 +196,7 @@ function parseItems(body, defaultTaxRate) {
       quantity: round3(quantity),
       unit_price: round2(unitPrice),
       tax_rate: Math.min(100, Math.max(0, taxRate)),
+      vat_code: codeForRate(taxRate),
       line_total: lineTotal,
     });
   }
@@ -942,8 +944,8 @@ router.post('/sales', async (req, res, next) => {
       for (const item of items) {
         await conn.query(
           `INSERT INTO pos_sale_items
-             (sale_id, product_id, description, quantity, unit_price, tax_rate, line_total)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (sale_id, product_id, description, quantity, unit_price, tax_rate, vat_code, line_total)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             id,
             item.product_id,
@@ -951,6 +953,7 @@ router.post('/sales', async (req, res, next) => {
             item.quantity,
             item.unit_price,
             item.tax_rate,
+            item.vat_code,
             item.line_total,
           ],
         );
@@ -1119,8 +1122,8 @@ router.post('/sales/:id(\\d+)', async (req, res, next) => {
       for (const item of items) {
         await conn.query(
           `INSERT INTO pos_sale_items
-             (sale_id, product_id, description, quantity, unit_price, tax_rate, line_total)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (sale_id, product_id, description, quantity, unit_price, tax_rate, vat_code, line_total)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             sale.id,
             item.product_id,
@@ -1128,6 +1131,7 @@ router.post('/sales/:id(\\d+)', async (req, res, next) => {
             item.quantity,
             item.unit_price,
             item.tax_rate,
+            item.vat_code,
             item.line_total,
           ],
         );

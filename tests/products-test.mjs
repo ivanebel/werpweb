@@ -184,7 +184,7 @@ try {
     const html = await res.text();
     ok('prefilled form renders', res.status === 200 && html.includes(sourceName), `${res.status}`);
     ok('sku input is blank', /<input[^>]*name="sku"[^>]*value=""/.test(html));
-    ok('source vat rate is preserved', /<input[^>]*name="sale_vat_rate"[^>]*value="0"/.test(html));
+    ok('source vat rate is preserved', /<select[^>]*name="sale_vat_rate"[^>]*>[\s\S]*?<option[^>]*value="0\.00"[^>]*selected/.test(html));
   }
 
   // ------------------------------------------------------ create the duplicate

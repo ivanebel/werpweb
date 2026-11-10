@@ -285,8 +285,12 @@
                 <input id="price-cost-gross" name="cost_gross_price" type="number" min="0" step="0.01" class="form-input text-right">
               </div>
               <div>
-                <label for="price-cost-vat" class="form-label"><%= t('Cost VAT rate (%)') %></label>
-                <input id="price-cost-vat" name="cost_vat_rate" type="number" min="0" max="100" step="0.01" class="form-input text-right">
+                <label for="price-cost-vat" class="form-label"><%= t('Cost VAT rate') %></label>
+                <select id="price-cost-vat" name="cost_vat_rate" class="form-select text-right">
+                  <% (vatRateOptions || []).forEach((option) => { %>
+                    <option value="<%= option.value %>"><%= option.label %></option>
+                  <% }) %>
+                </select>
               </div>
               <div>
                 <label for="price-cost-levy" class="form-label"><%= t('Supplier levy rate (%)') %></label>
@@ -307,8 +311,12 @@
                 <input id="price-sale-gross" name="sale_gross_price" type="number" min="0" step="0.01" class="form-input text-right">
               </div>
               <div>
-                <label for="price-sale-vat" class="form-label"><%= t('Sale VAT rate (%)') %></label>
-                <input id="price-sale-vat" name="sale_vat_rate" type="number" min="0" max="100" step="0.01" class="form-input text-right">
+                <label for="price-sale-vat" class="form-label"><%= t('Sale VAT rate') %></label>
+                <select id="price-sale-vat" name="sale_vat_rate" class="form-select text-right">
+                  <% (vatRateOptions || []).forEach((option) => { %>
+                    <option value="<%= option.value %>"><%= option.label %></option>
+                  <% }) %>
+                </select>
               </div>
               <div class="sm:col-span-2 sm:w-1/2 sm:pr-2">
                 <label for="price-sale-net" class="form-label"><%= t('Net sale price (incl. VAT)') %></label>

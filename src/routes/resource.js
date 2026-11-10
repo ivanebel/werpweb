@@ -172,7 +172,8 @@ function collect(fields, body, existing = null, t = (value) => value) {
 
     if (f.type === 'select') {
       const allowed = (f.options || []).map((o) => String(o.value));
-      if (allowed.length && !allowed.includes(String(raw))) {
+      const legacyNumeric = f.allowLegacy && raw !== '' && !Number.isNaN(Number(raw));
+      if (allowed.length && !allowed.includes(String(raw)) && !legacyNumeric) {
         errors[f.name] = t('Please choose a valid {label}.', { label: f.label.toLowerCase() });
         data[f.name] = raw;
       } else {

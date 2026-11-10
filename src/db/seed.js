@@ -13,6 +13,7 @@ const { lotFromDate } = require('../lib/helpers');
 const { packingDefaults } = require('../lib/packing');
 const { formatPackingSlipNo } = require('../lib/packingSlips');
 const { shiftWorksOn, shiftDurationMinutes, timeToMinutes, computeAttendance } = require('../lib/attendance');
+const { codeForRate } = require('../lib/vatRates');
 const { seedPosDemo } = require('./posSeed');
 
 const FORCE = process.env.FORCE_SEED === '1';
@@ -99,7 +100,7 @@ async function main() {
       company_address: '2450 Foundry Lane, Unit 12\nOakland, CA 94607\nUnited States',
       company_tax_id: 'US-94-7281556',
       currency: 'USD',
-      default_tax_rate: '8.25',
+      default_tax_rate: '21.00',
       invoice_footer: 'Thank you for your business. Payment is due within the agreed terms.',
       fiscal_year_start: '01-01',
     };
@@ -135,16 +136,16 @@ async function main() {
 
     // ------------------------------------------------------------ suppliers
     const supplierDefs = [
-      ['Pacific Aluminium Supply', 'Greg Sandoval', 'Long Beach, CA', 8.25, 1.5],
-      ['Lumen Components Inc.', 'Yuki Tanaka', 'Irvine, CA', 8.25, 0.75],
-      ['Voltway Electronics', 'Brian O\'Neill', 'Shenzhen, CN', 6.5, 2.25],
-      ['ClearView Diffusers', 'Hannah Berg', 'Tacoma, WA', 8.25, 1],
-      ['Precision Fasteners Co.', 'Miles Foster', 'Cleveland, OH', 8.25, 0.5],
-      ['Greenline Packaging', 'Zoe Martin', 'Portland, OR', 8.25, 1.25],
-      ['CircuitWorks Assembly', 'Ivan Costa', 'Guadalajara, MX', 7.5, 2],
-      ['Northstar Cabling', 'Rosa Delgado', 'Sacramento, CA', 8.25, 0.85],
-      ['Summit Logistics', 'Kenji Mori', 'Oakland, CA', 8.25, 3],
-      ['Brightline Tools', 'Alicia Wren', 'Phoenix, AZ', 8.25, 1.1],
+      ['Pacific Aluminium Supply', 'Greg Sandoval', 'Long Beach, CA', 21, 1.5],
+      ['Lumen Components Inc.', 'Yuki Tanaka', 'Irvine, CA', 21, 0.75],
+      ['Voltway Electronics', 'Brian O\'Neill', 'Shenzhen, CN', 21, 2.25],
+      ['ClearView Diffusers', 'Hannah Berg', 'Tacoma, WA', 21, 1],
+      ['Precision Fasteners Co.', 'Miles Foster', 'Cleveland, OH', 21, 0.5],
+      ['Greenline Packaging', 'Zoe Martin', 'Portland, OR', 21, 1.25],
+      ['CircuitWorks Assembly', 'Ivan Costa', 'Guadalajara, MX', 21, 2],
+      ['Northstar Cabling', 'Rosa Delgado', 'Sacramento, CA', 21, 0.85],
+      ['Summit Logistics', 'Kenji Mori', 'Oakland, CA', 21, 3],
+      ['Brightline Tools', 'Alicia Wren', 'Phoenix, AZ', 21, 1.1],
     ];
     const suppliers = [];
     let snum = 1;
@@ -296,7 +297,7 @@ async function main() {
       const costLevy = supplier ? supplier.levy : 0;
       const costGross = p.costNet > 0 ? round2(p.costNet / (1 + (costVat + costLevy) / 100)) : 0;
       const costPrice = round2(costGross + costGross * (costVat / 100) + costGross * (costLevy / 100));
-      const saleVat = p.saleNet > 0 ? 8.25 : 0;
+      const saleVat = p.saleNet > 0 ? 21 : 0;
       const saleGross = p.saleNet > 0 ? round2(p.saleNet / (1 + saleVat / 100)) : 0;
       const salePrice = round2(saleGross + saleGross * (saleVat / 100));
       prod[p.sku] = await insert(conn, 'products', {
@@ -737,7 +738,7 @@ async function main() {
         used.add(sku);
         const qty = sku.startsWith('SRV') ? Math.floor(between(1, 3)) : Math.floor(between(1, 9));
         const price = round2(productPrices[sku] * (rand() < 0.25 ? 0.95 : 1));
-        items.push({ sku, quantity: qty, unit_price: price, tax_rate: 8.25, description: null });
+        items.push({ sku, quantity: qty, unit_price: price, tax_rate: 21, description: null });
       }
       const status = pick(['draft', 'confirmed', 'confirmed', 'confirmed', 'partially_delivered', 'delivered', 'delivered', 'cancelled']);
       const totalsObj = totals(items);
@@ -769,6 +770,7 @@ async function main() {
           delivered_qty: status === 'delivered' ? item.quantity : status === 'partially_delivered' ? Math.floor(item.quantity / 2) : 0,
           unit_price: item.unit_price,
           tax_rate: item.tax_rate,
+          vat_code: codeForRate(item.tax_rate),
           line_total: round2(item.quantity * item.unit_price),
         });
       }
@@ -813,6 +815,7 @@ async function main() {
           received_qty: status === 'received' ? item.quantity : status === 'partially_received' ? Math.floor(item.quantity / 2) : 0,
           unit_price: item.unit_price,
           tax_rate: item.tax_rate,
+          vat_code: codeForRate(item.tax_rate),
           line_total: round2(item.quantity * item.unit_price),
         });
       }
@@ -834,7 +837,7 @@ async function main() {
         while (used.has(sku) && guard++ < 10) sku = pick(saleSkus);
         used.add(sku);
         const qty = sku.startsWith('SRV') ? 1 : Math.floor(between(1, 6));
-        items.push({ sku, quantity: qty, unit_price: productPrices[sku], tax_rate: 8.25, description: null });
+        items.push({ sku, quantity: qty, unit_price: productPrices[sku], tax_rate: 21, description: null });
       }
       const status = pick(invoiceStatuses);
       const totalsObj = totals(items, rand() < 0.15 ? 25 : 0);
@@ -859,6 +862,7 @@ async function main() {
           quantity: item.quantity,
           unit_price: item.unit_price,
           tax_rate: item.tax_rate,
+          vat_code: codeForRate(item.tax_rate),
           line_total: round2(item.quantity * item.unit_price),
         });
       }
@@ -905,6 +909,7 @@ async function main() {
           quantity: item.quantity,
           unit_price: item.unit_price,
           tax_rate: item.tax_rate,
+          vat_code: codeForRate(item.tax_rate),
           line_total: round2(item.quantity * item.unit_price),
         });
         if (posted) {

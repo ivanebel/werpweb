@@ -7,6 +7,8 @@
  * stock_movements or any Unit #1 document.
  */
 
+const { codeForRate } = require('../lib/vatRates');
+
 const LOCATIONS = [
   {
     code: 'OAK-01',
@@ -206,6 +208,7 @@ async function seedPosDemo(conn, { adminId = null, force = false } = {}) {
         quantity,
         unit_price: price,
         tax_rate: Number(product.sale_vat_rate || 0),
+        vat_code: codeForRate(product.sale_vat_rate),
         line_total: round2(quantity * price),
       });
     }

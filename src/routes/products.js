@@ -4,6 +4,7 @@ const express = require('express');
 const { makeResourceRouter } = require('./resource');
 const { query, one, getPool } = require('../db');
 const { requireRole } = require('../middleware/web');
+const { VAT_RATE_OPTIONS, DEFAULT_VAT_RATE } = require('../lib/vatRates');
 const { analyzeBarcode, barcodeFilename, renderBarcodeSvg } = require('../lib/barcodes');
 
 const typeOptions = [
@@ -195,11 +196,11 @@ const fields = [
   { name: 'min_order_qty', label: 'Minimum order quantity', type: 'decimal', min: 0, default: 0, section: 'Purchasing', help: 'Smallest quantity a supplier will accept. Used to round the suggested purchase quantity.' },
   { name: 'order_multiple', label: 'Order multiple', type: 'decimal', min: 0, default: 0, section: 'Purchasing', help: 'Round suggested purchases up to this multiple, for example a full box or pallet. Leave zero for no rounding.' },
   { name: 'cost_gross_price', label: 'Cost gross price', type: 'decimal', min: 0, default: 0, section: 'Pricing' },
-  { name: 'cost_vat_rate', label: 'Cost VAT rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Pricing' },
+  { name: 'cost_vat_rate', label: 'Cost VAT rate', type: 'select', options: VAT_RATE_OPTIONS, default: DEFAULT_VAT_RATE.toFixed(2), allowLegacy: true, required: true, section: 'Pricing' },
   { name: 'cost_levy_rate', label: 'Supplier levy rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Pricing', help: 'Levies vary by supplier; the default comes from the selected supplier.' },
   { name: 'cost_price', label: 'Net cost price', type: 'decimal', min: 0, default: 0, readonly: true, section: 'Pricing', help: 'Calculated as gross + VAT + levies. Used for stock valuation and purchasing.' },
   { name: 'sale_gross_price', label: 'Sale gross price', type: 'decimal', min: 0, default: 0, section: 'Pricing' },
-  { name: 'sale_vat_rate', label: 'Sale VAT rate (%)', type: 'decimal', min: 0, max: 100, default: 0, section: 'Pricing' },
+  { name: 'sale_vat_rate', label: 'Sale VAT rate', type: 'select', options: VAT_RATE_OPTIONS, default: DEFAULT_VAT_RATE.toFixed(2), allowLegacy: true, required: true, section: 'Pricing' },
   { name: 'sale_price', label: 'Net sale price (incl. VAT)', type: 'decimal', min: 0, default: 0, readonly: true, section: 'Pricing', help: 'Calculated as gross + VAT. This is the tax-inclusive price used on documents.' },
 
   { name: 'stock_qty', label: 'Stock on hand', type: 'decimal', default: 0, section: 'Inventory', help: 'Changing this value records a manual stock adjustment.' },

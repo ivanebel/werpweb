@@ -9,7 +9,7 @@ const DEFAULTS = {
   company_address: '',
   company_tax_id: '',
   currency: 'USD',
-  default_tax_rate: '0',
+  default_tax_rate: '21.00',
   invoice_footer: '',
   fiscal_year_start: '01-01',
   date_format: 'MMM d, yyyy',

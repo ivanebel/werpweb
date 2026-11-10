@@ -83,8 +83,14 @@
               <div class="card-header"><h2 class="card-title">Document defaults</h2></div>
               <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 md:p-6">
                 <div>
-                  <label for="default_tax_rate" class="form-label">Default tax rate (%)</label>
-                  <input id="default_tax_rate" name="default_tax_rate" type="number" min="0" step="0.01" value="<%= values.default_tax_rate || '0' %>" class="form-input <%= errors.default_tax_rate ? 'form-input-error' : '' %>" <%= canEdit ? '' : 'readonly' %>>
+                  <label for="default_tax_rate" class="form-label">Default tax rate</label>
+                  <% const defaultTaxValue = Number(values.default_tax_rate || 21).toFixed(2); const defaultTaxStandard = (vatRateOptions || []).some((option) => String(option.value) === defaultTaxValue); %>
+                  <select id="default_tax_rate" name="default_tax_rate" class="form-select <%= errors.default_tax_rate ? 'form-input-error' : '' %>" <%= canEdit ? '' : 'disabled' %>>
+                    <% if (!defaultTaxStandard) { %><option value="<%= defaultTaxValue %>" selected><%= defaultTaxValue %>% (<%= t('legacy') %>)</option><% } %>
+                    <% (vatRateOptions || []).forEach((option) => { %>
+                      <option value="<%= option.value %>" <%= defaultTaxValue === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+                    <% }) %>
+                  </select>
                   <% if (errors.default_tax_rate) { %><p class="form-error"><%= errors.default_tax_rate %></p><% } %>
                   <p class="form-help">Prefilled on new invoice and order lines.</p>
                 </div>

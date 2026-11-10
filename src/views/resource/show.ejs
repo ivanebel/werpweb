@@ -107,7 +107,8 @@
                       <% } else if (f.type === 'status') { %>
                         <%- statusBadge(value) %>
                       <% } else if (f.type === 'select') { %>
-                        <%= (f.options || []).find(o => String(o.value) === String(value))?.label || h.humanize(value) %>
+                        <% const selectedOption = (f.options || []).find(o => String(o.value) === String(value) || (f.allowLegacy && value !== '' && value !== null && value !== undefined && !Number.isNaN(Number(value)) && Number(o.value) === Number(value))); %>
+                        <%= selectedOption ? selectedOption.label : (f.allowLegacy && value !== '' && value !== null && value !== undefined && !Number.isNaN(Number(value)) ? `${Number(value).toFixed(2)}% (${t('legacy')})` : h.humanize(value)) %>
                       <% } else if (f.type === 'date' || f.type === 'date_dmy') { %>
                         <%= h.formatDate(value) %>
                       <% } else if (moneyFields.includes(f.name)) { %>

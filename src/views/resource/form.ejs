@@ -75,10 +75,12 @@
                       <% if (f.type === 'textarea') { %>
                         <textarea id="field-<%= f.name %>" name="<%= f.name %>" rows="4" class="form-textarea <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.readonly ? 'readonly' : '' %>><%= value %></textarea>
                       <% } else if (f.type === 'select') { %>
+                        <% const numericValue = value !== '' && value !== null && value !== undefined && !Number.isNaN(Number(value)); const matchesOption = (opt) => String(value) === String(opt.value) || (f.allowLegacy && numericValue && Number(value) === Number(opt.value)); const showLegacy = f.allowLegacy && value !== '' && value !== null && value !== undefined && !(f.options || []).some(matchesOption); %>
                         <select id="field-<%= f.name %>" name="<%= f.name %>" class="form-select <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.required ? 'required' : '' %>>
-                          <% if (!f.required) { %><option value=""><%= t('— None —') %></option><% } %>
+                          <% if (!f.required) { %><option value=""><%= t('- None -') %></option><% } %>
+                          <% if (showLegacy) { %><option value="<%= value %>" selected><%= Number(value).toFixed(2) %>% (<%= t('legacy') %>)</option><% } %>
                           <% (f.options || []).forEach(opt => { %>
-                            <option value="<%= opt.value %>"<% Object.entries(opt.data || {}).forEach(([key, val]) => { %> data-<%= key %>="<%= val %>"<% }) %> <%= String(value) === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                            <option value="<%= opt.value %>"<% Object.entries(opt.data || {}).forEach(([key, val]) => { %> data-<%= key %>="<%= val %>"<% }) %> <%= matchesOption(opt) ? 'selected' : '' %>><%= opt.label %></option>
                           <% }) %>
                         </select>
                       <% } else if (f.type === 'date_dmy') { %>
@@ -298,6 +300,23 @@
     update();
   });
 
+  function setSelectValue(name, value) {
+    const el = field(name);
+    if (!el) return;
+    const str = Number(value || 0).toFixed(2);
+    if (el.tagName === 'SELECT') {
+      if (![...el.options].some((option) => option.value === str)) {
+        const option = document.createElement('option');
+        option.value = str;
+        option.textContent = `${str}% (${<%- JSON.stringify(t('legacy')) %>})`;
+        el.appendChild(option);
+      }
+      el.value = str;
+    } else {
+      el.value = str;
+    }
+  }
+
   function recalcPricing() {
     const costGross = num('cost_gross_price');
     const costVat = num('cost_vat_rate');
@@ -311,7 +330,10 @@
 
   ['cost_gross_price', 'cost_vat_rate', 'cost_levy_rate', 'sale_gross_price', 'sale_vat_rate'].forEach((name) => {
     const el = field(name);
-    if (el) el.addEventListener('input', recalcPricing);
+    if (el) {
+      el.addEventListener('input', recalcPricing);
+      el.addEventListener('change', recalcPricing);
+    }
   });
 
   const supplier = field('supplier_id');
@@ -321,7 +343,7 @@
       if (!option || !option.value) return;
       const vat = option.dataset.vat;
       const levy = option.dataset.levy;
-      if (vat !== undefined && field('cost_vat_rate')) field('cost_vat_rate').value = Number(vat).toFixed(2);
+      if (vat !== undefined && field('cost_vat_rate')) setSelectValue('cost_vat_rate', vat);
       if (levy !== undefined && field('cost_levy_rate')) field('cost_levy_rate').value = Number(levy).toFixed(2);
       recalcPricing();
     });
@@ -334,7 +356,7 @@
   const isDuplicate = <%= typeof isDuplicate !== 'undefined' && isDuplicate ? 'true' : 'false' %>;
   const saleVat = field('sale_vat_rate');
   if (isCreate && !isDuplicate && saleVat && Number(saleVat.value || 0) === 0) {
-    saleVat.value = Number('<%= Number(settings.default_tax_rate || 0) %>').toFixed(2);
+    setSelectValue('sale_vat_rate', Number('<%= Number(settings.default_tax_rate || 0) %>'));
   }
 
   recalcPricing();

@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const { getSettings } = require('../lib/settings');
 const helpers = require('../lib/helpers');
 const i18n = require('../lib/i18n');
+const { VAT_RATE_OPTIONS } = require('../lib/vatRates');
 
 function locale(req, res, next) {
   const selected = i18n.getRequestLocale(req);
@@ -58,6 +59,7 @@ async function webLocals(req, res, next) {
     res.locals.currentUser = req.session.user || null;
     res.locals.currentPath = req.path;
     res.locals.query = req.query || {};
+    res.locals.vatRateOptions = VAT_RATE_OPTIONS;
     res.locals.money = (v) => h.formatMoney(v, currency);
     res.locals.compactMoney = (v) => h.compactMoney(v, currency);
     res.locals.statusBadge = h.statusBadge;
@@ -68,6 +70,7 @@ async function webLocals(req, res, next) {
     res.locals.jsMessages = {
       vatIncluded: req.t('VAT included'),
       taxIncluded: req.t('incl. {amount} VAT', { amount: '{amount}' }),
+      legacy: req.t('legacy'),
       customerCode: req.t('Customer code'),
       customerCodeLine: req.t('Customer code: {code}', { code: '{code}' }),
       lightMode: req.t('Light mode'),
