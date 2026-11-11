@@ -118,6 +118,24 @@ async function upgradeSchema(conn, dbName) {
   const addedSaleGross = await addColumn(conn, dbName, 'products', 'sale_gross_price', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER cost_price');
   await addColumn(conn, dbName, 'products', 'sale_vat_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER sale_gross_price');
 
+  // Every product must have a pack size of at least one so order entry can
+  // safely multiply quantities when the user selects packs.
+  await conn.query('UPDATE products SET units_per_pack = 1 WHERE units_per_pack IS NULL OR units_per_pack = 0');
+  const [packColumns] = await conn.query(
+    `SELECT IS_NULLABLE, COLUMN_DEFAULT
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'products' AND COLUMN_NAME = 'units_per_pack'
+      LIMIT 1`,
+    [dbName],
+  );
+  if (
+    packColumns.length
+    && (packColumns[0].IS_NULLABLE === 'YES' || Number(packColumns[0].COLUMN_DEFAULT) !== 1)
+  ) {
+    await conn.query('ALTER TABLE products MODIFY COLUMN units_per_pack INT UNSIGNED NOT NULL DEFAULT 1');
+    console.log('[migrate] set products.units_per_pack default to 1');
+  }
+
   const [productTypeColumns] = await conn.query(
     `SELECT COLUMN_TYPE AS column_type
        FROM information_schema.COLUMNS

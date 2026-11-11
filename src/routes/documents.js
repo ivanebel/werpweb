@@ -53,20 +53,36 @@ function arr(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-function parseItems(body, config, defaultTaxRate) {
+async function loadProductPackSizes(ids) {
+  const unique = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!unique.length) return new Map();
+  const rows = await query(
+    `SELECT id, units_per_pack FROM products WHERE id IN (${unique.map(() => '?').join(',')})`,
+    unique,
+  );
+  return new Map(rows.map((row) => [Number(row.id), Math.max(1, Number(row.units_per_pack) || 1)]));
+}
+
+async function parseItems(body, config, defaultTaxRate) {
   const ids = arr(body.item_product_id);
   const descriptions = arr(body.item_description);
   const quantities = arr(body.item_quantity);
+  const quantityUnits = arr(body.item_quantity_unit);
   const prices = arr(body.item_unit_price);
   const grossPrices = arr(body.item_unit_price_gross);
   const weights = arr(body.item_weight_per_unit);
   const taxes = arr(body.item_tax_rate);
   const items = [];
+  const supportsPackUnits = config.kind === 'purchase_order' || config.kind === 'sales_order';
+  const packSizes = supportsPackUnits ? await loadProductPackSizes(ids) : new Map();
 
   for (let i = 0; i < ids.length; i++) {
     const productId = Number.parseInt(ids[i], 10);
     if (!productId) continue;
-    const quantity = toNumber(quantities[i], 0);
+    const enteredQuantity = toNumber(quantities[i], 0);
+    const quantityUnit = String(quantityUnits[i] || 'unit').toLowerCase() === 'pack' ? 'pack' : 'unit';
+    const packSize = packSizes.get(productId) || 1;
+    const quantity = quantityUnit === 'pack' ? enteredQuantity * packSize : enteredQuantity;
     const enteredPrice = toNumber(prices[i], 0);
     const weightPerUnit = round3(Math.max(0, toNumber(weights[i], 0)));
     const taxRate = taxes[i] === undefined || taxes[i] === '' ? Number(defaultTaxRate || 0) : toNumber(taxes[i], 0);
@@ -641,7 +657,7 @@ async function loadPartyOptions(config) {
 async function loadProductOptions(config) {
   const rows = await query(
     `SELECT p.id, p.sku, p.name, p.unit, p.sale_price, p.cost_price,
-            p.sale_vat_rate, p.cost_vat_rate, p.sold_by_weight, p.weight_kg,
+            p.sale_vat_rate, p.cost_vat_rate, p.sold_by_weight, p.weight_kg, p.units_per_pack,
             b.name AS brand_name
        FROM products p
        LEFT JOIN brands b ON b.id = p.brand_id
@@ -659,6 +675,7 @@ async function loadProductOptions(config) {
     taxRate: config.priceField === 'cost_price' ? Number(p.cost_vat_rate || 0) : Number(p.sale_vat_rate || 0),
     weighted: Number(p.sold_by_weight) === 1,
     weightKg: Number(p.weight_kg) || 0,
+    unitsPerPack: Math.max(1, Number(p.units_per_pack) || 1),
   }));
 }
 
@@ -1244,7 +1261,7 @@ function makeDocumentRouter(config) {
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
       const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
-      const items = parseItems(req.body, config, defaultTaxRate);
+      const items = await parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
       let levyResult = { rows: [], error: null };
@@ -1690,7 +1707,7 @@ function makeDocumentRouter(config) {
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
       const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
-      const items = parseItems(req.body, config, defaultTaxRate);
+      const items = await parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
       let levyResult = { rows: [], error: null };

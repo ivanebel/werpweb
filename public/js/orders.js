@@ -19,6 +19,7 @@
   const currency = form.getAttribute('data-currency') || 'USD';
   const defaultTax = Number(form.getAttribute('data-default-tax') || 0);
   const defaultTaxValue = Number(defaultTax || 0).toFixed(2);
+  const packUnits = form.getAttribute('data-pack-units') === '1';
   const applyTaxRate = (select, rate) => {
     if (!select) return Number(rate) || 0;
     const value = Number(rate || 0).toFixed(2);
@@ -34,6 +35,50 @@
     }
     return Number(rate) || 0;
   };
+  const selectedProductOption = (row) => row.querySelector('[data-product-select]')?.selectedOptions?.[0] || null;
+  const packSizeFor = (row) => Math.max(1, Number(selectedProductOption(row)?.dataset.unitsPerPack || 1));
+  const baseQuantityFor = (row) => {
+    const qty = Number(row.querySelector('[data-qty]')?.value || 0);
+    const unit = row.querySelector('[data-qty-unit]')?.value || 'unit';
+    return qty * (unit === 'pack' ? packSizeFor(row) : 1);
+  };
+  function updatePackHint(row) {
+    if (!packUnits) return;
+    const hint = row.querySelector('[data-pack-hint]');
+    if (!hint) return;
+    const select = row.querySelector('[data-qty-unit]');
+    const qty = Number(row.querySelector('[data-qty]')?.value || 0);
+    const size = packSizeFor(row);
+    if (select?.value === 'pack' && size > 1 && qty > 0) {
+      const template = messages.packHint || '{packs} packs = {units} units';
+      hint.textContent = template.replace('{packs}', fmtQty(qty)).replace('{units}', fmtQty(qty * size));
+      hint.classList.remove('hidden');
+    } else {
+      hint.textContent = '';
+      hint.classList.add('hidden');
+    }
+  }
+  function syncPackOptions(row) {
+    if (!packUnits) return;
+    const select = row.querySelector('[data-qty-unit]');
+    if (!select) return;
+    const size = packSizeFor(row);
+    const current = select.value;
+    select.innerHTML = '';
+    const unitOption = document.createElement('option');
+    unitOption.value = 'unit';
+    unitOption.textContent = messages.unit || 'Unit';
+    select.appendChild(unitOption);
+    if (size > 1) {
+      const packOption = document.createElement('option');
+      packOption.value = 'pack';
+      packOption.textContent = `${messages.pack || 'Pack'} ×${size}`;
+      select.appendChild(packOption);
+    }
+    select.value = current === 'pack' && size > 1 ? 'pack' : 'unit';
+    select.disabled = size <= 1;
+    updatePackHint(row);
+  }
   const netPrices = form.getAttribute('data-net-prices') === '1';
   const partySelect = document.getElementById('party_id');
   const warehouseSelect = document.getElementById('customer_warehouse_id');
@@ -279,7 +324,7 @@
   }
 
   function recalcRow(row) {
-    const qty = Number(row.querySelector('[data-qty]')?.value || 0);
+    const qty = baseQuantityFor(row);
     const price = Number(row.querySelector('input[data-price]')?.value || 0);
     const tax = Number(row.querySelector('[data-tax]')?.value || 0);
     const weightInput = row.querySelector('[data-weight-unit]');
@@ -316,7 +361,7 @@
     let subtotal = 0;
     let taxTotal = 0;
     container.querySelectorAll('[data-line]').forEach((row) => {
-      const qty = Number(row.querySelector('[data-qty]')?.value || 0);
+      const qty = baseQuantityFor(row);
       const price = Number(row.querySelector('input[data-price]')?.value || 0);
       const tax = Number(row.querySelector('[data-tax]')?.value || 0);
       const weightInput = row.querySelector('[data-weight-unit]');
@@ -469,9 +514,13 @@
   }
 
   container.addEventListener('input', (event) => {
+    const row = event.target.closest('[data-line]');
+    if (row) updatePackHint(row);
     recalcAll();
   });
   container.addEventListener('change', (event) => {
+    const row = event.target.closest('[data-line]');
+    if (row) updatePackHint(row);
     recalcAll();
   });
 
@@ -485,6 +534,7 @@
       ? Number(option.dataset.taxRate || 0)
       : Number(tax?.value || 0);
     const effectiveTax = option && tax ? applyTaxRate(tax, optionTax) : optionTax;
+    syncPackOptions(row);
     if (option && option.dataset.price !== undefined) {
       const price = row.querySelector('input[data-price]');
       const grossPrice = Number(option.dataset.price || 0);
@@ -529,6 +579,7 @@
         syncProductCombobox(rows[0]);
         const tax = rows[0].querySelector('[data-tax]');
         if (tax) applyTaxRate(tax, defaultTax);
+        syncPackOptions(rows[0]);
         recalcAll();
         return;
       }
@@ -550,6 +601,7 @@
     initProductCombobox(row);
     const tax = row.querySelector('[data-tax]');
     if (tax && !tax.value) applyTaxRate(tax, defaultTax);
+    syncPackOptions(row);
     renumber();
     updateAllCustomerCodes();
     recalcAll();
@@ -755,6 +807,7 @@
   renumber();
   syncProductCombobox(container);
   initProductCombobox(container);
+  container.querySelectorAll('[data-line]').forEach(syncPackOptions);
   updateAllCustomerCodes();
   updateWarehouseOptions();
   updateInvoiceAssociations();

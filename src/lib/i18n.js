@@ -444,6 +444,7 @@ const ES = {
   'Sale VAT rate': 'Tasa de IVA de la venta',
   'Default VAT rate': 'Tasa de IVA predeterminada',
   'legacy': 'heredado',
+  '{packs} packs = {units} units': '{packs} packs = {units} unidades',
   'Select a valid ARCA VAT rate.': 'Seleccioná una alícuota de IVA de ARCA válida.',
   'Supplier levy rate (%)': 'Tasa de contribución del proveedor (%)',
   'Net cost price': 'Costo neto',
@@ -499,6 +500,8 @@ const ES = {
   'Number of selling units in one supplier pack.': 'Cantidad de unidades de venta en un paquete del proveedor.',
   'Number of selling units in one box/pack. Used to calculate packing slip boxes.':
     'Cantidad de unidades de venta en una caja/paquete. Se usa para calcular las cajas del remito.',
+  'Number of selling units in one box/pack. Used for pack entry on orders and packing slip boxes.':
+    'Cantidad de unidades de venta en una caja/paquete. Se usa para ingresar paquetes en pedidos y calcular las cajas del remito.',
   'Number of packs on a full pallet.': 'Cantidad de paquetes en un pallet completo.',
   'Number of boxes/packs on a full pallet. Used to calculate packing slip pallets.':
     'Cantidad de cajas/paquetes en un pallet completo. Se usa para calcular los pallets del remito.',

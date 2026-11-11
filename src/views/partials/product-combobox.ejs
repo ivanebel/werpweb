@@ -28,6 +28,7 @@
         data-tax-rate="<%= opt.taxRate %>"
         data-weighted="<%= opt.weighted ? 1 : 0 %>"
         data-weight-kg="<%= opt.weightKg || 0 %>"
+        data-units-per-pack="<%= opt.unitsPerPack || 1 %>"
         <%= String(selectedId || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
     <% }) %>
   </select>

@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS products (
   ean13         VARCHAR(13) NULL,
   dun14         VARCHAR(14) NULL,
   plu           INT UNSIGNED NULL,
-  units_per_pack   INT UNSIGNED NULL,
+  units_per_pack   INT UNSIGNED NOT NULL DEFAULT 1,
   packs_per_pallet INT UNSIGNED NULL,
   lead_time_days   INT UNSIGNED NOT NULL DEFAULT 0,
   min_order_qty    DECIMAL(14,3) NOT NULL DEFAULT 0,

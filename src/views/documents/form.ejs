@@ -12,11 +12,12 @@
         const backUrl = mode === 'edit' ? `${doc.basePath}/${row.id}` : doc.basePath;
         const skipStockChecked = Boolean(row.skip_stock) || Number(row.stock_skipped) === 1;
         const netLineEntry = true;
+        const supportsPackUnits = doc.kind === 'purchase_order' || doc.kind === 'sales_order';
         const standardVatValues = (vatRateOptions || []).map((option) => String(option.value));
         const defaultVatValue = standardVatValues.includes(Number(defaultTaxRate || 0).toFixed(2))
           ? Number(defaultTaxRate || 0).toFixed(2)
           : '21.00';
-        const qtyWidthClass = doc.isInvoice ? 'w-36' : (doc.kind === 'purchase_order' ? 'w-28' : 'w-24');
+        const qtyWidthClass = supportsPackUnits ? 'w-44' : (doc.isInvoice ? 'w-36' : (doc.kind === 'purchase_order' ? 'w-28' : 'w-24'));
         const displayDateInput = (value) => {
           const raw = String(value || '').trim();
           if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) return raw;
@@ -65,7 +66,7 @@
         </div>
       <% } %>
 
-      <form id="document-form" method="POST" action="<%= action %>" data-currency="<%= currency %>" data-default-tax="<%= defaultTaxRate %>" data-net-prices="<%= netLineEntry ? '1' : '0' %>" data-customer-codes="<%= JSON.stringify(customerCodes || {}) %>" data-warehouses="<%= JSON.stringify(warehouseOptions || []) %>">
+      <form id="document-form" method="POST" action="<%= action %>" data-currency="<%= currency %>" data-default-tax="<%= defaultTaxRate %>" data-pack-units="<%= supportsPackUnits ? '1' : '0' %>" data-net-prices="<%= netLineEntry ? '1' : '0' %>" data-customer-codes="<%= JSON.stringify(customerCodes || {}) %>" data-warehouses="<%= JSON.stringify(warehouseOptions || []) %>">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <% if (doc.linkOrder) { %>
           <input type="hidden" name="<%= doc.linkOrder.field %>" value="<%= row[doc.linkOrder.field] || '' %>">
@@ -337,7 +338,18 @@
                         </td>
                       <% } %>
                       <td class="table-td">
-                        <input name="item_quantity[<%= i %>]" data-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
+                        <% if (supportsPackUnits) { %>
+                          <div class="flex items-start gap-1">
+                            <input name="item_quantity[<%= i %>]" data-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input min-w-0 text-right">
+                            <select name="item_quantity_unit[<%= i %>]" data-qty-unit class="form-select w-[86px] shrink-0 px-2 text-xs">
+                              <option value="unit" selected><%= t('Unit') %></option>
+                              <% if (p && Number(p.unitsPerPack) > 1) { %><option value="pack"><%= t('Pack') %> ×<%= p.unitsPerPack %></option><% } %>
+                            </select>
+                          </div>
+                          <span class="mt-0.5 block text-[11px] text-gray-400 hidden" data-pack-hint></span>
+                        <% } else { %>
+                          <input name="item_quantity[<%= i %>]" data-qty type="number" min="0" step="0.001" value="<%= item.quantity !== undefined ? item.quantity : 1 %>" class="form-input text-right">
+                        <% } %>
                       </td>
                       <td class="table-td" data-weight-cell>
                         <input name="item_weight_per_unit[<%= i %>]" data-weight-unit type="number" min="0" step="0.001" value="<%= weightValue %>" class="form-input text-right <%= weightedRow ? '' : 'hidden' %>" <%= weightedRow ? '' : 'disabled' %>>
@@ -396,7 +408,19 @@
                 <% if (!netLineEntry) { %>
                   <td class="table-td"><input name="item_description[__INDEX__]" data-description class="form-input" placeholder="Optional"></td>
                 <% } %>
-                <td class="table-td"><input name="item_quantity[__INDEX__]" data-qty type="number" min="0" step="0.001" value="1" class="form-input text-right"></td>
+                <td class="table-td">
+                  <% if (supportsPackUnits) { %>
+                    <div class="flex items-start gap-1">
+                      <input name="item_quantity[__INDEX__]" data-qty type="number" min="0" step="0.001" value="1" class="form-input min-w-0 text-right">
+                      <select name="item_quantity_unit[__INDEX__]" data-qty-unit class="form-select w-[86px] shrink-0 px-2 text-xs">
+                        <option value="unit" selected><%= t('Unit') %></option>
+                      </select>
+                    </div>
+                    <span class="mt-0.5 block text-[11px] text-gray-400 hidden" data-pack-hint></span>
+                  <% } else { %>
+                    <input name="item_quantity[__INDEX__]" data-qty type="number" min="0" step="0.001" value="1" class="form-input text-right">
+                  <% } %>
+                </td>
                 <td class="table-td" data-weight-cell>
                   <input name="item_weight_per_unit[__INDEX__]" data-weight-unit type="number" min="0" step="0.001" value="0" class="form-input hidden text-right" disabled>
                   <span class="block text-right text-xs text-gray-300" data-weight-empty>—</span>
