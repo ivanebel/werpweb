@@ -16,6 +16,39 @@
         </a>
       </div>
 
+      <% const syncStatus = syncState ? syncState.last_status : 'idle'; const syncTone = { success: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400', error: 'bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400', running: 'bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300' }[syncStatus] || 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'; %>
+      <div class="card mb-5 p-5">
+        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="card-title"><%= t('Scale sync') %></h2>
+              <span class="badge <%= syncTone %> capitalize"><%= t(syncStatus) %></span>
+            </div>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <%= t('Source') %>: <span class="font-mono text-xs"><%= scaleConfig.database %>.<%= scaleConfig.table %></span>
+              <% if (syncState && syncState.last_synced_at) { %> · <%= t('Last sync') %>: <%= h.formatDateTime(syncState.last_synced_at) %><% } else { %> · <%= t('Not synced yet') %><% } %>
+            </p>
+            <p class="mt-0.5 text-xs text-gray-400"><%= t('History starts at {date}.', { date: scaleConfig.startAt }) %></p>
+            <% if (!scaleConfig.enabled) { %><p class="mt-1 text-xs text-warning-600 dark:text-warning-400"><%= t('Automatic sync is disabled. Use Sync now or enable SCALE_SYNC_ENABLED.') %></p><% } %>
+            <% if (syncState && syncState.last_error) { %><p class="mt-2 max-w-3xl text-sm text-error-600 dark:text-error-400"><%= syncState.last_error %></p><% } %>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('{count} records', { count: Number(syncSummary.total || 0) }) %></span>
+            <span class="rounded-full bg-warning-50 px-3 py-1.5 text-xs font-medium text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('{count} duplicates', { count: Number(syncSummary.duplicates || 0) }) %></span>
+            <span class="rounded-full bg-error-50 px-3 py-1.5 text-xs font-medium text-error-700 dark:bg-error-500/15 dark:text-error-400"><%= t('{count} unmatched', { count: Number(syncSummary.unmatched || 0) }) %></span>
+            <% if (canManageScale) { %>
+              <form method="POST" action="/manufacturing/scale-records/sync">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-primary btn-sm" <%= syncStatus === 'running' ? 'disabled' : '' %>>
+                  <%- include('/partials/icon', { name: 'refresh', className: 'h-4 w-4' }) %>
+                  <%= t('Sync now') %>
+                </button>
+              </form>
+            <% } %>
+          </div>
+        </div>
+      </div>
+
       <div class="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
         <div class="card flex items-center gap-4 p-5">
           <span class="kpi-icon bg-blue-light-50 text-blue-light-600 dark:bg-blue-light-500/15 dark:text-blue-light-400">
@@ -95,6 +128,19 @@
             <dd class="mt-1 text-lg font-semibold <%= stats.outOfRange ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white' %>"><%= h.formatNumber(stats.outOfRange, 0) %></dd>
             <dd class="text-xs text-gray-400"><%= h.formatNumber(stats.outOfRangePct, 1) %>%</dd>
           </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Unknown range') %></dt>
+            <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-white"><%= h.formatNumber(stats.unknownRange, 0) %></dd>
+            <dd class="text-xs text-gray-400"><%= h.formatNumber(stats.unknownPct, 1) %>%</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Duplicate labels') %></dt>
+            <dd class="mt-1 text-lg font-semibold <%= stats.duplicates ? 'text-warning-600 dark:text-warning-400' : 'text-gray-900 dark:text-white' %>"><%= h.formatNumber(stats.duplicates, 0) %></dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Unmatched products') %></dt>
+            <dd class="mt-1 text-lg font-semibold <%= stats.unmatched ? 'text-error-600 dark:text-error-400' : 'text-gray-900 dark:text-white' %>"><%= h.formatNumber(stats.unmatched, 0) %></dd>
+          </div>
         </dl>
       </div>
 
@@ -110,6 +156,14 @@
                 <input id="lot" type="search" name="lot" value="<%= lot %>" class="form-input pl-10" placeholder="<%= t('Lot number or partial lot…') %>">
               </div>
             </div>
+            <div class="w-full sm:w-56">
+              <label for="product" class="form-label"><%= t('Product') %></label>
+              <input id="product" type="search" name="product" value="<%= productFilter %>" class="form-input" placeholder="<%= t('Name, SKU or old ID') %>">
+            </div>
+            <div class="w-full sm:w-44">
+              <label for="label" class="form-label"><%= t('Label ID') %></label>
+              <input id="label" type="search" name="label" value="<%= labelFilter %>" class="form-input font-mono" placeholder="<%= t('Label ID') %>">
+            </div>
             <div class="w-full sm:w-auto">
               <label for="from" class="form-label"><%= t('Weighed from') %></label>
               <input id="from" type="datetime-local" name="from" value="<%= fromValue %>" class="form-input sm:w-52">
@@ -124,6 +178,21 @@
                 <option value=""><%= t('All records') %></option>
                 <option value="in" <%= rangeFilter === 'in' ? 'selected' : '' %>><%= t('In range') %></option>
                 <option value="out" <%= rangeFilter === 'out' ? 'selected' : '' %>><%= t('Out of range') %></option>
+                <option value="unknown" <%= rangeFilter === 'unknown' ? 'selected' : '' %>><%= t('Unknown') %></option>
+              </select>
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="duplicates" class="form-label"><%= t('Duplicate labels') %></label>
+              <select id="duplicates" name="duplicates" class="form-select sm:w-44">
+                <option value=""><%= t('All labels') %></option>
+                <option value="1" <%= duplicatesFilter ? 'selected' : '' %>><%= t('Duplicates only') %></option>
+              </select>
+            </div>
+            <div class="w-full sm:w-auto">
+              <label for="unmatched" class="form-label"><%= t('Products') %></label>
+              <select id="unmatched" name="unmatched" class="form-select sm:w-44">
+                <option value=""><%= t('All products') %></option>
+                <option value="1" <%= unmatchedFilter ? 'selected' : '' %>><%= t('Unmatched only') %></option>
               </select>
             </div>
             <button type="submit" class="btn btn-secondary"><%= t('Apply') %></button>
@@ -145,7 +214,7 @@
         </div>
 
         <div class="table-wrap">
-          <table class="table-base min-w-[1280px]">
+          <table class="table-base min-w-[1400px]">
             <thead>
               <tr>
                 <th class="table-th"><%= t('Weighed at') %></th>
@@ -159,6 +228,7 @@
                 <th class="table-th"><%= t('Box') %></th>
                 <th class="table-th"><%= t('Pallet') %></th>
                 <th class="table-th"><%= t('Range') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
               </tr>
             </thead>
             <tbody>
@@ -166,6 +236,7 @@
                 <tr class="table-row">
                   <td class="table-td whitespace-nowrap">
                     <span class="font-medium text-gray-700 dark:text-gray-300"><%= h.formatDateTime(row.weighed_at) %></span>
+                    <span class="mt-0.5 block text-[11px] text-gray-400"><%= t('Source') %>: <span class="font-mono">#<%= row.legacy_id || '—' %></span></span>
                     <span class="mt-0.5 block text-[11px] text-gray-400"><%= t('Created') %>: <%= h.formatDateTime(row.created_at) %></span>
                   </td>
                   <td class="table-td">
@@ -173,7 +244,9 @@
                       <a href="/products/<%= row.product_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.product_name %></a>
                       <span class="mt-0.5 block font-mono text-xs text-gray-400"><%= row.product_sku %></span>
                     <% } else { %>
-                      <span class="text-gray-500 dark:text-gray-400"><%= t('Unknown product') %></span>
+                      <span class="badge bg-error-50 text-error-700 ring-error-600/20 dark:bg-error-500/15 dark:text-error-400"><%= t('Unmatched') %></span>
+                      <span class="mt-1 block text-xs text-gray-400"><%= t('Legacy product') %> #<%= row.legacy_product_id || '—' %></span>
+                      <span class="mt-0.5 block text-[11px] text-gray-400"><%= t('Set the product Old ID to link this record.') %></span>
                     <% } %>
                   </td>
                   <td class="table-td font-mono text-xs"><%= row.plu ?? '—' %></td>
@@ -186,21 +259,37 @@
                   <td class="table-td text-right font-medium"><%= h.formatQty(row.real_weight) %></td>
                   <td class="table-td text-right text-gray-500 dark:text-gray-400"><%= h.formatQty(row.printed_weight) %></td>
                   <td class="table-td text-right font-medium"><%= money(row.printed_price) %></td>
-                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.label_id || '—' %></span></td>
-                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.box_id || '—' %></span></td>
-                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.pallet_id || '—' %></span></td>
                   <td class="table-td">
-                    <% if (Number(row.in_range) === 1) { %>
+                    <% if (row.label_id && row.label_id !== '0') { %>
+                      <a href="/manufacturing/scale-records/<%= row.id %>" class="font-mono text-xs text-gray-600 hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400"><%= row.label_id %></a>
+                    <% } else { %>
+                      <span class="text-gray-400">—</span>
+                    <% } %>
+                    <% if (Number(row.duplicate_label) === 1) { %>
+                      <span class="mt-0.5 block"><span class="badge bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Duplicate') %></span></span>
+                    <% } %>
+                  </td>
+                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.box_id && row.box_id !== '0' ? row.box_id : '—' %></span></td>
+                  <td class="table-td"><span class="font-mono text-xs text-gray-600 dark:text-gray-400"><%= row.pallet_id && row.pallet_id !== '0' ? row.pallet_id : '—' %></span></td>
+                  <td class="table-td">
+                    <% if (row.in_range === null || row.in_range === undefined) { %>
+                      <span class="badge bg-gray-100 text-gray-600 ring-gray-500/20 dark:bg-gray-800 dark:text-gray-300"><%= t('Unknown') %></span>
+                    <% } else if (Number(row.in_range) === 1) { %>
                       <span class="badge bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/15 dark:text-success-400"><%= t('In range') %></span>
                     <% } else { %>
                       <span class="badge bg-error-50 text-error-700 ring-error-600/20 dark:bg-error-500/15 dark:text-error-400"><%= t('Out of range') %></span>
                     <% } %>
                   </td>
+                  <td class="table-td text-right">
+                    <a href="/manufacturing/scale-records/<%= row.id %>" class="btn-icon" title="<%= t('View') %>">
+                      <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
+                    </a>
+                  </td>
                 </tr>
               <% }) %>
               <% if (!rows.length) { %>
                 <tr>
-                  <td colspan="11" class="px-6 py-16 text-center">
+                  <td colspan="12" class="px-6 py-16 text-center">
                     <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
                       <%- include('/partials/icon', { name: 'printer', className: 'h-6 w-6' }) %>
                     </span>

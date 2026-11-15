@@ -4,6 +4,7 @@ const config = require('./config');
 const { initDb, closeDb } = require('./db');
 const { createApp } = require('./app');
 const { startTelegramBot, stopTelegramBot } = require('./lib/telegram');
+const { startScaleSync, stopScaleSync } = require('./lib/scaleSync');
 
 async function start() {
   try {
@@ -21,10 +22,12 @@ async function start() {
     startTelegramBot().catch((error) => {
       console.error('[telegram] could not start:', error.message);
     });
+    startScaleSync();
 
     const shutdown = async (signal) => {
       console.log(`\n[shutdown] ${signal} received, closing…`);
       await stopTelegramBot().catch(() => {});
+      await stopScaleSync().catch(() => {});
       server.close(async () => {
         await closeDb();
         process.exit(0);

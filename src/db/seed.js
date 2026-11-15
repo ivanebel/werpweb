@@ -1574,13 +1574,16 @@ async function main() {
         for (let n = 0; n < scaleCount; n++) {
           const realWeight = Math.round((2.4 + between(-0.08, 0.08)) * 1000) / 1000;
           const inRange = rand() > 0.06 ? 1 : 0;
+          const weighedAt = `${startDate} ${String(8 + Math.floor(n / 6)).padStart(2, '0')}:${String((n * 7) % 60).padStart(2, '0')}:00`;
           await insert(conn, 'scale_records', {
             product_id: prod[finishedLine.sku],
             plu: finishedPlu,
             lot_number: productionLot,
             expiry_date: productionExpiry,
-            weighed_at: `${startDate} ${String(8 + Math.floor(n / 6)).padStart(2, '0')}:${String((n * 7) % 60).padStart(2, '0')}:00`,
+            created_at: weighedAt,
+            weighed_at: weighedAt,
             in_range: inRange,
+            legacy_status: inRange ? 'A' : 'R',
             real_weight: realWeight,
             printed_weight: inRange ? realWeight : 0,
             printed_price: inRange ? round2(realWeight * (productPrices[finishedLine.sku] || 0)) : 0,

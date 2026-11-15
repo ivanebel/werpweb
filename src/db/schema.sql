@@ -307,6 +307,7 @@ CREATE TABLE IF NOT EXISTS products (
   UNIQUE KEY uq_products_dun14 (dun14),
   UNIQUE KEY uq_products_plu (plu),
   KEY idx_products_name (name),
+  KEY idx_products_old_id (old_id),
   KEY idx_products_type (type),
   KEY idx_products_category (category_id),
   KEY idx_products_brand (brand_id),
@@ -1761,21 +1762,28 @@ CREATE TABLE IF NOT EXISTS production_line_inputs (
 -- Weights are stored in kilograms. Product data is snapshotted so the history
 -- remains readable if a product is renamed or removed later.
 CREATE TABLE IF NOT EXISTS scale_records (
-  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  product_id     INT UNSIGNED NULL,
-  plu            INT UNSIGNED NULL,
-  lot_number     VARCHAR(60) NULL,
-  expiry_date    DATE NULL,
-  weighed_at     DATETIME NOT NULL,
-  in_range       TINYINT(1) NOT NULL DEFAULT 0,
-  real_weight    DECIMAL(14,3) NOT NULL DEFAULT 0,
-  printed_weight DECIMAL(14,3) NOT NULL DEFAULT 0,
-  printed_price  DECIMAL(14,2) NOT NULL DEFAULT 0,
-  label_id       VARCHAR(80) NULL,
-  box_id         VARCHAR(80) NULL,
-  pallet_id      VARCHAR(80) NULL,
-  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  legacy_id         INT UNSIGNED NULL,
+  legacy_product_id INT UNSIGNED NULL,
+  product_id        INT UNSIGNED NULL,
+  plu               INT UNSIGNED NULL,
+  lot_number        VARCHAR(100) NULL,
+  expiry_date       DATE NULL,
+  created_at        DATETIME NULL,
+  weighed_at        DATETIME NULL,
+  imported_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  in_range          TINYINT(1) NULL,
+  legacy_status     CHAR(1) NULL,
+  real_weight       DECIMAL(14,4) NOT NULL DEFAULT 0,
+  printed_weight    DECIMAL(14,3) NOT NULL DEFAULT 0,
+  printed_price     DECIMAL(14,2) NOT NULL DEFAULT 0,
+  label_id          VARCHAR(80) NULL,
+  box_id            VARCHAR(80) NULL,
+  pallet_id         VARCHAR(80) NULL,
+  duplicate_label   TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_scale_records_legacy (legacy_id),
+  KEY idx_scale_records_legacy_product (legacy_product_id),
   KEY idx_scale_records_weighed (weighed_at, id),
   KEY idx_scale_records_lot (lot_number, weighed_at),
   KEY idx_scale_records_product (product_id, weighed_at),
@@ -1784,8 +1792,22 @@ CREATE TABLE IF NOT EXISTS scale_records (
   KEY idx_scale_records_label (label_id),
   KEY idx_scale_records_box (box_id),
   KEY idx_scale_records_pallet (pallet_id),
+  KEY idx_scale_records_duplicate (duplicate_label, weighed_at),
   CONSTRAINT fk_scale_records_product FOREIGN KEY (product_id)
     REFERENCES products (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scale_sync_state (
+  id              TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  last_legacy_id  INT UNSIGNED NOT NULL DEFAULT 0,
+  start_at        DATETIME NULL,
+  last_synced_at  DATETIME NULL,
+  last_status     ENUM('idle','running','success','error') NOT NULL DEFAULT 'idle',
+  last_error      VARCHAR(1000) NULL,
+  last_run_rows   INT UNSIGNED NOT NULL DEFAULT 0,
+  imported_total  BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS stock_movements (

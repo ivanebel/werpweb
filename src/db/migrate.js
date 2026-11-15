@@ -68,6 +68,38 @@ async function indexExists(conn, dbName, table, indexName) {
   return rows.length > 0;
 }
 
+async function renameColumn(conn, dbName, table, from, to, definition) {
+  const [fromRows] = await conn.query(
+    `SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [dbName, table, from],
+  );
+  const [toRows] = await conn.query(
+    `SELECT 1 FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [dbName, table, to],
+  );
+  if (!fromRows.length || toRows.length) return false;
+  await conn.query(`ALTER TABLE \`${table}\` CHANGE COLUMN \`${from}\` \`${to}\` ${definition}`);
+  console.log(`[migrate] renamed column ${table}.${from} to ${table}.${to}`);
+  return true;
+}
+
+async function ensureVarcharLength(conn, dbName, table, column, definition, minLength) {
+  const [rows] = await conn.query(
+    `SELECT CHARACTER_MAXIMUM_LENGTH AS length
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [dbName, table, column],
+  );
+  if (!rows.length) return false;
+  const current = Number(rows[0].length ?? rows[0].CHARACTER_MAXIMUM_LENGTH);
+  if (Number.isFinite(current) && current >= minLength) return false;
+  await conn.query(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` ${definition}`);
+  console.log(`[migrate] expanded ${table}.${column} to ${minLength}`);
+  return true;
+}
+
 async function addIndex(conn, dbName, table, indexName, definition) {
   if (await indexExists(conn, dbName, table, indexName)) return false;
   await conn.query(`ALTER TABLE \`${table}\` ADD ${definition}`);
@@ -167,6 +199,7 @@ async function upgradeSchema(conn, dbName) {
   await addIndex(conn, dbName, 'products', 'uq_products_plu', 'UNIQUE KEY `uq_products_plu` (`plu`)');
   await addIndex(conn, dbName, 'products', 'idx_products_brand', 'KEY `idx_products_brand` (`brand_id`)');
   await addIndex(conn, dbName, 'products', 'idx_products_supplier', 'KEY `idx_products_supplier` (`supplier_id`)');
+  await addIndex(conn, dbName, 'products', 'idx_products_old_id', 'KEY `idx_products_old_id` (`old_id`)');
   await addConstraint(conn, dbName, 'products', 'fk_products_brand',
     'FOREIGN KEY (`brand_id`) REFERENCES `brands` (`id`) ON DELETE SET NULL');
   await addConstraint(conn, dbName, 'products', 'fk_products_supplier',
@@ -655,6 +688,22 @@ async function upgradeSchema(conn, dbName) {
     );
     console.log('[migrate] added negotiated check status');
   }
+
+  // ------------------------------------------------------------- scale records
+  await renameColumn(conn, dbName, 'scale_records', 'created_at', 'imported_at', 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP');
+  await addColumn(conn, dbName, 'scale_records', 'created_at', 'DATETIME NULL AFTER expiry_date');
+  await addColumn(conn, dbName, 'scale_records', 'legacy_id', 'INT UNSIGNED NULL AFTER id');
+  await addColumn(conn, dbName, 'scale_records', 'legacy_product_id', 'INT UNSIGNED NULL AFTER product_id');
+  await addColumn(conn, dbName, 'scale_records', 'legacy_status', 'CHAR(1) NULL AFTER in_range');
+  await addColumn(conn, dbName, 'scale_records', 'duplicate_label', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER pallet_id');
+  await makeNullable(conn, dbName, 'scale_records', 'weighed_at', 'DATETIME NULL');
+  await makeNullable(conn, dbName, 'scale_records', 'in_range', 'TINYINT(1) NULL');
+  await ensureDecimalScale(conn, dbName, 'scale_records', 'real_weight', 'DECIMAL(14,4) NOT NULL DEFAULT 0', 4);
+  await ensureVarcharLength(conn, dbName, 'scale_records', 'lot_number', 'VARCHAR(100) NULL', 100);
+  await addIndex(conn, dbName, 'scale_records', 'uq_scale_records_legacy', 'UNIQUE KEY `uq_scale_records_legacy` (`legacy_id`)');
+  await addIndex(conn, dbName, 'scale_records', 'idx_scale_records_legacy_product', 'KEY `idx_scale_records_legacy_product` (`legacy_product_id`)');
+  await addIndex(conn, dbName, 'scale_records', 'idx_scale_records_duplicate', 'KEY `idx_scale_records_duplicate` (`duplicate_label`, `weighed_at`)');
+  await conn.query('INSERT IGNORE INTO scale_sync_state (id) VALUES (1)');
 
   // Production component quantities keep four decimals through BOM definition,
   // production requirements, floor consumption and stock.

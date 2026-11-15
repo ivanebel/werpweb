@@ -1,0 +1,209 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1150px]">
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('Scale record {id}', { id: row.legacy_id || row.id }) %></h1>
+            <% if (Number(row.duplicate_label) === 1) { %>
+              <span class="badge bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-500/15 dark:text-warning-400"><%= t('Duplicate label') %></span>
+            <% } %>
+            <% if (!row.product_id) { %>
+              <span class="badge bg-error-50 text-error-700 ring-error-600/20 dark:bg-error-500/15 dark:text-error-400"><%= t('Unmatched product') %></span>
+            <% } %>
+          </div>
+          <p class="page-subtitle"><%= t('Weighed at {date}. Source ID #{id}.', { date: h.formatDateTime(row.weighed_at), id: row.legacy_id || row.id }) %></p>
+        </div>
+        <a href="/manufacturing/scale-records" class="btn btn-secondary btn-sm">
+          <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+          <%= t('Back to scale records') %>
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card xl:col-span-2">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Production data') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('Source values received from the weighing and labeling machine.') %></p>
+            </div>
+          </div>
+          <dl class="grid grid-cols-1 gap-x-8 gap-y-5 p-5 sm:grid-cols-2 md:p-6">
+            <div class="sm:col-span-2">
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Product') %></dt>
+              <dd class="mt-1 text-sm text-gray-800 dark:text-gray-200">
+                <% if (row.product_id) { %>
+                  <a href="/products/<%= row.product_id %>" class="font-medium text-gray-900 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"><%= row.product_name %></a>
+                  <span class="ml-2 font-mono text-xs text-gray-400"><%= row.product_sku %></span>
+                <% } else { %>
+                  <span class="font-medium text-error-600 dark:text-error-400"><%= t('Unmatched product') %></span>
+                  <span class="ml-2 text-xs text-gray-400"><%= t('Legacy product') %> #<%= row.legacy_product_id || '—' %></span>
+                <% } %>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('PLU') %></dt>
+              <dd class="mt-1 font-mono text-sm text-gray-800 dark:text-gray-200"><%= row.plu ?? '—' %></dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Legacy product ID') %></dt>
+              <dd class="mt-1 font-mono text-sm text-gray-800 dark:text-gray-200"><%= row.legacy_product_id ?? '—' %></dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Lot number') %></dt>
+              <dd class="mt-1 font-mono text-sm text-gray-800 dark:text-gray-200"><%= row.lot_number || '—' %></dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Expiry date') %></dt>
+              <dd class="mt-1 text-sm text-gray-800 dark:text-gray-200"><%= row.expiry_date ? h.formatDate(row.expiry_date) : '—' %></dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Weighed at') %></dt>
+              <dd class="mt-1 text-sm text-gray-800 dark:text-gray-200"><%= h.formatDateTime(row.weighed_at) %></dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Source created at') %></dt>
+              <dd class="mt-1 text-sm text-gray-800 dark:text-gray-200"><%= h.formatDateTime(row.created_at) %></dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Imported at') %></dt>
+              <dd class="mt-1 text-sm text-gray-800 dark:text-gray-200"><%= h.formatDateTime(row.imported_at) %></dd>
+            </div>
+            <div>
+              <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Weighing range') %></dt>
+              <dd class="mt-1">
+                <% if (row.in_range === null || row.in_range === undefined) { %>
+                  <span class="badge bg-gray-100 text-gray-600 ring-gray-500/20 dark:bg-gray-800 dark:text-gray-300"><%= t('Unknown') %></span>
+                <% } else if (Number(row.in_range) === 1) { %>
+                  <span class="badge bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-500/15 dark:text-success-400"><%= t('In range') %></span>
+                <% } else { %>
+                  <span class="badge bg-error-50 text-error-700 ring-error-600/20 dark:bg-error-500/15 dark:text-error-400"><%= t('Out of range') %></span>
+                <% } %>
+                <% if (row.legacy_status) { %><span class="ml-2 font-mono text-xs text-gray-400"><%= row.legacy_status %></span><% } %>
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="space-y-5">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title"><%= t('Weights and price') %></h2>
+            </div>
+            <dl class="space-y-4 p-5 text-sm">
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Real weight') %></dt>
+                <dd class="font-semibold text-gray-900 dark:text-white"><%= h.formatQty(row.real_weight) %> kg</dd>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Printed weight') %></dt>
+                <dd class="font-medium text-gray-800 dark:text-gray-200"><%= h.formatQty(row.printed_weight) %> kg</dd>
+              </div>
+              <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Printed price') %></dt>
+                <dd class="text-lg font-bold text-gray-900 dark:text-white"><%= money(row.printed_price) %></dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title"><%= t('Label and packaging') %></h2>
+            </div>
+            <dl class="space-y-4 p-5 text-sm">
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Label ID') %></dt>
+                <dd class="font-mono text-gray-800 dark:text-gray-200"><%= row.label_id && row.label_id !== '0' ? row.label_id : '—' %></dd>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Box ID') %></dt>
+                <dd class="font-mono text-gray-800 dark:text-gray-200"><%= row.box_id && row.box_id !== '0' ? row.box_id : '—' %></dd>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Pallet ID') %></dt>
+                <dd class="font-mono text-gray-800 dark:text-gray-200"><%= row.pallet_id && row.pallet_id !== '0' ? row.pallet_id : '—' %></dd>
+              </div>
+              <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                <dt class="text-gray-500 dark:text-gray-400"><%= t('Source ID') %></dt>
+                <dd class="font-mono text-gray-800 dark:text-gray-200"><%= row.legacy_id || '—' %></dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      <% if (duplicates.length > 1) { %>
+        <div class="card mt-5">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title"><%= t('Duplicate labels') %></h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400"><%= t('All scale records that share label ID {label}.', { label: row.label_id }) %></p>
+            </div>
+            <span class="rounded-full bg-warning-50 px-3 py-1.5 text-xs font-medium text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('{count} records', { count: duplicates.length }) %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table-base min-w-[900px]">
+              <thead>
+                <tr>
+                  <th class="table-th"><%= t('Source ID') %></th>
+                  <th class="table-th"><%= t('Weighed at') %></th>
+                  <th class="table-th"><%= t('Product') %></th>
+                  <th class="table-th text-right"><%= t('Real weight') %></th>
+                  <th class="table-th text-right"><%= t('Printed price') %></th>
+                  <th class="table-th"><%= t('Box') %></th>
+                  <th class="table-th"><%= t('Pallet') %></th>
+                  <th class="table-th"><%= t('Range') %></th>
+                  <th class="table-th text-right"><%= t('Actions') %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% duplicates.forEach((duplicate) => { %>
+                  <tr class="table-row <%= duplicate.id === row.id ? 'bg-warning-50/50 dark:bg-warning-500/5' : '' %>">
+                    <td class="table-td font-mono text-xs"><%= duplicate.legacy_id || '—' %></td>
+                    <td class="table-td whitespace-nowrap"><%= h.formatDateTime(duplicate.weighed_at) %></td>
+                    <td class="table-td">
+                      <% if (duplicate.product_id) { %>
+                        <a href="/products/<%= duplicate.product_id %>" class="link"><%= duplicate.product_name || duplicate.product_id %></a>
+                        <% if (duplicate.product_sku) { %><span class="mt-0.5 block font-mono text-[11px] text-gray-400"><%= duplicate.product_sku %></span><% } %>
+                      <% } else { %>
+                        <span class="text-gray-400"><%= t('Unmatched') %></span>
+                      <% } %>
+                    </td>
+                    <td class="table-td text-right"><%= h.formatQty(duplicate.real_weight) %></td>
+                    <td class="table-td text-right"><%= money(duplicate.printed_price) %></td>
+                    <td class="table-td font-mono text-xs"><%= duplicate.box_id && duplicate.box_id !== '0' ? duplicate.box_id : '—' %></td>
+                    <td class="table-td font-mono text-xs"><%= duplicate.pallet_id && duplicate.pallet_id !== '0' ? duplicate.pallet_id : '—' %></td>
+                    <td class="table-td">
+                      <% if (duplicate.in_range === null || duplicate.in_range === undefined) { %>
+                        <span class="badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><%= t('Unknown') %></span>
+                      <% } else if (Number(duplicate.in_range) === 1) { %>
+                        <span class="badge bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"><%= t('In range') %></span>
+                      <% } else { %>
+                        <span class="badge bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400"><%= t('Out of range') %></span>
+                      <% } %>
+                    </td>
+                    <td class="table-td text-right">
+                      <a href="/manufacturing/scale-records/<%= duplicate.id %>" class="btn-icon" title="<%= t('View') %>">
+                        <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
+                      </a>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (!row.product_id) { %>
+        <div class="mt-5 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <%= t('This record could not be linked to a product. Set the product Old ID to {id} to link it automatically.', { id: row.legacy_product_id || '—' }) %>
+        </div>
+      <% } %>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>

@@ -9,6 +9,8 @@ const materials = require('../lib/materials');
 const productionFloor = require('../lib/productionFloor');
 const productionStock = require('../lib/productionStock');
 const { requireRole } = require('../middleware/web');
+const config = require('../config');
+const { runScaleSync } = require('../lib/scaleSync');
 
 const round4 = materials.round4;
 
@@ -131,9 +133,13 @@ function dateTimeInputValue(value, endOfDay = false) {
 
 function scaleRecordFilters(queryParams) {
   const lot = String(queryParams.lot || '').trim();
-  const range = ['in', 'out'].includes(String(queryParams.range || ''))
+  const product = String(queryParams.product || '').trim();
+  const label = String(queryParams.label || '').trim();
+  const range = ['in', 'out', 'unknown'].includes(String(queryParams.range || ''))
     ? String(queryParams.range)
     : '';
+  const duplicates = String(queryParams.duplicates || '') === '1';
+  const unmatched = String(queryParams.unmatched || '') === '1';
   const from = filterDateTime(queryParams.from, false);
   const to = filterDateTime(queryParams.to, true);
   const where = [];
@@ -141,6 +147,14 @@ function scaleRecordFilters(queryParams) {
   if (lot) {
     where.push('sr.lot_number LIKE ?');
     params.push(`%${lot}%`);
+  }
+  if (product) {
+    where.push('(p.name LIKE ? OR p.sku LIKE ? OR CAST(sr.legacy_product_id AS CHAR) LIKE ?)');
+    params.push(`%${product}%`, `%${product}%`, `%${product}%`);
+  }
+  if (label) {
+    where.push('sr.label_id LIKE ?');
+    params.push(`%${label}%`);
   }
   if (from) {
     where.push('sr.weighed_at >= ?');
@@ -152,7 +166,10 @@ function scaleRecordFilters(queryParams) {
   }
   if (range === 'in') where.push('sr.in_range = 1');
   if (range === 'out') where.push('sr.in_range = 0');
-  return { where, params, lot, range, from, to };
+  if (range === 'unknown') where.push('sr.in_range IS NULL');
+  if (duplicates) where.push('sr.duplicate_label = 1');
+  if (unmatched) where.push('sr.product_id IS NULL');
+  return { where, params, lot, product, label, range, duplicates, unmatched, from, to };
 }
 
 async function productOptions(type) {
@@ -3103,7 +3120,8 @@ router.post('/machines/:id(\\d+)/status', manageMaterials, async (req, res, next
 // ------------------------------------------------------------- scale records
 router.get('/scale-records', async (req, res, next) => {
   try {
-    const { where, params, lot, range } = scaleRecordFilters(req.query);
+    const filters = scaleRecordFilters(req.query);
+    const { where, params, lot, product, label, range, duplicates, unmatched } = filters;
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const statsRow = await one(
       `SELECT
@@ -3114,12 +3132,16 @@ router.get('/scale-records', async (req, res, next) => {
          COALESCE(AVG(sr.real_weight), 0) AS average_weight,
          COALESCE(MIN(sr.real_weight), 0) AS min_weight,
          COALESCE(MAX(sr.real_weight), 0) AS max_weight,
-         COUNT(DISTINCT NULLIF(sr.label_id, '')) AS labels,
-         COUNT(DISTINCT NULLIF(sr.box_id, '')) AS boxes,
-         COUNT(DISTINCT NULLIF(sr.pallet_id, '')) AS pallets,
+         COUNT(DISTINCT CASE WHEN sr.label_id IS NOT NULL AND sr.label_id <> '' AND sr.label_id <> '0' THEN sr.label_id END) AS labels,
+         COUNT(DISTINCT CASE WHEN sr.box_id IS NOT NULL AND sr.box_id <> '' AND sr.box_id <> '0' THEN sr.box_id END) AS boxes,
+         COUNT(DISTINCT CASE WHEN sr.pallet_id IS NOT NULL AND sr.pallet_id <> '' AND sr.pallet_id <> '0' THEN sr.pallet_id END) AS pallets,
          COALESCE(SUM(sr.in_range = 1), 0) AS in_range,
-         COALESCE(SUM(sr.in_range = 0), 0) AS out_of_range
+         COALESCE(SUM(sr.in_range = 0), 0) AS out_of_range,
+         COALESCE(SUM(sr.in_range IS NULL), 0) AS unknown_range,
+         COALESCE(SUM(sr.duplicate_label = 1), 0) AS duplicates,
+         COALESCE(SUM(sr.product_id IS NULL), 0) AS unmatched
        FROM scale_records sr
+       LEFT JOIN products p ON p.id = sr.product_id
        ${whereSql}`,
       params,
     );
@@ -3127,6 +3149,7 @@ router.get('/scale-records', async (req, res, next) => {
     const total = Number(statsRow.items || 0);
     const inRange = Number(statsRow.in_range || 0);
     const outOfRange = Number(statsRow.out_of_range || 0);
+    const unknownRange = Number(statsRow.unknown_range || 0);
     const stats = {
       items: total,
       totalRealWeight: Number(statsRow.total_real_weight || 0),
@@ -3140,22 +3163,34 @@ router.get('/scale-records', async (req, res, next) => {
       pallets: Number(statsRow.pallets || 0),
       inRange,
       outOfRange,
+      unknownRange,
+      duplicates: Number(statsRow.duplicates || 0),
+      unmatched: Number(statsRow.unmatched || 0),
       inRangePct: total ? (inRange / total) * 100 : 0,
       outOfRangePct: total ? (outOfRange / total) * 100 : 0,
+      unknownPct: total ? (unknownRange / total) * 100 : 0,
     };
 
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const perPage = 50;
     const pag = pagination(total, page, perPage);
-    const rows = await query(
-      `SELECT sr.*, p.name AS product_name, p.sku AS product_sku, p.unit AS product_unit
-         FROM scale_records sr
-         LEFT JOIN products p ON p.id = sr.product_id
-         ${whereSql}
-        ORDER BY sr.weighed_at DESC, sr.id DESC
-        LIMIT ? OFFSET ?`,
-      [...params, perPage, (pag.page - 1) * perPage],
-    );
+    const [rows, syncState, syncSummary] = await Promise.all([
+      query(
+        `SELECT sr.*, p.name AS product_name, p.sku AS product_sku, p.unit AS product_unit,
+                p.old_id AS product_old_id
+           FROM scale_records sr
+           LEFT JOIN products p ON p.id = sr.product_id
+           ${whereSql}
+          ORDER BY sr.duplicate_label DESC, sr.weighed_at DESC, sr.id DESC
+          LIMIT ? OFFSET ?`,
+        [...params, perPage, (pag.page - 1) * perPage],
+      ),
+      one('SELECT * FROM scale_sync_state WHERE id = 1'),
+      one(`SELECT COUNT(*) AS total,
+                  COALESCE(SUM(duplicate_label = 1), 0) AS duplicates,
+                  COALESCE(SUM(product_id IS NULL), 0) AS unmatched
+             FROM scale_records`),
+    ]);
 
     res.render('manufacturing/scale-records/index', {
       title: req.t('Scale records'),
@@ -3164,11 +3199,81 @@ router.get('/scale-records', async (req, res, next) => {
       rows,
       pagination: pag,
       stats,
+      syncState,
+      syncSummary,
+      scaleConfig: {
+        enabled: config.scale.enabled,
+        database: config.scale.database,
+        table: config.scale.table,
+        startAt: config.scale.startAt,
+      },
+      canManageScale: Boolean(req.session.user && ['admin', 'manager'].includes(req.session.user.role)),
       lot,
+      productFilter: product,
+      labelFilter: label,
       rangeFilter: range,
+      duplicatesFilter: duplicates,
+      unmatchedFilter: unmatched,
       fromValue: dateTimeInputValue(req.query.from, false),
       toValue: dateTimeInputValue(req.query.to, true),
-      hasFilters: Boolean(lot || range || req.query.from || req.query.to),
+      hasFilters: Boolean(lot || product || label || range || duplicates || unmatched || req.query.from || req.query.to),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/scale-records/sync', manageMaterials, async (req, res, next) => {
+  try {
+    const result = await runScaleSync({ trigger: 'manual', maxBatches: config.scale.maxBatches });
+    if (result.error) {
+      req.flash('error', req.t('Scale sync failed: {message}', { message: result.error }));
+    } else if (result.skipped) {
+      req.flash('info', req.t('Scale sync is already running.'));
+    } else {
+      req.flash('success', req.t('Scale sync completed: {count} rows processed.', { count: result.rows }));
+    }
+    res.redirect('/manufacturing/scale-records');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/scale-records/:id(\\d+)', async (req, res, next) => {
+  try {
+    const row = await one(
+      `SELECT sr.*, p.name AS product_name, p.sku AS product_sku, p.unit AS product_unit,
+              p.old_id AS product_old_id
+         FROM scale_records sr
+         LEFT JOIN products p ON p.id = sr.product_id
+        WHERE sr.id = ? LIMIT 1`,
+      [req.params.id],
+    );
+    if (!row) {
+      return next(Object.assign(new Error(req.t('Scale record not found.')), { status: 404 }));
+    }
+    const hasLabel = row.label_id && row.label_id !== '0';
+    const duplicates = hasLabel
+      ? await query(
+        `SELECT sr.id, sr.legacy_id, sr.weighed_at, sr.product_id, sr.label_id, sr.box_id, sr.pallet_id,
+                sr.in_range, sr.real_weight, sr.printed_price, p.name AS product_name, p.sku AS product_sku
+           FROM scale_records sr
+           LEFT JOIN products p ON p.id = sr.product_id
+          WHERE sr.label_id = ?
+          ORDER BY sr.weighed_at ASC, sr.id ASC`,
+        [row.label_id],
+      )
+      : [];
+    res.render('manufacturing/scale-records/show', {
+      title: req.t('Scale record {id}', { id: row.legacy_id || row.id }),
+      active: 'manufacturing-scale-records',
+      breadcrumbs: [
+        { label: req.t('Manufacturing') },
+        { label: req.t('Scale records'), href: '/manufacturing/scale-records' },
+        { label: `#${row.legacy_id || row.id}` },
+      ],
+      row,
+      duplicates,
     });
   } catch (err) {
     next(err);
