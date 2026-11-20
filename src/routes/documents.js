@@ -1241,7 +1241,8 @@ function makeDocumentRouter(config) {
         orderRequirements = await query(
           `SELECT p.id AS product_id, p.sku, p.name AS product_name,
                   COALESCE(b.name, '—') AS brand_name, p.units_per_pack,
-                  SUM(GREATEST(COALESCE(i.quantity, 0) - COALESCE(i.delivered_qty, 0), 0)) AS units
+                  SUM(GREATEST(COALESCE(i.quantity, 0) - COALESCE(i.delivered_qty, 0), 0)) AS units,
+                  SUM(GREATEST(COALESCE(i.quantity, 0) - COALESCE(i.delivered_qty, 0), 0) * COALESCE(i.weight_per_unit, 0)) AS weight
              FROM sales_order_items i
              JOIN sales_orders so ON so.id = i.order_id
              JOIN products p ON p.id = i.product_id
