@@ -66,6 +66,13 @@
         </div>
       <% } %>
 
+      <% if (duplicateFrom) { %>
+        <div class="mb-5 flex items-center gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+          <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
+          <%= t('Duplicated from order {number}. Choose the destination warehouse and the customer order number.', { number: duplicateFrom[doc.numberField] }) %>
+        </div>
+      <% } %>
+
       <form id="document-form" method="POST" action="<%= action %>" data-currency="<%= currency %>" data-default-tax="<%= defaultTaxRate %>" data-pack-units="<%= supportsPackUnits ? '1' : '0' %>" data-net-prices="<%= netLineEntry ? '1' : '0' %>" data-customer-codes="<%= JSON.stringify(customerCodes || {}) %>" data-warehouses="<%= JSON.stringify(warehouseOptions || []) %>">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <% if (doc.linkOrder) { %>

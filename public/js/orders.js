@@ -764,6 +764,30 @@
     });
   }
 
+  const expectedDelivery = document.querySelector('[name="expected_date"]');
+  const receptionAt = document.getElementById('reception_at');
+  if (expectedDelivery && receptionAt) {
+    let lastExpected = expectedDelivery.value.trim();
+    const syncReception = () => {
+      const nextDate = expectedDelivery.value.trim();
+      if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(nextDate)) {
+        lastExpected = nextDate;
+        return;
+      }
+      const current = receptionAt.value.trim();
+      const parts = current.split(/\s+/);
+      const currentDate = parts[0] || '';
+      const currentTime = parts[1] || '00:00';
+      if (!current || currentDate === lastExpected) {
+        receptionAt.value = `${nextDate} ${currentTime}`;
+      }
+      lastExpected = nextDate;
+    };
+    expectedDelivery.addEventListener('change', syncReception);
+    expectedDelivery.addEventListener('blur', syncReception);
+    if (!receptionAt.value.trim()) syncReception();
+  }
+
   if (levyContainer) {
     const applyDefaultPercentage = (row) => {
       const select = row.querySelector('[data-levy-select]');

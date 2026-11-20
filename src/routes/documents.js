@@ -866,6 +866,7 @@ function actionsFor(config, row, locale) {
 
   if (config.kind === 'sales_order') {
     if (row.status === 'draft') add('status', 'confirmed', 'Confirm order', 'primary');
+    if (['draft', 'confirmed'].includes(row.status)) link(`${base}/duplicate`, 'Duplicate', 'secondary');
     if (['confirmed', 'partially_delivered'].includes(row.status)) {
       link(`/deliveries/new?sales_order_id=${row.id}`, 'Create delivery', 'primary');
       link(`/sales/new?sales_order_id=${row.id}`, 'Create invoice', 'secondary');
@@ -1088,6 +1089,42 @@ function makeDocumentRouter(config) {
       if (own.length === 1) defaults[config.customerOrder.warehouseField] = own[0].value;
     }
 
+    const duplicateOrderId = config.kind === 'sales_order'
+      ? Number.parseInt(req.query.duplicate_order_id, 10)
+      : 0;
+    if (duplicateOrderId) {
+      const order = await one(
+        `SELECT * FROM \`${config.table}\` WHERE id = ? LIMIT 1`,
+        [duplicateOrderId],
+      );
+      if (order) {
+        defaults[config.party.field] = String(order[config.party.field]);
+        defaults[config.dateField] = order[config.dateField];
+        defaults[config.dueField] = order[config.dueField] || '';
+        defaults[config.customerOrder.orderNoField] = '';
+        defaults[config.customerOrder.warehouseField] = '';
+        defaults[config.customerOrder.dockingField] = order[config.customerOrder.dockingField] || '';
+        defaults[config.customerOrder.receptionField] = order[config.customerOrder.receptionField] || '';
+        defaults.discount_total = order.discount_total || 0;
+        defaults.notes = order.notes || '';
+        defaults.status = config.defaultStatus || 'draft';
+        const items = await query(
+          `SELECT i.* FROM \`${config.itemTable}\` i WHERE i.\`${config.itemFk}\` = ? ORDER BY i.id`,
+          [order.id],
+        );
+        return {
+          partyOptions,
+          productOptions,
+          customerCodes,
+          warehouseOptions,
+          defaults,
+          items,
+          prefill: null,
+          duplicateFrom: order,
+        };
+      }
+    }
+
     const prefillOrderId = Number.parseInt(
       req.query[config.linkOrder ? config.linkOrder.queryParam : '__none'],
       10,
@@ -1108,14 +1145,14 @@ function makeDocumentRouter(config) {
           `SELECT i.* FROM \`${config.linkOrder.itemTable}\` i WHERE i.\`${config.linkOrder.itemFk}\` = ? ORDER BY i.id`,
           [order.id],
         );
-        return { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items, prefill: order };
+        return { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items, prefill: order, duplicateFrom: null };
       }
     }
 
     const fallbackItems = [
       { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: config.defaultTaxRate, sku: '', name: '', unit: '' },
     ];
-    return { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items: fallbackItems, prefill: null };
+    return { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items: fallbackItems, prefill: null, duplicateFrom: null };
   }
 
   // ---------------------------------------------------------------- index
@@ -1199,6 +1236,23 @@ function makeDocumentRouter(config) {
       );
       totalValue = Number(totals.v);
 
+      let orderRequirements = [];
+      if (config.kind === 'sales_order') {
+        orderRequirements = await query(
+          `SELECT p.id AS product_id, p.sku, p.name AS product_name,
+                  COALESCE(b.name, '—') AS brand_name, p.units_per_pack,
+                  SUM(GREATEST(COALESCE(i.quantity, 0) - COALESCE(i.delivered_qty, 0), 0)) AS units
+             FROM sales_order_items i
+             JOIN sales_orders so ON so.id = i.order_id
+             JOIN products p ON p.id = i.product_id
+             LEFT JOIN brands b ON b.id = p.brand_id
+            WHERE so.status IN ('confirmed', 'partially_delivered')
+            GROUP BY p.id, p.sku, p.name, b.name, p.units_per_pack
+           HAVING units > 0
+            ORDER BY COALESCE(b.name, '') ASC, p.name ASC`,
+        );
+      }
+
       res.render('documents/index', {
         title: lc.title,
         active: config.active,
@@ -1208,6 +1262,7 @@ function makeDocumentRouter(config) {
         pagination: pag,
         search,
         activeStatus: status,
+        orderRequirements,
         stats: {
           openCount,
           openValue,
@@ -1225,7 +1280,7 @@ function makeDocumentRouter(config) {
   router.get('/new', async (req, res, next) => {
     try {
       const lc = localizeDocConfig(config, req.locale);
-      const { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items, prefill } = await loadFormData(req);
+      const { partyOptions, productOptions, customerCodes, warehouseOptions, defaults, items, prefill, duplicateFrom } = await loadFormData(req);
       const invoiceOptions = await loadInvoiceFormOptions(config);
       const settings = require('../lib/settings');
       const appSettings = await settings.getSettings();
@@ -1247,6 +1302,7 @@ function makeDocumentRouter(config) {
         action: basePath,
         defaultTaxRate: Number(appSettings.default_tax_rate || 0),
         prefill,
+        duplicateFrom,
       });
     } catch (err) {
       next(err);
@@ -1503,6 +1559,24 @@ function makeDocumentRouter(config) {
         req.flash('error', 'This invoice number already exists.');
         return res.redirect(`${basePath}/new`);
       }
+      next(err);
+    }
+  });
+
+  // ------------------------------------------------------------- duplicate
+  router.get('/:id(\\d+)/duplicate', async (req, res, next) => {
+    try {
+      if (config.kind !== 'sales_order') return next();
+      const row = await one(`SELECT id, status FROM \`${config.table}\` WHERE id = ? LIMIT 1`, [req.params.id]);
+      if (!row) {
+        return next(Object.assign(new Error(req.t('{item} not found.', { item: req.t(config.singular) })), { status: 404 }));
+      }
+      if (!['draft', 'confirmed'].includes(row.status)) {
+        req.flash('error', req.t('Only draft or confirmed sales orders can be duplicated.'));
+        return res.redirect(`${basePath}/${row.id}`);
+      }
+      return res.redirect(`${basePath}/new?duplicate_order_id=${row.id}`);
+    } catch (err) {
       next(err);
     }
   });

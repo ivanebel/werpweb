@@ -949,6 +949,15 @@ const ES = {
   'Another warehouse for this customer already uses that code.': 'Otro depósito de este cliente ya usa ese código.',
   'Enter a valid email address.': 'Ingresá una dirección de correo válida.',
   'Customer order details': 'Datos de la orden del cliente',
+  'Only draft or confirmed sales orders can be duplicated.':
+    'Solo se pueden duplicar órdenes de venta en borrador o confirmadas.',
+  'Duplicated from order {number}. Choose the destination warehouse and the customer order number.':
+    'Duplicada desde la orden {number}. Elegí el depósito de destino y el número de orden del cliente.',
+  'Open order requirements': 'Requerimientos de órdenes abiertas',
+  'Confirmed and partially delivered orders. Quantities are still pending delivery.':
+    'Órdenes confirmadas y parcialmente entregadas. Las cantidades siguen pendientes de entrega.',
+  'Packs (units)': 'Paquetes (unidades)',
+  'No open order requirements.': 'No hay requerimientos de órdenes abiertas.',
   'Customer order no.': 'N.º de orden del cliente',
   'Order number used by the customer': 'Número de orden usado por el cliente',
   'Destination warehouse': 'Depósito de destino',

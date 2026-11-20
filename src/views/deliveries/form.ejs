@@ -19,6 +19,12 @@
           : (nextPackingSlip || t('Not assigned'));
         const assignedCai = mode === 'edit' ? delivery.cai_number : (activeCai ? activeCai.cai_number : null);
         const legacyCarrierValue = row.legacy_carrier || (!row.carrier_id && row.carrier ? row.carrier : '');
+        const displayDateInput = (value) => {
+          const raw = String(value || '').trim();
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw)) return raw;
+          if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return h.formatDate(raw.slice(0, 10));
+          return raw;
+        };
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -72,7 +78,7 @@
           <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-4 md:p-6">
             <div class="md:col-span-2">
               <label for="delivery_date" class="form-label">Delivery date <span class="text-error-500">*</span></label>
-              <input id="delivery_date" type="date" name="delivery_date" value="<%= String(row.delivery_date || '').slice(0, 10) %>" class="form-input" required>
+              <input id="delivery_date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" name="delivery_date" value="<%= displayDateInput(row.delivery_date) %>" class="form-input" required>
             </div>
             <div class="md:col-span-2">
               <label class="form-label">Sales order</label>

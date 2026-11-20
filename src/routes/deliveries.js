@@ -201,6 +201,20 @@ async function loadDeliveryItems(delivery, withOrderedQty = false) {
   );
 }
 
+function parseDateInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const date = new Date(`${raw}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === raw ? raw : null;
+  }
+  const match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  if (!match) return null;
+  const iso = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
+}
+
 function dateOnly(value) {
   if (!value) return null;
   if (value instanceof Date) {
@@ -675,8 +689,8 @@ router.post('/', async (req, res, next) => {
       item.lot_number = fallback ? fallback.lot_number : null;
       item.expiry_date = fallback ? fallback.expiry_date : null;
     }
-    const deliveryDate = (req.body.delivery_date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) errors.push(req.t('A valid delivery date is required.'));
+    const deliveryDate = parseDateInput(req.body.delivery_date);
+    if (!deliveryDate) errors.push(req.t('A valid delivery date is required.'));
 
     const renderCreateError = async (messages) => {
       const available = (await loadOrderItems(orderId)).filter((i) => remainingOf(i) > 0);
@@ -820,8 +834,8 @@ router.post('/standalone', async (req, res, next) => {
 
   try {
     const { items, errors } = standaloneItemsFromBody(req.body, req.t);
-    const deliveryDate = String(req.body.delivery_date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+    const deliveryDate = parseDateInput(req.body.delivery_date);
+    if (!deliveryDate) {
       errors.push(req.t('A valid delivery date is required.'));
     }
     const recipient = await resolveRecipient(req.body.recipient, req.t);
@@ -1435,8 +1449,8 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       };
       try {
         const { items, errors } = standaloneItemsFromBody(req.body, req.t);
-        const deliveryDate = String(req.body.delivery_date || '').slice(0, 10);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+        const deliveryDate = parseDateInput(req.body.delivery_date);
+        if (!deliveryDate) {
           errors.push(req.t('A valid delivery date is required.'));
         }
         const recipient = await resolveRecipient(req.body.recipient, req.t);
@@ -1488,8 +1502,8 @@ router.post('/:id(\\d+)', async (req, res, next) => {
       item.lot_number = normalizeLot(preserved && preserved.lot_number) || normalizeLot(fallback && fallback.lot_number);
       item.expiry_date = dateOnly(preserved && preserved.expiry_date) || dateOnly(fallback && fallback.expiry_date);
     }
-    const deliveryDate = (req.body.delivery_date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) errors.push(req.t('A valid delivery date is required.'));
+    const deliveryDate = parseDateInput(req.body.delivery_date);
+    if (!deliveryDate) errors.push(req.t('A valid delivery date is required.'));
 
     if (errors.length) {
       const order = await loadOrderWithWarehouse(delivery.sales_order_id);

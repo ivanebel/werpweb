@@ -17,6 +17,12 @@
               <%= t('Import ARCA PDF') %>
             </a>
           <% } %>
+          <% if (doc.kind === 'sales_order') { %>
+            <button type="button" class="btn btn-secondary btn-sm" data-open-order-requirements>
+              <%- include('/partials/icon', { name: 'cube', className: 'h-4 w-4' }) %>
+              <%= t('Open order requirements') %>
+            </button>
+          <% } %>
           <a href="<%= doc.basePath %>/new" class="btn btn-primary btn-sm">
             <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
             <%= doc.newLabel %>
@@ -163,4 +169,65 @@
       </div>
     </div>
   </main>
+
+  <% if (doc.kind === 'sales_order') { const requirementUnits = orderRequirements.reduce((sum, row) => sum + Number(row.units || 0), 0); const requirementPacks = orderRequirements.reduce((sum, row) => sum + Number(row.units || 0) / Math.max(1, Number(row.units_per_pack) || 1), 0); %>
+    <dialog id="order-requirements-dialog" class="w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-gray-900/60 dark:border-gray-700 dark:bg-gray-900">
+      <div class="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+        <div>
+          <h2 class="text-base font-semibold text-gray-900 dark:text-white"><%= t('Open order requirements') %></h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400"><%= t('Confirmed and partially delivered orders. Quantities are still pending delivery.') %></p>
+        </div>
+        <button type="button" class="btn-icon" data-order-requirements-close aria-label="<%= t('Close') %>">
+          <%- include('/partials/icon', { name: 'x', className: 'h-4 w-4' }) %>
+        </button>
+      </div>
+      <div class="max-h-[65vh] overflow-y-auto p-5">
+        <% if (orderRequirements.length) { %>
+          <table class="table-base min-w-[560px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Brand') %></th>
+                <th class="table-th"><%= t('Product') %></th>
+                <th class="table-th text-right"><%= t('Packs (units)') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% orderRequirements.forEach((requirement) => { const packs = Number(requirement.units || 0) / Math.max(1, Number(requirement.units_per_pack) || 1); %>
+                <tr class="table-row">
+                  <td class="table-td"><%= requirement.brand_name || '—' %></td>
+                  <td class="table-td">
+                    <p class="font-medium text-gray-800 dark:text-gray-200"><%= requirement.product_name %></p>
+                    <p class="mt-0.5 font-mono text-[11px] text-gray-400"><%= requirement.sku %></p>
+                  </td>
+                  <td class="table-td text-right font-medium"><%= h.formatQty(packs) %> (<%= h.formatQty(requirement.units) %>)</td>
+                </tr>
+              <% }) %>
+            </tbody>
+            <tfoot>
+              <tr class="border-t-2 border-gray-200 bg-gray-50 font-semibold dark:border-gray-700 dark:bg-gray-800/60">
+                <td class="px-5 py-3 text-sm" colspan="2"><%= t('Total') %></td>
+                <td class="px-3 py-3 text-right text-sm"><%= h.formatQty(requirementPacks) %> (<%= h.formatQty(requirementUnits) %>)</td>
+              </tr>
+            </tfoot>
+          </table>
+        <% } else { %>
+          <p class="py-10 text-center text-sm text-gray-400"><%= t('No open order requirements.') %></p>
+        <% } %>
+      </div>
+    </dialog>
+    <script>
+      (function () {
+        const dialog = document.getElementById('order-requirements-dialog');
+        if (!dialog) return;
+        document.querySelector('[data-open-order-requirements]')?.addEventListener('click', () => dialog.showModal());
+        dialog.querySelectorAll('[data-order-requirements-close]').forEach((button) => {
+          button.addEventListener('click', () => dialog.close());
+        });
+        dialog.addEventListener('click', (event) => {
+          if (event.target === dialog) dialog.close();
+        });
+      })();
+    </script>
+  <% } %>
+
   <%- include('/layouts/footer') %>
