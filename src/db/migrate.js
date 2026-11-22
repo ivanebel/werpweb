@@ -705,6 +705,33 @@ async function upgradeSchema(conn, dbName) {
   await addIndex(conn, dbName, 'scale_records', 'idx_scale_records_duplicate', 'KEY `idx_scale_records_duplicate` (`duplicate_label`, `weighed_at`)');
   await conn.query('INSERT IGNORE INTO scale_sync_state (id) VALUES (1)');
 
+  // ------------------------------------------------------------------- POS
+  await addColumn(conn, dbName, 'pos_locations', 'legacy_pos_number', 'INT UNSIGNED NULL AFTER name');
+  await addIndex(conn, dbName, 'pos_locations', 'uq_pos_locations_legacy', 'UNIQUE KEY `uq_pos_locations_legacy` (`legacy_pos_number`)');
+  await addColumn(conn, dbName, 'pos_sales', 'legacy_id', 'INT UNSIGNED NULL AFTER id');
+  await addColumn(conn, dbName, 'pos_sales', 'ticket_id', 'INT UNSIGNED NULL AFTER ticket_number');
+  await addColumn(conn, dbName, 'pos_sales', 'legacy_customer_id', 'INT UNSIGNED NULL AFTER customer_name');
+  await addColumn(conn, dbName, 'pos_sales', 'imported_at', 'TIMESTAMP NULL AFTER created_by');
+  await addIndex(conn, dbName, 'pos_sales', 'uq_pos_sales_legacy', 'UNIQUE KEY `uq_pos_sales_legacy` (`legacy_id`)');
+  await addIndex(conn, dbName, 'pos_sales', 'idx_pos_sales_customer', 'KEY `idx_pos_sales_customer` (`legacy_customer_id`)');
+  await addIndex(conn, dbName, 'pos_sales', 'idx_pos_sales_ticket_id', 'KEY `idx_pos_sales_ticket_id` (`ticket_id`)');
+  const [saleDateColumns] = await conn.query(
+    `SELECT DATA_TYPE AS data_type
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'pos_sales' AND COLUMN_NAME = 'sale_date'
+      LIMIT 1`,
+    [dbName],
+  );
+  if (saleDateColumns.length && String(saleDateColumns[0].data_type || saleDateColumns[0].DATA_TYPE).toLowerCase() !== 'datetime') {
+    await conn.query('ALTER TABLE pos_sales MODIFY COLUMN sale_date DATETIME NOT NULL');
+    console.log('[migrate] changed pos_sales.sale_date to DATETIME');
+  }
+  await addColumn(conn, dbName, 'pos_sale_items', 'legacy_id', 'INT UNSIGNED NULL AFTER id');
+  await addColumn(conn, dbName, 'pos_sale_items', 'legacy_product_id', 'INT UNSIGNED NULL AFTER product_id');
+  await makeNullable(conn, dbName, 'pos_sale_items', 'product_id', 'INT UNSIGNED NULL');
+  await addIndex(conn, dbName, 'pos_sale_items', 'uq_pos_sale_items_legacy', 'UNIQUE KEY `uq_pos_sale_items_legacy` (`legacy_id`)');
+  await addIndex(conn, dbName, 'pos_sale_items', 'idx_pos_sale_items_legacy_product', 'KEY `idx_pos_sale_items_legacy_product` (`legacy_product_id`)');
+
   // Production component quantities keep four decimals through BOM definition,
   // production requirements, floor consumption and stock.
   const quantityColumns = [

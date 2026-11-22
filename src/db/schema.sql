@@ -1838,6 +1838,7 @@ CREATE TABLE IF NOT EXISTS pos_locations (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
   code          VARCHAR(20) NOT NULL,
   name          VARCHAR(120) NOT NULL,
+  legacy_pos_number INT UNSIGNED NULL,
   address_line1 VARCHAR(190) NULL,
   city          VARCHAR(100) NULL,
   state         VARCHAR(100) NULL,
@@ -1849,31 +1850,39 @@ CREATE TABLE IF NOT EXISTS pos_locations (
   updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_pos_locations_code (code),
+  UNIQUE KEY uq_pos_locations_legacy (legacy_pos_number),
   KEY idx_pos_locations_name (name),
   KEY idx_pos_locations_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pos_sales (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  legacy_id       INT UNSIGNED NULL,
   pos_id          INT UNSIGNED NOT NULL,
   ticket_type     VARCHAR(40) NOT NULL,
   ticket_number   VARCHAR(40) NOT NULL,
-  sale_date       DATE NOT NULL,
+  ticket_id       INT UNSIGNED NULL,
+  sale_date       DATETIME NOT NULL,
   payment_method  ENUM('cash','card','transfer','other') NOT NULL DEFAULT 'cash',
   customer_name   VARCHAR(180) NULL,
+  legacy_customer_id INT UNSIGNED NULL,
   subtotal        DECIMAL(14,2) NOT NULL DEFAULT 0,
   discount_total  DECIMAL(14,2) NOT NULL DEFAULT 0,
   tax_total       DECIMAL(14,2) NOT NULL DEFAULT 0,
   total           DECIMAL(14,2) NOT NULL DEFAULT 0,
   notes           TEXT NULL,
   created_by      INT UNSIGNED NULL,
+  imported_at     TIMESTAMP NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_pos_sales_legacy (legacy_id),
   UNIQUE KEY uq_pos_sales_ticket (pos_id, ticket_type, ticket_number),
   KEY idx_pos_sales_pos_date (pos_id, sale_date),
   KEY idx_pos_sales_date (sale_date),
   KEY idx_pos_sales_type (ticket_type),
+  KEY idx_pos_sales_customer (legacy_customer_id),
+  KEY idx_pos_sales_ticket_id (ticket_id),
   CONSTRAINT fk_pos_sales_location FOREIGN KEY (pos_id)
     REFERENCES pos_locations (id) ON DELETE RESTRICT,
   CONSTRAINT fk_pos_sales_user FOREIGN KEY (created_by)
@@ -1882,8 +1891,10 @@ CREATE TABLE IF NOT EXISTS pos_sales (
 
 CREATE TABLE IF NOT EXISTS pos_sale_items (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  legacy_id   INT UNSIGNED NULL,
   sale_id     INT UNSIGNED NOT NULL,
-  product_id  INT UNSIGNED NOT NULL,
+  product_id  INT UNSIGNED NULL,
+  legacy_product_id INT UNSIGNED NULL,
   description VARCHAR(255) NULL,
   quantity    DECIMAL(14,3) NOT NULL DEFAULT 0,
   unit_price  DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -1891,8 +1902,10 @@ CREATE TABLE IF NOT EXISTS pos_sale_items (
   vat_code    CHAR(4) NULL,
   line_total  DECIMAL(14,2) NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_pos_sale_items_legacy (legacy_id),
   KEY idx_pos_sale_items_sale (sale_id),
   KEY idx_pos_sale_items_product (product_id),
+  KEY idx_pos_sale_items_legacy_product (legacy_product_id),
   KEY idx_pos_sale_items_vat_code (vat_code),
   CONSTRAINT fk_pos_sale_items_sale FOREIGN KEY (sale_id)
     REFERENCES pos_sales (id) ON DELETE CASCADE,
@@ -1900,6 +1913,45 @@ CREATE TABLE IF NOT EXISTS pos_sale_items (
     REFERENCES products (id) ON DELETE RESTRICT,
   CONSTRAINT fk_pos_sale_items_vat_code FOREIGN KEY (vat_code)
     REFERENCES vat_rates (code) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pos_import_runs (
+  id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  from_at           DATETIME NOT NULL,
+  to_at             DATETIME NOT NULL,
+  status            ENUM('pending','running','completed','completed_with_errors','failed','interrupted') NOT NULL DEFAULT 'pending',
+  total_sales       INT UNSIGNED NOT NULL DEFAULT 0,
+  processed_sales   INT UNSIGNED NOT NULL DEFAULT 0,
+  imported_sales    INT UNSIGNED NOT NULL DEFAULT 0,
+  skipped_sales     INT UNSIGNED NOT NULL DEFAULT 0,
+  failed_sales      INT UNSIGNED NOT NULL DEFAULT 0,
+  imported_lines    INT UNSIGNED NOT NULL DEFAULT 0,
+  unmapped_products INT UNSIGNED NOT NULL DEFAULT 0,
+  placeholder_pos   INT UNSIGNED NOT NULL DEFAULT 0,
+  last_legacy_id    INT UNSIGNED NOT NULL DEFAULT 0,
+  error_text        TEXT NULL,
+  created_by        INT UNSIGNED NULL,
+  started_at        DATETIME NULL,
+  finished_at       DATETIME NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_pos_import_runs_status (status, created_at),
+  CONSTRAINT fk_pos_import_runs_user FOREIGN KEY (created_by)
+    REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pos_import_errors (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  run_id         INT UNSIGNED NOT NULL,
+  legacy_sale_id INT UNSIGNED NULL,
+  legacy_line_id INT UNSIGNED NULL,
+  scope          ENUM('sale','line') NOT NULL DEFAULT 'sale',
+  message        VARCHAR(500) NOT NULL,
+  created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_pos_import_errors_run (run_id, id),
+  CONSTRAINT fk_pos_import_errors_run FOREIGN KEY (run_id)
+    REFERENCES pos_import_runs (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

@@ -14,7 +14,7 @@
             <h1 class="page-title"><%= sale.ticket_number %></h1>
             <span class="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/15 dark:text-brand-300"><%= t(sale.ticket_type) %></span>
           </div>
-          <p class="page-subtitle"><%= sale.pos_name %> · <%= h.formatDate(sale.sale_date) %> · <%= sale.customer_name || t('Walk-in customer') %></p>
+          <p class="page-subtitle"><%= sale.pos_name %> · <%= h.formatDateTime(sale.sale_date) %> · <%= sale.customer_name || t('Walk-in customer') %></p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <a href="/pos/sales" class="btn btn-secondary btn-sm">
@@ -60,8 +60,13 @@
                   <% items.forEach(item => { %>
                     <tr class="table-row">
                       <td class="table-td">
-                        <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
-                        <p class="mt-0.5 text-xs text-gray-400"><%= item.sku %><%= item.description ? ` · ${item.description}` : '' %></p>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <p class="font-medium text-gray-800 dark:text-gray-200"><%= item.name %></p>
+                          <% if (!item.product_id) { %>
+                            <span class="rounded-full bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"><%= t('N/A product') %></span>
+                          <% } %>
+                        </div>
+                        <p class="mt-0.5 text-xs text-gray-400"><%= item.sku ? `${item.sku}${item.description ? ` · ${item.description}` : ''}` : (item.description || '') %></p>
                       </td>
                       <td class="table-td text-right"><%= h.formatQty(item.quantity) %> <span class="text-xs text-gray-400"><%= item.unit %></span></td>
                       <td class="table-td text-right"><%= money(item.unit_price) %></td>
@@ -126,13 +131,31 @@
                 <dt class="text-gray-500 dark:text-gray-400"><%= t('Ticket number') %></dt>
                 <dd class="text-right font-mono text-xs text-gray-800 dark:text-gray-200"><%= sale.ticket_number %></dd>
               </div>
+              <% if (sale.ticket_id) { %>
+                <div class="flex items-start justify-between gap-4">
+                  <dt class="text-gray-500 dark:text-gray-400"><%= t('Fiscal document code') %></dt>
+                  <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= sale.ticket_id %></dd>
+                </div>
+              <% } %>
+              <% if (sale.legacy_id) { %>
+                <div class="flex items-start justify-between gap-4">
+                  <dt class="text-gray-500 dark:text-gray-400"><%= t('Legacy sale') %></dt>
+                  <dd class="text-right font-mono text-xs text-gray-800 dark:text-gray-200">#<%= sale.legacy_id %></dd>
+                </div>
+              <% } %>
+              <% if (sale.legacy_customer_id) { %>
+                <div class="flex items-start justify-between gap-4">
+                  <dt class="text-gray-500 dark:text-gray-400"><%= t('Legacy customer') %></dt>
+                  <dd class="text-right font-mono text-xs text-gray-800 dark:text-gray-200">#<%= sale.legacy_customer_id %></dd>
+                </div>
+              <% } %>
               <div class="flex items-start justify-between gap-4">
                 <dt class="text-gray-500 dark:text-gray-400"><%= t('Point of sale') %></dt>
                 <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= sale.pos_name %></dd>
               </div>
               <div class="flex items-start justify-between gap-4">
                 <dt class="text-gray-500 dark:text-gray-400"><%= t('Sale date') %></dt>
-                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatDate(sale.sale_date) %></dd>
+                <dd class="text-right font-medium text-gray-800 dark:text-gray-200"><%= h.formatDateTime(sale.sale_date) %></dd>
               </div>
               <div class="flex items-start justify-between gap-4">
                 <dt class="text-gray-500 dark:text-gray-400"><%= t('Payment method') %></dt>

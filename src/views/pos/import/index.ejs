@@ -1,0 +1,151 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1400px]">
+      <%
+        const statusTone = {
+          pending: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+          running: 'bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300',
+          completed: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400',
+          completed_with_errors: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400',
+          failed: 'bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400',
+          interrupted: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400',
+        };
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 class="page-title"><%= t('Import POS sales') %></h1>
+          <p class="page-subtitle"><%= t('Copy historical sales from the old POS system into this database.') %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/pos/sales" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'receipt', className: 'h-4 w-4' }) %>
+            <%= t('POS sales') %>
+          </a>
+          <a href="/pos/locations" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'building', className: 'h-4 w-4' }) %>
+            <%= t('Points of sale') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div class="card p-5 md:p-6 xl:col-span-2">
+          <h2 class="card-title"><%= t('New import') %></h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <%= t('Select the days to import. Sales already imported are skipped automatically, so running the same range twice is safe.') %>
+          </p>
+
+          <form id="pos-import-form" method="POST" action="/pos/import" class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div>
+              <label for="from" class="form-label"><%= t('From date') %></label>
+              <input id="from" name="from" type="date" value="<%= defaultFrom %>" max="<%= defaultTo %>" class="form-input" required>
+            </div>
+            <div>
+              <label for="to" class="form-label"><%= t('To date') %></label>
+              <input id="to" name="to" type="date" value="<%= defaultTo %>" class="form-input" required>
+            </div>
+            <div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+              <button id="pos-import-submit" type="submit" class="btn btn-primary">
+                <%- include('/partials/icon', { name: 'download', className: 'h-4 w-4' }) %>
+                <span data-label><%= t('Start import') %></span>
+              </button>
+              <span class="text-xs text-gray-400"><%= t('Maximum range: {days} days', { days: maxDays }) %></span>
+            </div>
+          </form>
+
+          <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-900/40 dark:text-gray-400">
+            <p><%= t('Source: {database} ({sales} / {lines})', { database: sourceDatabase, sales: sourceSalesTable, lines: sourceLinesTable }) %></p>
+            <p class="mt-1"><%= t('Each point of sale must have its legacy POS number set before importing. Unmapped products are kept as N/A product lines.') %></p>
+          </div>
+        </div>
+
+        <div class="card p-5 md:p-6">
+          <h2 class="card-title"><%= t('Before you import') %></h2>
+          <ul class="mt-3 space-y-2 text-sm text-gray-600 dark:text-gray-300">
+            <li class="flex gap-2"><span class="text-brand-500">•</span><span><%= t('Map each shop to its legacy POS number in Points of sale.') %></span></li>
+            <li class="flex gap-2"><span class="text-brand-500">•</span><span><%= t('Imported sales are reporting records and do not change inventory.') %></span></li>
+            <li class="flex gap-2"><span class="text-brand-500">•</span><span><%= t('Only one import can run at a time. The progress page updates automatically.') %></span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="card-header">
+          <h2 class="card-title"><%= t('Recent imports') %></h2>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[860px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Run') %></th>
+                <th class="table-th"><%= t('Range') %></th>
+                <th class="table-th"><%= t('Status') %></th>
+                <th class="table-th text-right"><%= t('Sales') %></th>
+                <th class="table-th text-right"><%= t('Imported') %></th>
+                <th class="table-th text-right"><%= t('Skipped') %></th>
+                <th class="table-th text-right"><%= t('Failed') %></th>
+                <th class="table-th"><%= t('Started') %></th>
+                <th class="table-th text-right"><%= t('Actions') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% runs.forEach(run => { %>
+                <tr class="table-row">
+                  <td class="table-td font-mono text-xs">#<%= run.id %></td>
+                  <td class="table-td whitespace-nowrap text-gray-500 dark:text-gray-400">
+                    <%= h.formatDate(run.from_at) %> – <%= h.formatDate(run.to_at) %>
+                  </td>
+                  <td class="table-td">
+                    <span class="rounded-full px-2.5 py-1 text-xs font-medium <%= statusTone[run.status] || statusTone.pending %>"><%= t(h.humanize(run.status)) %></span>
+                  </td>
+                  <td class="table-td text-right"><%= h.formatNumber(run.processed_sales, 0) %> / <%= h.formatNumber(run.total_sales, 0) %></td>
+                  <td class="table-td text-right font-medium text-success-600 dark:text-success-400"><%= h.formatNumber(run.imported_sales, 0) %></td>
+                  <td class="table-td text-right"><%= h.formatNumber(run.skipped_sales, 0) %></td>
+                  <td class="table-td text-right <%= Number(run.failed_sales) > 0 ? 'text-error-600 dark:text-error-400' : '' %>"><%= h.formatNumber(run.failed_sales, 0) %></td>
+                  <td class="table-td whitespace-nowrap text-gray-500 dark:text-gray-400"><%= run.started_at ? h.formatDateTime(run.started_at) : h.formatDateTime(run.created_at) %></td>
+                  <td class="table-td text-right">
+                    <a href="/pos/import/<%= run.id %>" class="btn-icon" title="<%= t('View') %>">
+                      <%- include('/partials/icon', { name: 'eye', className: 'h-4 w-4' }) %>
+                    </a>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if (!runs.length) { %>
+                <tr>
+                  <td colspan="9" class="px-5 py-16 text-center">
+                    <span class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">
+                      <%- include('/partials/icon', { name: 'download', className: 'h-6 w-6' }) %>
+                    </span>
+                    <p class="text-sm font-medium text-gray-600 dark:text-gray-300"><%= t('No imports yet') %></p>
+                    <p class="mt-1 text-sm text-gray-400"><%= t('Start the first historical import above.') %></p>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>
+
+<script>
+  (() => {
+    const form = document.getElementById('pos-import-form');
+    const button = document.getElementById('pos-import-submit');
+    if (!form || !button) return;
+    form.addEventListener('submit', () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      button.classList.add('opacity-60', 'cursor-not-allowed');
+      const label = button.querySelector('[data-label]');
+      if (label) label.textContent = '<%= t('Starting import…') %>';
+    });
+  })();
+</script>

@@ -5,12 +5,16 @@ const { initDb, closeDb } = require('./db');
 const { createApp } = require('./app');
 const { startTelegramBot, stopTelegramBot } = require('./lib/telegram');
 const { startScaleSync, stopScaleSync } = require('./lib/scaleSync');
+const { markInterruptedRuns, stopPosImport } = require('./lib/posImport');
 
 async function start() {
   try {
     console.log('[startup] connecting to database…');
     await initDb();
     console.log('[startup] database ready');
+    await markInterruptedRuns().catch((error) => {
+      console.error('[pos-import] could not mark interrupted runs:', error.message);
+    });
 
     const app = await createApp();
 
@@ -28,6 +32,7 @@ async function start() {
       console.log(`\n[shutdown] ${signal} received, closing…`);
       await stopTelegramBot().catch(() => {});
       await stopScaleSync().catch(() => {});
+      await stopPosImport().catch(() => {});
       server.close(async () => {
         await closeDb();
         process.exit(0);

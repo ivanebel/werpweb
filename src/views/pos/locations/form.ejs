@@ -54,6 +54,12 @@
               <input id="name" name="name" value="<%= row.name || '' %>" maxlength="120" class="form-input" placeholder="<%= t('e.g. Uptown Oakland') %>" required>
               <% if (errors.name) { %><p class="form-error"><%= errors.name %></p><% } %>
             </div>
+            <div>
+              <label for="legacy_pos_number" class="form-label"><%= t('Legacy POS number') %></label>
+              <input id="legacy_pos_number" name="legacy_pos_number" type="number" min="1" step="1" value="<%= row.legacy_pos_number || '' %>" class="form-input" placeholder="<%= t('e.g. 1') %>">
+              <p class="form-help"><%= t('Number used by the old POS system. Required to import historical sales into this shop.') %></p>
+              <% if (errors.legacy_pos_number) { %><p class="form-error"><%= errors.legacy_pos_number %></p><% } %>
+            </div>
             <div class="md:col-span-2">
               <label for="address_line1" class="form-label"><%= t('Address') %></label>
               <input id="address_line1" name="address_line1" value="<%= row.address_line1 || '' %>" maxlength="190" class="form-input" placeholder="<%= t('Street address') %>">

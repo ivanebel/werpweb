@@ -19,6 +19,12 @@
             <%- include('/partials/icon', { name: 'chart', className: 'h-4 w-4' }) %>
             <%= t('Sales performance') %>
           </a>
+          <% if (currentUser && ['admin', 'manager'].includes(currentUser.role)) { %>
+            <a href="/pos/import" class="btn btn-secondary btn-sm">
+              <%- include('/partials/icon', { name: 'download', className: 'h-4 w-4' }) %>
+              <%= t('Import sales') %>
+            </a>
+          <% } %>
           <a href="/pos/sales/new" class="btn btn-primary btn-sm">
             <%- include('/partials/icon', { name: 'plus', className: 'h-4 w-4' }) %>
             <%= t('New POS sale') %>

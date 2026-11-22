@@ -2,11 +2,15 @@
 
 const express = require('express');
 const { query, one, scalar, withTransaction } = require('../db');
-const { pagination, toNumber, todayISO, percentChange } = require('../lib/helpers');
+const { pagination, toNumber, todayISO, percentChange, addDaysISO } = require('../lib/helpers');
 const { getSettings } = require('../lib/settings');
 const { codeForRate } = require('../lib/vatRates');
+const { requireRole } = require('../middleware/web');
+const config = require('../config');
+const posImport = require('../lib/posImport');
 
 const router = express.Router();
+const managePos = requireRole('admin', 'manager');
 
 const TICKET_TYPE_SUGGESTIONS = ['Ticket', 'Invoice', 'Credit note'];
 const PAYMENT_METHODS = [
@@ -82,8 +86,8 @@ function resolveRange(source = {}) {
 }
 
 function saleScope(range, posId = null) {
-  const where = ['s.sale_date BETWEEN ? AND ?'];
-  const params = [range.from, range.to];
+  const where = ['s.sale_date >= ? AND s.sale_date < ?'];
+  const params = [range.from, addDaysISO(range.to, 1)];
   if (posId) {
     where.push('s.pos_id = ?');
     params.push(posId);
@@ -162,9 +166,11 @@ async function findLocation(id) {
 
 async function loadSaleItems(saleId) {
   return query(
-    `SELECT i.*, p.sku, p.name, p.unit
+    `SELECT i.*, p.sku,
+            COALESCE(p.name, i.description, CONCAT('N/A product #', COALESCE(i.legacy_product_id, ''))) AS name,
+            p.unit
        FROM pos_sale_items i
-       JOIN products p ON p.id = i.product_id
+       LEFT JOIN products p ON p.id = i.product_id
       WHERE i.sale_id = ?
       ORDER BY i.id ASC`,
     [saleId],
@@ -285,12 +291,11 @@ async function loadSaleTotals(scope) {
 async function loadItemTotals(scope) {
   const row = await one(
     `SELECT COUNT(DISTINCT s.id) AS tickets,
-            COUNT(DISTINCT i.product_id) AS products,
+            COUNT(DISTINCT COALESCE(i.product_id, 0)) AS products,
             COALESCE(SUM(i.quantity),0) AS units,
             COALESCE(SUM(${NET_LINE_REVENUE}),0) AS revenue
        FROM pos_sale_items i
        JOIN pos_sales s ON s.id = i.sale_id
-       JOIN products p ON p.id = i.product_id
        JOIN pos_locations l ON l.id = s.pos_id
       WHERE ${scope.sql}`,
     scope.params,
@@ -315,10 +320,10 @@ async function loadCategoryBreakdown(scope, limit = null) {
             COALESCE(SUM(i.quantity),0) AS qty,
             COALESCE(SUM(${NET_LINE_REVENUE}),0) AS revenue,
             COUNT(DISTINCT s.id) AS tickets,
-            COUNT(DISTINCT p.id) AS products
+            COUNT(DISTINCT COALESCE(p.id, 0)) AS products
        FROM pos_sale_items i
        JOIN pos_sales s ON s.id = i.sale_id
-       JOIN products p ON p.id = i.product_id
+       LEFT JOIN products p ON p.id = i.product_id
        JOIN pos_locations l ON l.id = s.pos_id
        LEFT JOIN product_categories pc ON pc.id = p.category_id
       WHERE ${scope.sql}
@@ -339,18 +344,22 @@ async function loadCategoryBreakdown(scope, limit = null) {
 async function loadProductBreakdown(scope, { limit = 10, offset = 0, sort = 'revenue' } = {}) {
   const order = sort === 'units' ? 'qty' : 'revenue';
   const rows = await query(
-    `SELECT p.id, p.sku, p.name, p.unit, COALESCE(pc.name, 'Uncategorised') AS category_name,
+    `SELECT COALESCE(p.id, 0) AS id,
+            COALESCE(p.sku, '') AS sku,
+            COALESCE(p.name, i.description, CONCAT('N/A product #', COALESCE(i.legacy_product_id, ''))) AS name,
+            p.unit,
+            COALESCE(pc.name, 'Uncategorised') AS category_name,
             COALESCE(SUM(i.quantity),0) AS qty,
             COALESCE(SUM(${NET_LINE_REVENUE}),0) AS revenue,
             COUNT(DISTINCT s.id) AS tickets
        FROM pos_sale_items i
        JOIN pos_sales s ON s.id = i.sale_id
-       JOIN products p ON p.id = i.product_id
+       LEFT JOIN products p ON p.id = i.product_id
        JOIN pos_locations l ON l.id = s.pos_id
        LEFT JOIN product_categories pc ON pc.id = p.category_id
       WHERE ${scope.sql}
-      GROUP BY p.id, p.sku, p.name, p.unit, pc.name
-      ORDER BY ${order} DESC, p.name ASC
+      GROUP BY COALESCE(p.id, 0), p.sku, COALESCE(p.name, i.description, CONCAT('N/A product #', COALESCE(i.legacy_product_id, ''))), p.unit, pc.name
+      ORDER BY ${order} DESC, name ASC
       LIMIT ? OFFSET ?`,
     [...scope.params, limit, offset],
   );
@@ -369,10 +378,9 @@ async function loadProductBreakdown(scope, { limit = 10, offset = 0, sort = 'rev
 async function loadProductCount(scope) {
   return Number(
     (await scalar(
-      `SELECT COUNT(DISTINCT i.product_id)
+      `SELECT COUNT(DISTINCT COALESCE(i.product_id, 0))
          FROM pos_sale_items i
          JOIN pos_sales s ON s.id = i.sale_id
-         JOIN products p ON p.id = i.product_id
          JOIN pos_locations l ON l.id = s.pos_id
         WHERE ${scope.sql}`,
       scope.params,
@@ -423,8 +431,8 @@ async function loadTrend(range, posId, locale) {
   const start = new Date(`${endMonth}-01T00:00:00Z`);
   start.setUTCMonth(start.getUTCMonth() - 5);
   const startMonth = iso(start).slice(0, 7);
-  const where = ['s.sale_date BETWEEN ? AND ?'];
-  const params = [iso(start), range.to];
+  const where = ['s.sale_date >= ? AND s.sale_date < ?'];
+  const params = [iso(start), addDaysISO(range.to, 1)];
   if (posId) {
     where.push('s.pos_id = ?');
     params.push(posId);
@@ -464,7 +472,7 @@ async function loadTrend(range, posId, locale) {
 
 async function loadPosComparison(range, posId = null) {
   const where = posId ? 'WHERE l.id = ?' : '';
-  const params = [range.from, range.to, range.from, range.to];
+  const params = [range.from, addDaysISO(range.to, 1), range.from, addDaysISO(range.to, 1)];
   if (posId) params.push(posId);
 
   const rows = await query(
@@ -477,12 +485,12 @@ async function loadPosComparison(range, posId = null) {
             COALESCE(u.units,0) AS units,
             MAX(s.sale_date) AS last_sale
        FROM pos_locations l
-       LEFT JOIN pos_sales s ON s.pos_id = l.id AND s.sale_date BETWEEN ? AND ?
+       LEFT JOIN pos_sales s ON s.pos_id = l.id AND s.sale_date >= ? AND s.sale_date < ?
        LEFT JOIN (
          SELECT s2.pos_id, COALESCE(SUM(i.quantity),0) AS units
            FROM pos_sales s2
            JOIN pos_sale_items i ON i.sale_id = s2.id
-          WHERE s2.sale_date BETWEEN ? AND ?
+          WHERE s2.sale_date >= ? AND s2.sale_date < ?
           GROUP BY s2.pos_id
        ) u ON u.pos_id = l.id
       ${where}
@@ -740,8 +748,8 @@ router.get('/sales', async (req, res, next) => {
     const search = String(req.query.q || '').trim();
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
 
-    const where = ['s.sale_date BETWEEN ? AND ?'];
-    const params = [range.from, range.to];
+    const where = ['s.sale_date >= ? AND s.sale_date < ?'];
+    const params = [range.from, addDaysISO(range.to, 1)];
     if (posId) {
       where.push('s.pos_id = ?');
       params.push(posId);
@@ -1235,6 +1243,9 @@ router.post('/locations', async (req, res, next) => {
     const data = {
       code: normalizeCode(req.body.code),
       name: String(req.body.name || '').trim().slice(0, 120),
+      legacy_pos_number: Number.parseInt(req.body.legacy_pos_number, 10) > 0
+        ? Number.parseInt(req.body.legacy_pos_number, 10)
+        : null,
       address_line1: String(req.body.address_line1 || '').trim().slice(0, 190) || null,
       city: String(req.body.city || '').trim().slice(0, 100) || null,
       state: String(req.body.state || '').trim().slice(0, 100) || null,
@@ -1249,6 +1260,15 @@ router.post('/locations', async (req, res, next) => {
     if (data.code) {
       const duplicate = await one('SELECT id FROM pos_locations WHERE code = ? LIMIT 1', [data.code]);
       if (duplicate) errors.code = req.t('This code is already used by another point of sale.');
+    }
+    if (data.legacy_pos_number !== null) {
+      const legacyDuplicate = await one(
+        'SELECT id FROM pos_locations WHERE legacy_pos_number = ? LIMIT 1',
+        [data.legacy_pos_number],
+      );
+      if (legacyDuplicate) {
+        errors.legacy_pos_number = req.t('This legacy POS number is already mapped to another point of sale.');
+      }
     }
     if (Object.keys(errors).length) {
       return res.status(422).render(
@@ -1269,11 +1289,12 @@ router.post('/locations', async (req, res, next) => {
 
     const result = await query(
       `INSERT INTO pos_locations
-         (code, name, address_line1, city, state, postal_code, phone, status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (code, name, legacy_pos_number, address_line1, city, state, postal_code, phone, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.code,
         data.name,
+        data.legacy_pos_number,
         data.address_line1,
         data.city,
         data.state,
@@ -1368,6 +1389,9 @@ router.post('/locations/:id(\\d+)', async (req, res, next) => {
     const data = {
       code: normalizeCode(req.body.code),
       name: String(req.body.name || '').trim().slice(0, 120),
+      legacy_pos_number: Number.parseInt(req.body.legacy_pos_number, 10) > 0
+        ? Number.parseInt(req.body.legacy_pos_number, 10)
+        : null,
       address_line1: String(req.body.address_line1 || '').trim().slice(0, 190) || null,
       city: String(req.body.city || '').trim().slice(0, 100) || null,
       state: String(req.body.state || '').trim().slice(0, 100) || null,
@@ -1385,6 +1409,15 @@ router.post('/locations/:id(\\d+)', async (req, res, next) => {
         location.id,
       ]);
       if (duplicate) errors.code = req.t('This code is already used by another point of sale.');
+    }
+    if (data.legacy_pos_number !== null) {
+      const legacyDuplicate = await one(
+        'SELECT id FROM pos_locations WHERE legacy_pos_number = ? AND id <> ? LIMIT 1',
+        [data.legacy_pos_number, location.id],
+      );
+      if (legacyDuplicate) {
+        errors.legacy_pos_number = req.t('This legacy POS number is already mapped to another point of sale.');
+      }
     }
     if (Object.keys(errors).length) {
       return res.status(422).render(
@@ -1406,12 +1439,13 @@ router.post('/locations/:id(\\d+)', async (req, res, next) => {
 
     await query(
       `UPDATE pos_locations
-          SET code = ?, name = ?, address_line1 = ?, city = ?, state = ?, postal_code = ?,
-              phone = ?, status = ?, notes = ?
+          SET code = ?, name = ?, legacy_pos_number = ?, address_line1 = ?, city = ?, state = ?,
+              postal_code = ?, phone = ?, status = ?, notes = ?
         WHERE id = ?`,
       [
         data.code,
         data.name,
+        data.legacy_pos_number,
         data.address_line1,
         data.city,
         data.state,
@@ -1452,6 +1486,91 @@ router.post('/locations/:id(\\d+)/delete', async (req, res, next) => {
     await query('DELETE FROM pos_locations WHERE id = ?', [location.id]);
     req.flash('success', 'Point of sale deleted.');
     res.redirect('/pos/locations');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------------------------------------------------- legacy import
+router.get('/import', managePos, async (req, res, next) => {
+  try {
+    const runs = await posImport.getRecentRuns(20);
+    res.render('pos/import/index', {
+      title: req.t('Import POS sales'),
+      active: 'pos-import',
+      breadcrumbs: [
+        { label: req.t('Point of Sale'), href: '/pos' },
+        { label: req.t('Import POS sales') },
+      ],
+      runs,
+      defaultFrom: todayISO(),
+      defaultTo: todayISO(),
+      maxDays: config.posImport.maxDays,
+      sourceDatabase: config.scale.database,
+      sourceSalesTable: config.posImport.salesTable,
+      sourceLinesTable: config.posImport.linesTable,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/import', managePos, async (req, res, next) => {
+  try {
+    const run = await posImport.createRun({
+      fromRaw: req.body.from,
+      toRaw: req.body.to,
+      userId: req.session.user.id,
+    });
+    req.flash('success', req.t('POS import started for {count} sales.', { count: run.total }));
+    return res.redirect(`/pos/import/${run.id}`);
+  } catch (err) {
+    req.flash('error', err.message || req.t('Could not start the POS import.'));
+    return res.redirect('/pos/import');
+  }
+});
+
+router.get('/import/:id(\\d+)', managePos, async (req, res, next) => {
+  try {
+    const run = await posImport.getRun(req.params.id);
+    if (!run) {
+      return next(Object.assign(new Error(req.t('POS import run not found.')), { status: 404 }));
+    }
+    const errors = await posImport.getRunErrors(run.id, 50);
+    res.render('pos/import/run', {
+      title: req.t('POS import #{id}', { id: run.id }),
+      active: 'pos-import',
+      breadcrumbs: [
+        { label: req.t('Point of Sale'), href: '/pos' },
+        { label: req.t('Import POS sales'), href: '/pos/import' },
+        { label: `#${run.id}` },
+      ],
+      run,
+      errors,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/import/:id(\\d+)/status', managePos, async (req, res, next) => {
+  try {
+    const run = await posImport.getRun(req.params.id);
+    if (!run) return res.status(404).json({ error: 'not_found' });
+    return res.json({
+      id: run.id,
+      status: run.status,
+      total_sales: run.total_sales,
+      processed_sales: run.processed_sales,
+      imported_sales: run.imported_sales,
+      skipped_sales: run.skipped_sales,
+      failed_sales: run.failed_sales,
+      imported_lines: run.imported_lines,
+      unmapped_products: run.unmapped_products,
+      placeholder_pos: run.placeholder_pos,
+      error_text: run.error_text,
+      finished_at: run.finished_at,
+    });
   } catch (err) {
     next(err);
   }

@@ -156,7 +156,9 @@ function formatQty(value, locale = DEFAULT_LOCALE) {
 function formatDate(value, locale = DEFAULT_LOCALE) {
   if (!value) return '-';
   const raw = String(value);
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00Z`) : new Date(value);
+  const datePart = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (datePart) return `${datePart[3]}/${datePart[2]}/${datePart[1]}`;
+  const d = new Date(value);
   if (Number.isNaN(d.getTime())) return raw;
   const day = String(d.getUTCDate()).padStart(2, '0');
   const month = String(d.getUTCMonth() + 1).padStart(2, '0');

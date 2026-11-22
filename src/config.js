@@ -57,6 +57,13 @@ const config = {
     overlap: Math.max(0, int(process.env.SCALE_SYNC_OVERLAP, 50)),
     startAt: process.env.SCALE_SYNC_START_AT || '2026-11-01 00:00:00',
   },
+  posImport: {
+    maxDays: Math.min(366, Math.max(1, int(process.env.POS_IMPORT_MAX_DAYS, 31))),
+    batchSize: Math.min(500, Math.max(10, int(process.env.POS_IMPORT_BATCH_SIZE, 100))),
+    salesTable: process.env.POS_IMPORT_SALES_TABLE || 'pos_movimiento',
+    linesTable: process.env.POS_IMPORT_LINES_TABLE || 'pos_linea',
+    lineSaleColumn: process.env.POS_IMPORT_LINE_SALE_COLUMN || 'pos_movimiento',
+  },
   telegram: {
     enabled: bool(process.env.TELEGRAM_ENABLED),
     token: String(process.env.TELEGRAM_BOT_TOKEN || '').trim(),

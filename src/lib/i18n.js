@@ -1771,6 +1771,68 @@ const ES = {
   'Delete this point of sale? This cannot be undone.': '¿Eliminar este punto de venta? Esta acción no se puede deshacer.',
   'Code': 'Código',
   'Name': 'Nombre',
+  'Import POS sales': 'Importar ventas POS',
+  'Import sales': 'Importar ventas',
+  'Legacy POS number': 'Número de punto de venta anterior',
+  'Number used by the old POS system. Required to import historical sales into this shop.':
+    'Número que usaba el sistema POS anterior. Necesario para importar ventas históricas a este local.',
+  'This legacy POS number is already mapped to another point of sale.':
+    'Este número anterior ya está asociado a otro punto de venta.',
+  'Copy historical sales from the old POS system into this database.':
+    'Copiá las ventas históricas del sistema POS anterior a esta base de datos.',
+  'New import': 'Nueva importación',
+  'Select the days to import. Sales already imported are skipped automatically, so running the same range twice is safe.':
+    'Elegí los días a importar. Las ventas ya importadas se omiten automáticamente, así que repetir el mismo rango es seguro.',
+  'From date': 'Fecha desde',
+  'To date': 'Fecha hasta',
+  'Start import': 'Iniciar importación',
+  'Maximum range: {days} days': 'Rango máximo: {days} días',
+  'Source: {database} ({sales} / {lines})': 'Origen: {database} ({sales} / {lines})',
+  'Each point of sale must have its legacy POS number set before importing. Unmapped products are kept as N/A product lines.':
+    'Cada punto de venta debe tener configurado su número anterior antes de importar. Los productos no reconocidos se conservan como líneas de producto N/A.',
+  'Before you import': 'Antes de importar',
+  'Map each shop to its legacy POS number in Points of sale.':
+    'Asociá cada local con su número anterior en Puntos de venta.',
+  'Imported sales are reporting records and do not change inventory.':
+    'Las ventas importadas son registros informativos y no modifican el inventario.',
+  'Only one import can run at a time. The progress page updates automatically.':
+    'Solo puede ejecutarse una importación a la vez. La página de progreso se actualiza automáticamente.',
+  'Recent imports': 'Importaciones recientes',
+  'Run': 'Ejecución',
+  'Skipped': 'Omitidas',
+  'Started': 'Iniciada',
+  'No imports yet': 'Todavía no hay importaciones',
+  'Start the first historical import above.': 'Iniciá la primera importación histórica arriba.',
+  'Starting import…': 'Iniciando importación…',
+  'POS import started for {count} sales.': 'Importación POS iniciada para {count} ventas.',
+  'Could not start the POS import.': 'No se pudo iniciar la importación POS.',
+  'POS import run not found.': 'No se encontró la ejecución de importación POS.',
+  'POS import #{id}': 'Importación POS #{id}',
+  'Started by {name}': 'Iniciada por {name}',
+  'View imported sales': 'Ver ventas importadas',
+  'All imports': 'Todas las importaciones',
+  'Progress': 'Progreso',
+  'sales processed': 'ventas procesadas',
+  'This page updates automatically. You can leave it open or come back later.':
+    'Esta página se actualiza automáticamente. Podés dejarla abierta o volver más tarde.',
+  'Imported sales': 'Ventas importadas',
+  'Already imported or duplicate ticket': 'Ya importada o comprobante duplicado',
+  'Imported lines': 'Líneas importadas',
+  'N/A product lines': 'Líneas de producto N/A',
+  'Sales kept with their amounts; products can be matched later.':
+    'Las ventas se conservan con sus importes; los productos se pueden asociar después.',
+  'Placeholder shops created': 'Locales provisionales creados',
+  'Map them to real shops in Points of sale.': 'Asocialos a locales reales en Puntos de venta.',
+  'Errors': 'Errores',
+  'First {count} messages': 'Primeros {count} mensajes',
+  'Legacy sale': 'Venta anterior',
+  'Legacy customer': 'Cliente anterior',
+  'N/A product': 'Producto N/A',
+  'Fiscal document code': 'Código de comprobante fiscal',
+  'No errors recorded.': 'No se registraron errores.',
+  'Imported sales are reporting records. They do not post stock movements or change inventory.':
+    'Las ventas importadas son registros informativos. No generan movimientos de stock ni modifican el inventario.',
+  'e.g. 1': 'p. ej. 1',
   // --------------------------------------------------------------- payments
   'Payments': 'Pagos',
   'payment': 'pago',

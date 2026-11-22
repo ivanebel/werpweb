@@ -1,0 +1,194 @@
+<%- include('/layouts/head') %>
+<%- include('/layouts/sidebar') %>
+<div class="flex min-h-screen flex-col lg:pl-[290px]">
+  <%- include('/layouts/header') %>
+  <main class="flex-1 p-4 md:p-6">
+    <div class="mx-auto max-w-[1200px]">
+      <%
+        const statusTone = {
+          pending: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+          running: 'bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-300',
+          completed: 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400',
+          completed_with_errors: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400',
+          failed: 'bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400',
+          interrupted: 'bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400',
+        };
+        const active = run.status === 'pending' || run.status === 'running';
+        const total = Number(run.total_sales) || 0;
+        const processed = Number(run.processed_sales) || 0;
+        const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : (active ? 2 : 100);
+        const fromDay = String(run.from_at || '').slice(0, 10);
+        const toDay = String(run.to_at || '').slice(0, 10);
+      %>
+
+      <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="page-title"><%= t('POS import #{id}', { id: run.id }) %></h1>
+            <span id="run-status-badge" class="rounded-full px-2.5 py-1 text-xs font-medium <%= statusTone[run.status] || statusTone.pending %>"><%= t(h.humanize(run.status)) %></span>
+          </div>
+          <p class="page-subtitle"><%= h.formatDate(run.from_at) %> – <%= h.formatDate(run.to_at) %><%= run.created_by_name ? ` · ${t('Started by {name}', { name: run.created_by_name })}` : '' %></p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/pos/sales?from=<%= fromDay %>&to=<%= toDay %>" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'receipt', className: 'h-4 w-4' }) %>
+            <%= t('View imported sales') %>
+          </a>
+          <a href="/pos/import" class="btn btn-secondary btn-sm">
+            <%- include('/partials/icon', { name: 'arrow-left', className: 'h-4 w-4' }) %>
+            <%= t('All imports') %>
+          </a>
+        </div>
+      </div>
+
+      <div class="card p-5 md:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="card-title"><%= t('Progress') %></h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            <span id="run-processed"><%= h.formatNumber(processed, 0) %></span>
+            / <span id="run-total"><%= h.formatNumber(total, 0) %></span>
+            <%= t('sales processed') %>
+          </p>
+        </div>
+        <div class="mt-4 h-3 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+          <div id="run-progress" class="h-full rounded-full bg-brand-500 transition-all duration-500" style="width: <%= pct %>%"></div>
+        </div>
+        <p id="run-progress-label" class="mt-2 text-xs text-gray-400"><%= pct %>%</p>
+
+        <% if (active) { %>
+          <p id="run-live-note" class="mt-3 text-xs text-gray-400"><%= t('This page updates automatically. You can leave it open or come back later.') %></p>
+        <% } %>
+        <% if (run.error_text) { %>
+          <p class="mt-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400"><%= run.error_text %></p>
+        <% } %>
+      </div>
+
+      <div class="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div class="card p-5">
+          <p class="stat-label"><%= t('Imported sales') %></p>
+          <p id="run-imported" class="mt-1 stat-value text-success-600 dark:text-success-400"><%= h.formatNumber(run.imported_sales, 0) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="stat-label"><%= t('Skipped') %></p>
+          <p id="run-skipped" class="mt-1 stat-value"><%= h.formatNumber(run.skipped_sales, 0) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Already imported or duplicate ticket') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="stat-label"><%= t('Failed') %></p>
+          <p id="run-failed" class="mt-1 stat-value <%= Number(run.failed_sales) > 0 ? 'text-error-600 dark:text-error-400' : '' %>"><%= h.formatNumber(run.failed_sales, 0) %></p>
+        </div>
+        <div class="card p-5">
+          <p class="stat-label"><%= t('Imported lines') %></p>
+          <p id="run-lines" class="mt-1 stat-value"><%= h.formatNumber(run.imported_lines, 0) %></p>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="card p-5">
+          <p class="stat-label"><%= t('N/A product lines') %></p>
+          <p id="run-unmapped" class="mt-1 text-2xl font-semibold text-warning-600 dark:text-warning-400"><%= h.formatNumber(run.unmapped_products, 0) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Sales kept with their amounts; products can be matched later.') %></p>
+        </div>
+        <div class="card p-5">
+          <p class="stat-label"><%= t('Placeholder shops created') %></p>
+          <p id="run-placeholders" class="mt-1 text-2xl font-semibold text-gray-800 dark:text-gray-200"><%= h.formatNumber(run.placeholder_pos, 0) %></p>
+          <p class="mt-1 text-xs text-gray-400"><%= t('Map them to real shops in Points of sale.') %></p>
+        </div>
+      </div>
+
+      <div class="mt-5 card overflow-hidden">
+        <div class="card-header">
+          <h2 class="card-title"><%= t('Errors') %></h2>
+          <span class="text-xs text-gray-400"><%= t('First {count} messages', { count: 50 }) %></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table-base min-w-[680px]">
+            <thead>
+              <tr>
+                <th class="table-th"><%= t('Legacy sale') %></th>
+                <th class="table-th"><%= t('Scope') %></th>
+                <th class="table-th"><%= t('Message') %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% errors.forEach(row => { %>
+                <tr class="table-row">
+                  <td class="table-td font-mono text-xs"><%= row.legacy_sale_id || '—' %><%= row.legacy_line_id ? ` / ${row.legacy_line_id}` : '' %></td>
+                  <td class="table-td capitalize text-gray-500 dark:text-gray-400"><%= t(h.humanize(row.scope)) %></td>
+                  <td class="table-td text-sm text-error-600 dark:text-error-400"><%= row.message %></td>
+                </tr>
+              <% }) %>
+              <% if (!errors.length) { %>
+                <tr><td colspan="3" class="px-5 py-10 text-center text-sm text-gray-400"><%= t('No errors recorded.') %></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-5 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
+        <div class="flex items-start gap-3">
+          <span class="mt-0.5"><%- include('/partials/icon', { name: 'info', className: 'h-5 w-5' }) %></span>
+          <p><%= t('Imported sales are reporting records. They do not post stock movements or change inventory.') %></p>
+        </div>
+      </div>
+    </div>
+  </main>
+  <%- include('/layouts/footer') %>
+</div>
+
+<% if (active) { %>
+<script>
+  (() => {
+    const runId = <%= Number(run.id) %>;
+    const url = '/pos/import/' + runId + '/status';
+    let timer = null;
+    let stopped = false;
+    let inFlight = false;
+
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+
+    const formatInt = (value) => new Intl.NumberFormat(document.documentElement.lang || undefined).format(Number(value) || 0);
+
+    async function poll() {
+      if (stopped || inFlight) return;
+      inFlight = true;
+      try {
+        const response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (!response.ok) throw new Error('status ' + response.status);
+        const data = await response.json();
+        const total = Number(data.total_sales) || 0;
+        const processed = Number(data.processed_sales) || 0;
+        const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 2;
+        setText('run-processed', formatInt(processed));
+        setText('run-total', formatInt(total));
+        setText('run-imported', formatInt(data.imported_sales));
+        setText('run-skipped', formatInt(data.skipped_sales));
+        setText('run-failed', formatInt(data.failed_sales));
+        setText('run-lines', formatInt(data.imported_lines));
+        setText('run-unmapped', formatInt(data.unmapped_products));
+        setText('run-placeholders', formatInt(data.placeholder_pos));
+        setText('run-progress-label', pct + '%');
+        const bar = document.getElementById('run-progress');
+        if (bar) bar.style.width = pct + '%';
+
+        if (data.status !== 'pending' && data.status !== 'running') {
+          stopped = true;
+          if (timer) clearInterval(timer);
+          window.location.reload();
+        }
+      } catch (error) {
+        // Keep polling; the server may be briefly busy.
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    timer = setInterval(poll, 1500);
+    poll();
+  })();
+</script>
+<% } %>
