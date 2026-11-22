@@ -27,6 +27,8 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
     const [
       revenueMonth,
       revenuePrev,
+      posMonth,
+      posPrev,
       purchasesMonth,
       purchasesPrev,
       openOrders,
@@ -36,8 +38,10 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
       stockValue,
       customerCount,
       monthlySales,
+      monthlyPosSales,
       monthlyPurchases,
-      categorySales,
+      invoice90,
+      pos90,
       topProducts,
       productionByStatus,
       recentOrders,
@@ -52,6 +56,16 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
       one(
         `SELECT COALESCE(SUM(total),0) v FROM sales_invoices
           WHERE status IN ('sent','paid','overdue') AND invoice_date >= ? AND invoice_date < ?`,
+        [prevMonth, thisMonth],
+      ),
+      one(
+        `SELECT COALESCE(SUM(total),0) v, COUNT(*) c FROM pos_sales
+          WHERE sale_date >= ? AND sale_date < ?`,
+        [thisMonth, nextMonth],
+      ),
+      one(
+        `SELECT COALESCE(SUM(total),0) v FROM pos_sales
+          WHERE sale_date >= ? AND sale_date < ?`,
         [prevMonth, thisMonth],
       ),
       one(
@@ -88,20 +102,27 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
         [chartStart],
       ),
       query(
+        `SELECT DATE_FORMAT(sale_date, '%Y-%m') ym, COALESCE(SUM(total),0) v
+           FROM pos_sales
+          WHERE sale_date >= ?
+          GROUP BY ym ORDER BY ym`,
+        [chartStart],
+      ),
+      query(
         `SELECT DATE_FORMAT(invoice_date, '%Y-%m') ym, COALESCE(SUM(total),0) v
            FROM purchase_invoices
           WHERE status IN ('received','paid','overdue') AND invoice_date >= ?
           GROUP BY ym ORDER BY ym`,
         [chartStart],
       ),
-      query(
-        `SELECT COALESCE(pc.name, 'Uncategorised') AS label, COALESCE(SUM(ii.line_total),0) AS value
-           FROM sales_invoice_items ii
-           JOIN sales_invoices si ON si.id = ii.invoice_id
-           JOIN products p ON p.id = ii.product_id
-           LEFT JOIN product_categories pc ON pc.id = p.category_id
-          WHERE si.status IN ('sent','paid','overdue') AND si.invoice_date >= ?
-          GROUP BY label ORDER BY value DESC LIMIT 6`,
+      one(
+        `SELECT COALESCE(SUM(total),0) v FROM sales_invoices
+          WHERE status IN ('sent','paid','overdue') AND invoice_date >= ?`,
+        [ninetyDaysAgo],
+      ),
+      one(
+        `SELECT COALESCE(SUM(total),0) v FROM pos_sales
+          WHERE sale_date >= ?`,
         [ninetyDaysAgo],
       ),
       query(
@@ -142,19 +163,27 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
       const d = monthStart(i);
       monthKeys.push(d.toISOString().slice(0, 7));
     }
-    const salesMap = Object.fromEntries(monthlySales.map((r) => [r.ym, Number(r.v)]));
+    const salesMap = {};
+    for (const row of monthlySales) {
+      salesMap[row.ym] = (salesMap[row.ym] || 0) + Number(row.v);
+    }
+    for (const row of monthlyPosSales) {
+      salesMap[row.ym] = (salesMap[row.ym] || 0) + Number(row.v);
+    }
     const purchasesMap = Object.fromEntries(monthlyPurchases.map((r) => [r.ym, Number(r.v)]));
     const monthLabels = monthKeys.map((k) =>
       new Intl.DateTimeFormat(req.locale, { month: 'short', timeZone: 'UTC' }).format(new Date(`${k}-01T00:00:00Z`)),
     );
 
-    const totalRevenue = monthlySales.reduce((s, r) => s + Number(r.v), 0);
+    const totalRevenue = Object.values(salesMap).reduce((sum, value) => sum + value, 0);
     const totalPurchases = monthlyPurchases.reduce((s, r) => s + Number(r.v), 0);
+    const currentRevenue = Number(revenueMonth.v) + Number(posMonth.v);
+    const previousRevenue = Number(revenuePrev.v) + Number(posPrev.v);
 
     const stats = {
-      revenue: Number(revenueMonth.v),
-      revenueDelta: percentChange(Number(revenueMonth.v), Number(revenuePrev.v)),
-      revenueCount: Number(revenueMonth.c),
+      revenue: currentRevenue,
+      revenueDelta: percentChange(currentRevenue, previousRevenue),
+      revenueCount: Number(revenueMonth.c) + Number(posMonth.c),
       purchases: Number(purchasesMonth.v),
       purchasesDelta: percentChange(Number(purchasesMonth.v), Number(purchasesPrev.v)),
       openOrders: Number(openOrders.c),
@@ -171,9 +200,9 @@ router.get(['/', '/dashboard'], async (req, res, next) => {
       months: monthLabels,
       revenue: monthKeys.map((k) => salesMap[k] || 0),
       purchases: monthKeys.map((k) => purchasesMap[k] || 0),
-      categories: {
-        labels: categorySales.map((r) => (r.label === 'Uncategorised' ? req.t('Uncategorised') : r.label)),
-        values: categorySales.map((r) => Number(r.value)),
+      revenueMix: {
+        labels: [req.t('Manufacturing sales (invoices)'), req.t('POS sales')],
+        values: [Number(invoice90.v), Number(pos90.v)],
       },
       production: {
         labels: productionByStatus.map((r) => statusInfo(r.status, req.locale).label),

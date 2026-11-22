@@ -36,7 +36,7 @@
           </div>
           <p class="mt-5 stat-label">Revenue this month</p>
           <p class="mt-1 stat-value"><%= money(stats.revenue) %></p>
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><%= t('{count} invoices · vs last month', { count: stats.revenueCount }) %></p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400"><%= t('Sales this month: {count} · vs last month', { count: stats.revenueCount }) %></p>
         </div>
 
         <div class="card p-5 md:p-6">
@@ -82,7 +82,7 @@
           <div class="card-header">
             <div>
               <h2 class="card-title">Revenue vs purchases</h2>
-              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Invoiced sales and supplier bills, last 6 months</p>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Invoiced sales, POS sales and supplier bills, last 6 months</p>
             </div>
             <span class="rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 dark:bg-white/[0.04] dark:text-gray-400">6 months</span>
           </div>
@@ -91,7 +91,7 @@
           </div>
           <div class="grid grid-cols-3 border-t border-gray-100 dark:border-gray-800">
             <div class="px-5 py-4">
-              <p class="text-xs text-gray-500 dark:text-gray-400">Sales (6 mo.)</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Total sales (6 mo.)</p>
               <p class="mt-1 text-lg font-semibold text-gray-800 dark:text-white"><%= money(charts.revenue.reduce((a, b) => a + b, 0)) %></p>
             </div>
             <div class="border-l border-gray-100 px-5 py-4 dark:border-gray-800">
@@ -108,23 +108,24 @@
         <div class="card xl:col-span-4">
           <div class="card-header">
             <div>
-              <h2 class="card-title">Sales by category</h2>
-              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Last 90 days</p>
+              <h2 class="card-title">Manufacturing vs POS sales</h2>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">Invoiced sales vs shop sales, last 90 days</p>
             </div>
           </div>
           <div class="flex flex-col items-center px-4 py-4">
-            <div id="category-chart" class="w-full"></div>
+            <div id="revenue-mix-chart" class="w-full"></div>
             <ul class="mt-2 w-full space-y-2">
-              <% charts.categories.labels.forEach((label, i) => { %>
-                <li class="flex items-center justify-between text-sm">
-                  <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-                    <span class="h-2.5 w-2.5 rounded-full" data-chart-dot="<%= i %>"></span><%= label %>
-                  </span>
-                  <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(charts.categories.values[i]) %></span>
-                </li>
-              <% }) %>
-              <% if (!charts.categories.labels.length) { %>
-                <li class="py-6 text-center text-sm text-gray-400">No invoiced sales yet.</li>
+              <% if (charts.revenueMix.values.some(value => value > 0)) { %>
+                <% charts.revenueMix.labels.forEach((label, i) => { %>
+                  <li class="flex items-center justify-between text-sm">
+                    <span class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+                      <span class="h-2.5 w-2.5 rounded-full" data-chart-dot="<%= i %>"></span><%= label %>
+                    </span>
+                    <span class="font-medium text-gray-800 dark:text-gray-200"><%= money(charts.revenueMix.values[i]) %></span>
+                  </li>
+                <% }) %>
+              <% } else { %>
+                <li class="py-6 text-center text-sm text-gray-400"><%= t('No sales in this period') %></li>
               <% } %>
             </ul>
           </div>
@@ -327,14 +328,14 @@
       tooltipTheme: colors.tooltip,
     };
   }
-  function paintCategoryDots() {
+  function paintMixDots() {
     const colors = palette();
-    categoryDots.forEach((dot, i) => { dot.style.backgroundColor = colors[i % colors.length]; });
+    mixDots.forEach((dot, i) => { dot.style.backgroundColor = colors[i % colors.length]; });
   }
 
-  const categoryDots = document.querySelectorAll('[data-chart-dot]');
-  paintCategoryDots();
-  document.addEventListener('werp:theme', paintCategoryDots);
+  const mixDots = document.querySelectorAll('[data-chart-dot]');
+  paintMixDots();
+  document.addEventListener('werp:theme', paintMixDots);
 
   const revenueEl = document.querySelector('#revenue-chart');
   if (revenueEl) {
@@ -363,14 +364,14 @@
     });
   }
 
-  const categoryEl = document.querySelector('#category-chart');
-  if (categoryEl) {
-    const hasData = charts.categories.values.some(v => v > 0);
-    const category = new ApexCharts(categoryEl, {
+  const revenueMixEl = document.querySelector('#revenue-mix-chart');
+  if (revenueMixEl) {
+    const hasData = charts.revenueMix.values.some(v => v > 0);
+    const revenueMix = new ApexCharts(revenueMixEl, {
       chart: { type: 'donut', height: 240, fontFamily: 'Outfit, sans-serif', foreColor: themeAxis().foreColor },
-      series: hasData ? charts.categories.values : [1],
-      labels: hasData ? charts.categories.labels : [messages.noData || 'No data'],
-      colors: hasData ? palette() : [chartColors().grid],
+      series: hasData ? charts.revenueMix.values : [1],
+      labels: hasData ? charts.revenueMix.labels : [messages.noData || 'No data'],
+      colors: hasData ? palette().slice(0, 2) : [chartColors().grid],
       stroke: { width: 0 },
       legend: { show: false },
       dataLabels: { enabled: false },
@@ -378,14 +379,14 @@
         show: true,
         name: { show: false },
         value: { show: true, fontSize: '20px', fontWeight: 600, color: chartColors().ink, formatter: (v) => money(v) },
-        total: { show: true, showAlways: true, label: messages.sales90 || '90-day sales', fontSize: '12px', color: chartColors().fore, formatter: () => money(charts.categories.values.reduce((a, b) => a + b, 0)) }
+        total: { show: true, showAlways: true, label: messages.sales90 || '90-day sales', fontSize: '12px', color: chartColors().fore, formatter: () => money(charts.revenueMix.values.reduce((a, b) => a + b, 0)) }
       } } } },
       tooltip: { theme: themeAxis().tooltipTheme, y: { formatter: money } }
     });
-    category.render();
+    revenueMix.render();
     document.addEventListener('werp:theme', () => {
       const nt = themeAxis();
-      category.updateOptions({ chart: { foreColor: nt.foreColor }, colors: hasData ? palette() : [chartColors().grid], tooltip: { theme: nt.tooltipTheme } });
+      revenueMix.updateOptions({ chart: { foreColor: nt.foreColor }, colors: hasData ? palette().slice(0, 2) : [chartColors().grid], tooltip: { theme: nt.tooltipTheme } });
     });
   }
 
