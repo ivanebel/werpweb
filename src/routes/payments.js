@@ -111,11 +111,21 @@ function textValue(value, maxLength) {
 }
 
 function normalizeDate(value) {
-  const raw = String(value || '').slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
-  const date = new Date(`${raw}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10) === raw ? raw : null;
+  const raw = String(value || '').trim();
+  let match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  let year;
+  let month;
+  let day;
+  if (match) {
+    [, year, month, day] = match;
+  } else {
+    match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+    if (!match) return null;
+    [, day, month, year] = match;
+  }
+  const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
 }
 
 function blankMethod() {

@@ -36,11 +36,11 @@
         <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-12">
           <div class="xl:col-span-2">
             <label for="from" class="form-label"><%= t('From') %></label>
-            <input id="from" type="date" name="from" value="<%= range.from %>" class="form-input">
+            <input id="from" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" name="from" value="<%= h.dateInput(range.from) %>" class="form-input">
           </div>
           <div class="xl:col-span-2">
             <label for="to" class="form-label"><%= t('To') %></label>
-            <input id="to" type="date" name="to" value="<%= range.to %>" class="form-input">
+            <input id="to" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" name="to" value="<%= h.dateInput(range.to) %>" class="form-input">
           </div>
           <div class="xl:col-span-3">
             <label for="pos" class="form-label"><%= t('Point of sale') %></label>

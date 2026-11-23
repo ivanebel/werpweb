@@ -109,26 +109,58 @@ function arr(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-// Scale filters accept both date-only values and datetime-local values. A
+function parseDateInput(value) {
+  const raw = String(value || '').trim();
+  let match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  let year;
+  let month;
+  let day;
+  if (match) {
+    [, year, month, day] = match;
+  } else {
+    match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+    if (!match) return null;
+    [, day, month, year] = match;
+  }
+  const iso = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  const date = new Date(`${iso}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
+}
+
+// Scale filters accept ISO dates, dd/mm/yyyy dates and datetime values. A
 // date-only "to" value includes the whole day, which is what users expect.
 function filterDateTime(value, endOfDay = false) {
-  let raw = String(value || '').trim().replace(' ', 'T');
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    raw += endOfDay ? 'T23:59:59' : 'T00:00:00';
-  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)) {
-    raw += endOfDay ? ':59' : ':00';
+  const raw = String(value || '').trim();
+  let match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  let year;
+  let month;
+  let day;
+  if (match) {
+    [, year, month, day] = match;
+  } else {
+    match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:[T ](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (!match) return null;
+    [, day, month, year] = match;
   }
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(raw)) return null;
-  if (Number.isNaN(new Date(`${raw}Z`).getTime())) return null;
-  return raw.replace('T', ' ');
+  const date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
+
+  const hasTime = match[4] !== undefined;
+  const hours = hasTime ? Number(match[4]) : (endOfDay ? 23 : 0);
+  const minutes = hasTime ? Number(match[5]) : (endOfDay ? 59 : 0);
+  const seconds = hasTime ? Number(match[6] || (endOfDay ? 59 : 0)) : (endOfDay ? 59 : 0);
+  if (hours > 23 || minutes > 59 || seconds > 59) return null;
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${date} ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
 function dateTimeInputValue(value, endOfDay = false) {
-  const raw = String(value || '').trim();
-  const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2}))?/);
-  if (!match) return '';
-  return `${match[1]}T${match[2] || (endOfDay ? '23' : '00')}:${match[3] || (endOfDay ? '59' : '00')}`;
+  const normalized = filterDateTime(value, endOfDay);
+  if (!normalized) return '';
+  const [date, time] = normalized.split(' ');
+  const [year, month, day] = date.split('-');
+  return `${day}/${month}/${year} ${time.slice(0, 5)}`;
 }
 
 function scaleRecordFilters(queryParams) {
@@ -1104,7 +1136,8 @@ function collectProductionLines(body, boms, t = (value) => value) {
     if (!raw.lot_number) {
       errors.push(t('Line {line}: lot number is required.', { line: lineNumber }));
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw.expiry_date)) {
+    const expiryDate = parseDateInput(raw.expiry_date);
+    if (!expiryDate) {
       errors.push(t('Line {line}: valid expiry date required.', { line: lineNumber }));
     }
     lines.push({
@@ -1112,7 +1145,7 @@ function collectProductionLines(body, boms, t = (value) => value) {
       product_id: bom.product_id,
       quantity,
       lot_number: raw.lot_number.slice(0, 60),
-      expiry_date: raw.expiry_date.slice(0, 10),
+      expiry_date: expiryDate,
       notes: raw.notes.slice(0, 5000) || null,
       sort_order: lines.length,
     });
@@ -1334,12 +1367,12 @@ router.post('/production-orders', async (req, res, next) => {
     const selectedSalesOrderIds = parseSalesOrderIds(req.body, options.salesOrders);
     const { rows, lines, errors: lineErrors } = collectProductionLines(req.body, options.boms, req.t);
     const errors = {};
-    const startDate = String(req.body.start_date || '').slice(0, 10);
-    const dueDate = String(req.body.due_date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    const startDate = parseDateInput(req.body.start_date);
+    const dueDate = req.body.due_date ? parseDateInput(req.body.due_date) : null;
+    if (!startDate) {
       errors.start_date = req.t('Valid start date required.');
     }
-    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    if (req.body.due_date && !dueDate) {
       errors.due_date = req.t('Valid due date required.');
     }
     if (!errors.start_date && !errors.due_date && dueDate && dueDate < startDate) {
@@ -1784,12 +1817,12 @@ router.post('/production-orders/:id(\\d+)', async (req, res, next) => {
     const selectedSalesOrderIds = parseSalesOrderIds(req.body, options.salesOrders);
     const { rows, lines, errors: lineErrors } = collectProductionLines(req.body, options.boms, req.t);
     const errors = {};
-    const startDate = String(req.body.start_date || '').slice(0, 10);
-    const dueDate = String(req.body.due_date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    const startDate = parseDateInput(req.body.start_date);
+    const dueDate = req.body.due_date ? parseDateInput(req.body.due_date) : null;
+    if (!startDate) {
       errors.start_date = req.t('Valid start date required.');
     }
-    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    if (req.body.due_date && !dueDate) {
       errors.due_date = req.t('Valid due date required.');
     }
     if (!errors.start_date && !errors.due_date && dueDate && dueDate < startDate) {
@@ -1928,24 +1961,27 @@ router.post('/production-orders/:id(\\d+)/batches', async (req, res, next) => {
     const submitted = lines.map((line) => {
       const index = ids.indexOf(String(line.id));
       if (index < 0) return line;
+      const expiryRaw = String(expiries[index] || '').trim();
+      const expiryDate = parseDateInput(expiryRaw);
       return {
         ...line,
         lot_number: String(lots[index] || '').trim(),
-        expiry_date: String(expiries[index] || '').slice(0, 10),
+        expiry_date: expiryDate || expiryRaw,
         notes: String(notes[index] || '').trim(),
       };
     });
 
     submitted.forEach((line, index) => {
       if (!line.lot_number) errors.push(req.t('Line {line}: lot number is required.', { line: index + 1 }));
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(line.expiry_date)) {
+      const expiryDate = parseDateInput(line.expiry_date);
+      if (!expiryDate) {
         errors.push(req.t('Line {line}: valid expiry date required.', { line: index + 1 }));
       }
-      if (byId.has(String(line.id)) && line.lot_number && /^\d{4}-\d{2}-\d{2}$/.test(line.expiry_date)) {
+      if (byId.has(String(line.id)) && line.lot_number && expiryDate) {
         updates.push({
           id: line.id,
           lot_number: line.lot_number.slice(0, 60),
-          expiry_date: line.expiry_date,
+          expiry_date: expiryDate,
           notes: line.notes.slice(0, 5000) || null,
         });
       }
@@ -2133,10 +2169,7 @@ router.post('/production-lines', manageMaterials, async (req, res, next) => {
 
 // ------------------------------------------------------------ production floor
 function floorDate(value) {
-  const raw = String(value || '').slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
-  const date = new Date(`${raw}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === raw ? raw : null;
+  return parseDateInput(value);
 }
 
 async function findActiveRunForLine(lineId) {

@@ -43,11 +43,11 @@
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <div>
               <label for="from" class="form-label"><%= t('From date') %></label>
-              <input id="from" name="from" type="date" value="<%= defaultFrom %>" max="<%= defaultTo %>" class="form-input" required>
+              <input id="from" name="from" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" value="<%= h.dateInput(defaultFrom) %>" class="form-input" required>
             </div>
             <div>
               <label for="to" class="form-label"><%= t('To date') %></label>
-              <input id="to" name="to" type="date" value="<%= defaultTo %>" class="form-input" required>
+              <input id="to" name="to" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" value="<%= h.dateInput(defaultTo) %>" class="form-input" required>
             </div>
             <div class="sm:col-span-2 flex flex-wrap items-center gap-3">
               <button id="pos-import-submit" type="submit" class="btn btn-primary">

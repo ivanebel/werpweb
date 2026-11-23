@@ -166,11 +166,11 @@
             </div>
             <div class="w-full sm:w-auto">
               <label for="from" class="form-label"><%= t('Weighed from') %></label>
-              <input id="from" type="datetime-local" name="from" value="<%= fromValue %>" class="form-input sm:w-52">
+              <input id="from" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4} [0-9]{2}:[0-9]{2}" placeholder="dd/mm/yyyy HH:mm" maxlength="16" name="from" value="<%= fromValue %>" class="form-input sm:w-52">
             </div>
             <div class="w-full sm:w-auto">
               <label for="to" class="form-label"><%= t('Weighed to') %></label>
-              <input id="to" type="datetime-local" name="to" value="<%= toValue %>" class="form-input sm:w-52">
+              <input id="to" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4} [0-9]{2}:[0-9]{2}" placeholder="dd/mm/yyyy HH:mm" maxlength="16" name="to" value="<%= toValue %>" class="form-input sm:w-52">
             </div>
             <div class="w-full sm:w-auto">
               <label for="range" class="form-label"><%= t('Weighing range') %></label>
@@ -318,7 +318,7 @@
       const from = form.querySelector('#from');
       const to = form.querySelector('#to');
       const pad = (value) => String(value).padStart(2, '0');
-      const inputValue = (date) => `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+      const inputValue = (date) => `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
       const startOfDay = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0));
       const endOfDay = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 0));
       form.querySelectorAll('[data-quick-range]').forEach((button) => {

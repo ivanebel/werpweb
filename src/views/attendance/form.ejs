@@ -55,13 +55,13 @@
 
               <div>
                 <label for="clock_in" class="form-label"><%= t('Clock in') %> <span class="text-error-500">*</span></label>
-                <input id="clock_in" name="clock_in" type="datetime-local" value="<%= row.clock_in || '' %>" class="form-input <%= errors.clock_in ? 'form-input-error' : '' %>" required>
+                <input id="clock_in" name="clock_in" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4} [0-9]{2}:[0-9]{2}" placeholder="dd/mm/yyyy HH:mm" maxlength="16" value="<%= row.clock_in || '' %>" class="form-input <%= errors.clock_in ? 'form-input-error' : '' %>" required>
                 <% if (errors.clock_in) { %><p class="form-error"><%= errors.clock_in %></p><% } %>
               </div>
 
               <div>
                 <label for="clock_out" class="form-label"><%= t('Clock out') %></label>
-                <input id="clock_out" name="clock_out" type="datetime-local" value="<%= row.clock_out || '' %>" class="form-input <%= errors.clock_out ? 'form-input-error' : '' %>">
+                <input id="clock_out" name="clock_out" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4} [0-9]{2}:[0-9]{2}" placeholder="dd/mm/yyyy HH:mm" maxlength="16" value="<%= row.clock_out || '' %>" class="form-input <%= errors.clock_out ? 'form-input-error' : '' %>">
                 <% if (errors.clock_out) { %><p class="form-error"><%= errors.clock_out %></p><% } %>
                 <p class="form-help"><%= t('Leave blank if the employee has not clocked out yet.') %></p>
               </div>

@@ -50,16 +50,25 @@ function validDate(value) {
 }
 
 function normalizeDateTime(value) {
-  const raw = String(value || '').replace('T', ' ').trim();
-  const match = raw.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/);
-  if (!match) return null;
-  const date = match[1];
-  const hours = Number(match[2]);
-  const minutes = Number(match[3]);
-  const seconds = Number(match[4] || 0);
+  const raw = String(value || '').trim();
+  let match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  let year;
+  let month;
+  let day;
+  if (match) {
+    [, year, month, day] = match;
+  } else {
+    match = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) return null;
+    [, day, month, year] = match;
+  }
+  const date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  const hours = Number(match[4]);
+  const minutes = Number(match[5]);
+  const seconds = Number(match[6] || 0);
   if (hours > 23 || minutes > 59 || seconds > 59) return null;
   const parsed = new Date(`${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}Z`);
-  if (Number.isNaN(parsed.getTime())) return null;
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
   return {
     date,
     db: `${date} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
@@ -69,8 +78,10 @@ function normalizeDateTime(value) {
 }
 
 function datetimeLocalValue(value) {
-  const raw = String(value || '').replace('T', ' ').slice(0, 19);
-  return raw.length >= 16 ? `${raw.slice(0, 10)}T${raw.slice(11, 16)}` : '';
+  const match = String(value || '')
+    .replace('T', ' ')
+    .match(/^(\d{4})-(\d{2})-(\d{2})[ ](\d{2}):(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1]} ${match[4]}:${match[5]}` : '';
 }
 
 function toDbDateTime(value) {
@@ -435,7 +446,12 @@ router.get('/new', async (req, res, next) => {
       title: req.t('Record time'),
       mode: 'create',
       action: basePath,
-      row: { employee_id: employeeId || '', clock_in: clockIn, clock_out: clockOut, notes: '' },
+      row: {
+        employee_id: employeeId || '',
+        clock_in: datetimeLocalValue(clockIn),
+        clock_out: datetimeLocalValue(clockOut),
+        notes: '',
+      },
     });
   } catch (err) {
     next(err);

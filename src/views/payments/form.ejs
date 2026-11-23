@@ -66,7 +66,7 @@
                 </div>
                 <div>
                   <label for="payment_date" class="form-label"><%= t('Payment date') %></label>
-                  <input id="payment_date" type="date" name="payment_date" value="<%= form.payment_date %>" class="form-input" required>
+                  <input id="payment_date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" name="payment_date" value="<%= h.dateInput(form.payment_date) %>" class="form-input" required>
                   <% if (errors.payment_date) { %><p class="form-error"><%= errors.payment_date %></p><% } %>
                 </div>
                 <div class="sm:col-span-2">
@@ -191,7 +191,7 @@
                       </div>
                       <div class="sm:col-span-2">
                         <label class="form-label"><%= t('Check date') %></label>
-                        <input type="date" name="method_date[]" value="<%= method.check_date || '' %>" class="form-input">
+                        <input type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" name="method_date[]" value="<%= h.dateInput(method.check_date) %>" class="form-input">
                       </div>
                     </div>
                     <% if (typeKey === 'supplier') { %>
@@ -358,7 +358,7 @@
         </div>
         <div class="sm:col-span-2">
           <label class="form-label"><%= t('Check date') %></label>
-          <input type="date" name="method_date[]" class="form-input">
+          <input type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" name="method_date[]" class="form-input">
         </div>
       </div>
       <% if (typeKey === 'supplier') { %>

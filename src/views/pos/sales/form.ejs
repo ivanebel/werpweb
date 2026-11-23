@@ -75,7 +75,7 @@
             </div>
             <div>
               <label for="sale_date" class="form-label"><%= t('Sale date') %> <span class="text-error-500">*</span></label>
-              <input id="sale_date" type="date" name="sale_date" value="<%= String(row.sale_date || '').slice(0, 10) %>" class="form-input" required>
+              <input id="sale_date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" name="sale_date" value="<%= h.dateInput(row.sale_date) %>" class="form-input" required>
               <% if (errors.sale_date) { %><p class="form-error"><%= errors.sale_date %></p><% } %>
             </div>
             <div>

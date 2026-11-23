@@ -58,12 +58,12 @@
                 </div>
                 <div>
                   <label for="start_date" class="form-label"><%= t('Start date') %> <span class="text-error-500">*</span></label>
-                  <input id="start_date" name="start_date" type="date" value="<%= String(row.start_date || '').slice(0, 10) %>" class="form-input <%= errors.start_date ? 'form-input-error' : '' %>" required>
+                  <input id="start_date" name="start_date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" value="<%= h.dateInput(row.start_date) %>" class="form-input <%= errors.start_date ? 'form-input-error' : '' %>" required>
                   <% if (errors.start_date) { %><p class="form-error"><%= errors.start_date %></p><% } %>
                 </div>
                 <div>
                   <label for="due_date" class="form-label"><%= t('Due date') %></label>
-                  <input id="due_date" name="due_date" type="date" value="<%= String(row.due_date || '').slice(0, 10) %>" class="form-input <%= errors.due_date ? 'form-input-error' : '' %>">
+                  <input id="due_date" name="due_date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" value="<%= h.dateInput(row.due_date) %>" class="form-input <%= errors.due_date ? 'form-input-error' : '' %>">
                   <% if (errors.due_date) { %><p class="form-error"><%= errors.due_date %></p><% } %>
                 </div>
                 <div class="md:col-span-2">
@@ -152,7 +152,7 @@
                       <input name="line_lot_number" type="text" maxlength="60" value="<%= lineLot %>" class="form-input min-w-[100px]" data-auto-lot="<%= autoLot ? 'true' : 'false' %>" required>
                     </td>
                     <td class="table-td align-top">
-                      <input name="line_expiry_date" type="date" value="<%= String(line.expiry_date || '').slice(0, 10) %>" class="form-input" required>
+                      <input name="line_expiry_date" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}" placeholder="dd/mm/yyyy" maxlength="10" value="<%= h.dateInput(line.expiry_date) %>" class="form-input" required>
                     </td>
                     <td class="table-td align-top">
                       <input name="line_notes" type="text" maxlength="5000" value="<%= line.notes || '' %>" class="form-input min-w-[120px]" placeholder="<%= t('Optional line notes') %>">
@@ -190,8 +190,13 @@
       if (!start || !body || !addButton) return;
 
       const lotFromISO = (value) => {
-        const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        return match ? `${match[3]}.${match[2]}.${match[1].slice(2)}` : '';
+        const raw = String(value || '').trim();
+        const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) return `${iso[3]}.${iso[2]}.${iso[1].slice(2)}`;
+        const dayFirst = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+        return dayFirst
+          ? `${dayFirst[1].padStart(2, '0')}.${dayFirst[2].padStart(2, '0')}.${dayFirst[3].slice(2)}`
+          : '';
       };
 
       function updateCount() {

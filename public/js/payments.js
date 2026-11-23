@@ -120,7 +120,10 @@
     const bank = row.querySelector('input[name="method_bank[]"]');
     if (bank) bank.value = option.dataset.bank || '';
     const date = row.querySelector('input[name="method_date[]"]');
-    if (date) date.value = option.dataset.date || '';
+    if (date) {
+      const match = String(option.dataset.date || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      date.value = match ? `${match[3]}/${match[2]}/${match[1]}` : (option.dataset.date || '');
+    }
     recalculate();
   }
 

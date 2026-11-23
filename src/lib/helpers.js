@@ -178,6 +178,30 @@ function formatDateTime(value, locale = DEFAULT_LOCALE) {
   return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
+function dateInput(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const dayFirst = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+  if (dayFirst) {
+    return `${dayFirst[1].padStart(2, '0')}/${dayFirst[2].padStart(2, '0')}/${dayFirst[3]}`;
+  }
+  return '';
+}
+
+function dateTimeInput(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]} ${iso[4]}:${iso[5]}`;
+  const dayFirst = raw.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})[T ](\d{1,2}):(\d{2})/);
+  if (dayFirst) {
+    return `${dayFirst[1].padStart(2, '0')}/${dayFirst[2].padStart(2, '0')}/${dayFirst[3]} ${dayFirst[4].padStart(2, '0')}:${dayFirst[5]}`;
+  }
+  return '';
+}
+
 function relativeDate(value, locale = DEFAULT_LOCALE) {
   if (!value) return '';
   const d = new Date(String(value).replace(' ', 'T') + (String(value).includes('Z') ? '' : 'Z'));
@@ -358,6 +382,8 @@ function forLocale(locale = DEFAULT_LOCALE) {
     formatQty: (value) => formatQty(value, locale),
     formatDate: (value) => formatDate(value, locale),
     formatDateTime: (value) => formatDateTime(value, locale),
+    dateInput,
+    dateTimeInput,
     relativeDate: (value) => relativeDate(value, locale),
     pluralize: (count, singular, plural) => pluralize(count, singular, plural, locale),
     paymentState: (invoice) => paymentState(invoice, locale),
@@ -378,6 +404,8 @@ module.exports = {
   formatQty,
   formatDate,
   formatDateTime,
+  dateInput,
+  dateTimeInput,
   relativeDate,
   initials,
   toNumber,
