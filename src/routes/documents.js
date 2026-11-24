@@ -1236,6 +1236,34 @@ function makeDocumentRouter(config) {
       );
       totalValue = Number(totals.v);
 
+      let purchaseCards = null;
+      if (config.kind === 'purchase_invoice') {
+        const today = todayISO();
+        const summary = await one(
+          `SELECT
+             COALESCE(SUM(CASE WHEN status = 'received' AND (due_date IS NULL OR due_date >= ?) THEN 1 ELSE 0 END),0) AS current_unpaid_count,
+             COALESCE(SUM(CASE WHEN status = 'received' AND (due_date IS NULL OR due_date >= ?) THEN total ELSE 0 END),0) AS current_open_value,
+             COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','draft','overdue') AND (due_date IS NULL OR due_date >= ?) THEN total ELSE 0 END),0) AS current_total_value,
+             COALESCE(SUM(CASE WHEN status IN ('received','overdue') THEN 1 ELSE 0 END),0) AS all_unpaid_count,
+             COALESCE(SUM(CASE WHEN status IN ('received','overdue') THEN total ELSE 0 END),0) AS all_open_value,
+             COALESCE(SUM(CASE WHEN status NOT IN ('cancelled','draft') THEN total ELSE 0 END),0) AS all_total_value
+           FROM purchase_invoices`,
+          [today, today, today],
+        );
+        purchaseCards = {
+          current: {
+            unpaidCount: Number(summary.current_unpaid_count || 0),
+            invoicedValue: Number(summary.current_open_value || 0),
+            totalValue: Number(summary.current_total_value || 0),
+          },
+          all: {
+            unpaidCount: Number(summary.all_unpaid_count || 0),
+            invoicedValue: Number(summary.all_open_value || 0),
+            totalValue: Number(summary.all_total_value || 0),
+          },
+        };
+      }
+
       let orderRequirements = [];
       if (config.kind === 'sales_order') {
         orderRequirements = await query(
@@ -1268,6 +1296,7 @@ function makeDocumentRouter(config) {
           openCount,
           openValue,
           totalValue,
+          purchaseCards,
           label: req.t(config.kind.includes('invoice') ? 'Invoiced (non-draft)' : 'Open value'),
           openLabel: req.t(config.kind.includes('invoice') ? 'Unpaid invoices' : 'Open orders'),
         },

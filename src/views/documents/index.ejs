@@ -30,35 +30,105 @@
         </div>
       </div>
 
-      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="card flex items-center gap-4 p-5">
-          <span class="kpi-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-            <%- include('/partials/icon', { name: 'clipboard-list', className: 'h-6 w-6' }) %>
-          </span>
-          <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= stats.openLabel %></p>
-            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.openCount, 0) %></p>
+      <% if (stats.purchaseCards) { %>
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200"><%= t('Current invoices') %></h2>
+          <span class="text-xs text-gray-400"><%= t('Not expired') %></span>
+        </div>
+        <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+              <%- include('/partials/icon', { name: 'clipboard-list', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Unpaid') %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.purchaseCards.current.unpaidCount, 0) %></p>
+            </div>
+          </div>
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+              <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Invoiced') %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.purchaseCards.current.invoicedValue) %></p>
+            </div>
+          </div>
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
+              <%- include('/partials/icon', { name: 'chart', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Total') %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.purchaseCards.current.totalValue) %></p>
+            </div>
           </div>
         </div>
-        <div class="card flex items-center gap-4 p-5">
-          <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
-            <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
-          </span>
-          <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= stats.label %></p>
-            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.openValue) %></p>
+
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200"><%= t('All invoices') %></h2>
+          <span class="text-xs text-gray-400"><%= t('Including expired') %></span>
+        </div>
+        <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+              <%- include('/partials/icon', { name: 'clipboard-list', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Unpaid') %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.purchaseCards.all.unpaidCount, 0) %></p>
+            </div>
+          </div>
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+              <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Invoiced') %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.purchaseCards.all.invoicedValue) %></p>
+            </div>
+          </div>
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
+              <%- include('/partials/icon', { name: 'chart', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= t('Total') %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.purchaseCards.all.totalValue) %></p>
+            </div>
           </div>
         </div>
-        <div class="card flex items-center gap-4 p-5">
-          <span class="kpi-icon bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
-            <%- include('/partials/icon', { name: 'chart', className: 'h-6 w-6' }) %>
-          </span>
-          <div>
-            <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Total (non-draft)</p>
-            <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.totalValue) %></p>
+      <% } else { %>
+        <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+              <%- include('/partials/icon', { name: 'clipboard-list', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= stats.openLabel %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= h.formatNumber(stats.openCount, 0) %></p>
+            </div>
+          </div>
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+              <%- include('/partials/icon', { name: 'banknotes', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400"><%= stats.label %></p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.openValue) %></p>
+            </div>
+          </div>
+          <div class="card flex items-center gap-4 p-5">
+            <span class="kpi-icon bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
+              <%- include('/partials/icon', { name: 'chart', className: 'h-6 w-6' }) %>
+            </span>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Total (non-draft)</p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white"><%= money(stats.totalValue) %></p>
+            </div>
           </div>
         </div>
-      </div>
+      <% } %>
 
       <div class="card">
         <div class="flex flex-col gap-4 border-b border-gray-100 p-5 dark:border-gray-800 md:flex-row md:items-end md:justify-between">
