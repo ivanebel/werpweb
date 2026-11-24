@@ -8,6 +8,7 @@
   const docTitle = labels[doc.kind] || t('Document');
   const isInvoice = doc.kind.includes('invoice');
   const isSalesInvoice = doc.kind === 'sales_invoice';
+  const isPurchaseOrder = doc.kind === 'purchase_order';
   const netPrices = true;
   const isNonFiscal = Number(row.document_type_code) === 999;
   const caePending = isSalesInvoice && !row.cae && !isNonFiscal;
@@ -18,6 +19,10 @@
   const customerOrder = doc.customerOrder
     ? row
     : (linked && linked.customer_order_no !== undefined ? linked : null);
+  const packsFor = (item) => {
+    const size = Math.max(1, Number(item.units_per_pack) || 1);
+    return size > 1 ? Number(item.quantity || 0) / size : null;
+  };
 %>
 <!DOCTYPE html>
 <html lang="<%= locale %>">
@@ -58,7 +63,7 @@
           </div>
         </div>
         <div class="mt-4 whitespace-pre-line text-xs leading-relaxed text-gray-500"><%= settings.company_address %></div>
-        <% if (settings.company_tax_id) { %><p class="mt-1 text-xs text-gray-500">Tax ID: <%= settings.company_tax_id %></p><% } %>
+        <% if (settings.company_tax_id) { %><p class="mt-1 text-xs text-gray-500"><%= t('Tax ID') %>: <%= settings.company_tax_id %></p><% } %>
       </div>
       <div class="text-right">
         <p class="text-2xl font-semibold uppercase tracking-wide text-brand-600"><%= documentTitle %></p>
@@ -96,12 +101,14 @@
       <div>
         <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400"><%= isInvoice && doc.kind === 'purchase_invoice' ? t('Vendor') : isInvoice ? t('Bill to') : doc.party.label %></p>
         <p class="mt-2 text-sm font-semibold text-gray-900"><%= row.party_name %></p>
-        <% if (row.party_contact) { %><p class="text-sm text-gray-600"><%= row.party_contact %></p><% } %>
-        <% if (row.party_address) { %><p class="text-sm text-gray-600"><%= row.party_address %></p><% } %>
-        <% if (row.party_city) { %><p class="text-sm text-gray-600"><%= row.party_city %><%= row.party_state ? ', ' + row.party_state : '' %> <%= row.party_postal %></p><% } %>
-        <% if (row.party_country) { %><p class="text-sm text-gray-600"><%= row.party_country %></p><% } %>
-        <% if (row.party_email) { %><p class="mt-1 text-sm text-gray-600"><%= row.party_email %></p><% } %>
-        <% if (row.party_tax_id) { %><p class="mt-1 text-xs text-gray-500">Tax ID: <%= row.party_tax_id %></p><% } %>
+        <% if (!isPurchaseOrder) { %>
+          <% if (row.party_contact) { %><p class="text-sm text-gray-600"><%= row.party_contact %></p><% } %>
+          <% if (row.party_address) { %><p class="text-sm text-gray-600"><%= row.party_address %></p><% } %>
+          <% if (row.party_city) { %><p class="text-sm text-gray-600"><%= row.party_city %><%= row.party_state ? ', ' + row.party_state : '' %> <%= row.party_postal %></p><% } %>
+          <% if (row.party_country) { %><p class="text-sm text-gray-600"><%= row.party_country %></p><% } %>
+          <% if (row.party_email) { %><p class="mt-1 text-sm text-gray-600"><%= row.party_email %></p><% } %>
+        <% } %>
+        <% if (row.party_tax_id) { %><p class="mt-1 text-xs text-gray-500"><%= t('Tax ID') %>: <%= row.party_tax_id %></p><% } %>
 
         <% if (customerOrder && customerOrder.warehouse_name) { %>
           <div class="mt-4 border-t border-gray-200 pt-3">
@@ -140,9 +147,10 @@
           <th class="py-2.5 pl-3 pr-2 font-semibold">Item</th>
           <% if (showCustomerCode) { %><th class="px-2 py-2.5 font-semibold">Customer code</th><% } %>
           <th class="px-2 py-2.5 text-right font-semibold">Qty</th>
-          <th class="px-2 py-2.5 text-right font-semibold"><%= netPrices ? t('Unit price (gross)') : t('Unit price') %></th>
-          <th class="px-2 py-2.5 text-right font-semibold">VAT</th>
+          <th class="px-2 py-2.5 text-right font-semibold"><%= isPurchaseOrder ? t('Unit price') : (netPrices ? t('Unit price (gross)') : t('Unit price')) %></th>
+          <% if (!isPurchaseOrder) { %><th class="px-2 py-2.5 text-right font-semibold">VAT</th><% } %>
           <% if (netPrices) { %><th class="px-2 py-2.5 text-right font-semibold"><%= t('Gross price') %></th><% } %>
+          <% if (isPurchaseOrder) { %><th class="px-2 py-2.5 text-right font-semibold"><%= t('Packs') %></th><% } %>
           <th class="py-2.5 pl-2 pr-3 text-right font-semibold">Amount</th>
         </tr>
       </thead>
@@ -161,11 +169,12 @@
               <% if (Number(item.total_weight) > 0) { %><span class="block text-[11px] text-gray-400"><%= h.formatQty(item.total_weight) %> kg</span><% } %>
             </td>
             <td class="px-2 py-3 text-right align-top whitespace-nowrap">
-              <%= money(netPrices ? itemNetUnit : item.unit_price) %>
+              <%= money(isPurchaseOrder ? Number(item.unit_price) : (netPrices ? itemNetUnit : item.unit_price)) %>
               <span class="text-[11px] text-gray-400">/ <%= Number(item.weight_per_unit) > 0 ? 'kg' : (item.unit || 'unit') %></span>
             </td>
-            <td class="px-2 py-3 text-right align-top"><%= h.formatNumber(item.tax_rate, 2) %>%</td>
+            <% if (!isPurchaseOrder) { %><td class="px-2 py-3 text-right align-top"><%= h.formatNumber(item.tax_rate, 2) %>%</td><% } %>
             <% if (netPrices) { %><td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= money(itemNetTotal) %></td><% } %>
+            <% if (isPurchaseOrder) { %><td class="px-2 py-3 text-right align-top whitespace-nowrap"><%= packsFor(item) === null ? '—' : h.formatQty(packsFor(item)) %></td><% } %>
             <td class="py-3 pl-2 pr-3 text-right align-top font-medium whitespace-nowrap"><%= money(item.line_total) %></td>
           </tr>
         <% }) %>
@@ -218,7 +227,11 @@
     <% } %>
 
     <div class="mt-10 border-t border-gray-200 pt-4 text-center text-xs text-gray-400">
-      <%= settings.invoice_footer || t('Thank you for your business.') %>
+      <% if (isPurchaseOrder) { %>
+        <%= t('This purchase order is for orientation purposes only. Prices and quantities may vary when the products are received.') %>
+      <% } else { %>
+        <%= settings.invoice_footer || t('Thank you for your business.') %>
+      <% } %>
     </div>
   </div>
 </body>

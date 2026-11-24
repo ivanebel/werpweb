@@ -821,7 +821,7 @@ async function loadItems(config, id, customerId = null) {
   const codeSelect = customerId ? ', cpc.code AS customer_code' : '';
   const params = customerId ? [customerId, id] : [id];
   return query(
-    `SELECT i.*, p.sku, p.name, p.unit, p.type AS product_type${codeSelect}
+    `SELECT i.*, p.sku, p.name, p.unit, p.type AS product_type, p.units_per_pack${codeSelect}
        FROM \`${config.itemTable}\` i
        JOIN products p ON p.id = i.product_id
        ${codeJoin}
@@ -893,6 +893,7 @@ function actionsFor(config, row, locale) {
     if (['confirmed', 'partially_received'].includes(row.status)) {
       link(`/purchases/new?purchase_order_id=${row.id}`, 'Create bill', 'secondary');
     }
+    link(`${base}/print`, 'Print / PDF', 'secondary');
     if (!['received', 'cancelled'].includes(row.status)) add('status', 'cancelled', 'Cancel', 'danger', true);
   }
 
