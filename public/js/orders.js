@@ -76,7 +76,6 @@
       select.appendChild(packOption);
     }
     select.value = current === 'pack' && size > 1 ? 'pack' : 'unit';
-    select.disabled = size <= 1;
     updatePackHint(row);
   }
   const netPrices = form.getAttribute('data-net-prices') === '1';
@@ -328,7 +327,7 @@
     const price = Number(row.querySelector('input[data-price]')?.value || 0);
     const tax = Number(row.querySelector('[data-tax]')?.value || 0);
     const weightInput = row.querySelector('[data-weight-unit]');
-    const weight = weightInput && !weightInput.disabled ? Number(weightInput.value || 0) : 0;
+    const weight = weightInput ? Number(weightInput.value || 0) : 0;
     const effectiveQty = weight > 0 ? qty * weight : qty;
     const net = effectiveQty * price;
     const grossUnit = netPrices && tax ? price * (1 + tax / 100) : price;
@@ -365,7 +364,7 @@
       const price = Number(row.querySelector('input[data-price]')?.value || 0);
       const tax = Number(row.querySelector('[data-tax]')?.value || 0);
       const weightInput = row.querySelector('[data-weight-unit]');
-      const weight = weightInput && !weightInput.disabled ? Number(weightInput.value || 0) : 0;
+      const weight = weightInput ? Number(weightInput.value || 0) : 0;
       const effectiveQty = weight > 0 ? qty * weight : qty;
       const net = effectiveQty * price;
       const gross = netPrices ? net * (1 + tax / 100) : net;
@@ -551,7 +550,6 @@
     const weightWrapper = row.querySelector('[data-weight-total-wrapper]');
     row.dataset.weighted = weighted ? '1' : '0';
     if (weightInput) {
-      weightInput.disabled = !weighted;
       weightInput.classList.toggle('hidden', !weighted);
       weightInput.value = weighted ? String(Number(option.dataset.weightKg || 0)) : '0';
     }

@@ -53,17 +53,23 @@ function arr(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-async function loadProductPackSizes(ids) {
+async function loadProductUnitMeta(ids) {
   const unique = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
   if (!unique.length) return new Map();
   const rows = await query(
-    `SELECT id, units_per_pack FROM products WHERE id IN (${unique.map(() => '?').join(',')})`,
+    `SELECT id, units_per_pack, sold_by_weight, weight_kg, unit
+       FROM products WHERE id IN (${unique.map(() => '?').join(',')})`,
     unique,
   );
-  return new Map(rows.map((row) => [Number(row.id), Math.max(1, Number(row.units_per_pack) || 1)]));
+  return new Map(rows.map((row) => [Number(row.id), {
+    unitsPerPack: Math.max(1, Number(row.units_per_pack) || 1),
+    soldByWeight: Number(row.sold_by_weight) === 1,
+    weightKg: Math.max(0, Number(row.weight_kg) || 0),
+    unit: String(row.unit || '').toLowerCase(),
+  }]));
 }
 
-async function parseItems(body, config, defaultTaxRate) {
+async function parseItems(body, defaultTaxRate) {
   const ids = arr(body.item_product_id);
   const descriptions = arr(body.item_description);
   const quantities = arr(body.item_quantity);
@@ -73,18 +79,23 @@ async function parseItems(body, config, defaultTaxRate) {
   const weights = arr(body.item_weight_per_unit);
   const taxes = arr(body.item_tax_rate);
   const items = [];
-  const supportsPackUnits = config.kind === 'purchase_order' || config.kind === 'sales_order';
-  const packSizes = supportsPackUnits ? await loadProductPackSizes(ids) : new Map();
+  const productMeta = await loadProductUnitMeta(ids);
 
   for (let i = 0; i < ids.length; i++) {
     const productId = Number.parseInt(ids[i], 10);
     if (!productId) continue;
+    const meta = productMeta.get(productId) || {};
     const enteredQuantity = toNumber(quantities[i], 0);
     const quantityUnit = String(quantityUnits[i] || 'unit').toLowerCase() === 'pack' ? 'pack' : 'unit';
-    const packSize = packSizes.get(productId) || 1;
+    const packSize = meta.unitsPerPack || 1;
     const quantity = quantityUnit === 'pack' ? enteredQuantity * packSize : enteredQuantity;
     const enteredPrice = toNumber(prices[i], 0);
-    const weightPerUnit = round3(Math.max(0, toNumber(weights[i], 0)));
+    const kgUnits = ['kg', 'kgs', 'kilogram', 'kilograms'];
+    const soldByWeight = Boolean(meta.soldByWeight) && !kgUnits.includes(meta.unit || '');
+    const postedWeight = Number(weights[i]) || 0;
+    const weightPerUnit = soldByWeight
+      ? round3(Math.max(0, postedWeight > 0 ? postedWeight : (meta.weightKg || 0)))
+      : 0;
     const taxRate = taxes[i] === undefined || taxes[i] === '' ? Number(defaultTaxRate || 0) : toNumber(taxes[i], 0);
     if (quantity <= 0) continue;
     const effectiveQuantity = weightPerUnit > 0 ? quantity * weightPerUnit : quantity;
@@ -1347,7 +1358,7 @@ function makeDocumentRouter(config) {
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
       const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
-      const items = await parseItems(req.body, config, defaultTaxRate);
+      const items = await parseItems(req.body, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
       let levyResult = { rows: [], error: null };
@@ -1448,6 +1459,7 @@ function makeDocumentRouter(config) {
           action: basePath,
           defaultTaxRate,
           prefill: null,
+          duplicateFrom: null,
         });
       }
 
@@ -1754,6 +1766,7 @@ function makeDocumentRouter(config) {
         action: `${basePath}/${row.id}`,
         defaultTaxRate: Number(appSettings.default_tax_rate || 0),
         prefill: null,
+        duplicateFrom: null,
       });
     } catch (err) {
       next(err);
@@ -1811,7 +1824,7 @@ function makeDocumentRouter(config) {
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
       const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
-      const items = await parseItems(req.body, config, defaultTaxRate);
+      const items = await parseItems(req.body, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
       let levyResult = { rows: [], error: null };
@@ -1921,6 +1934,7 @@ function makeDocumentRouter(config) {
           action: `${basePath}/${existing.id}`,
           defaultTaxRate,
           prefill: null,
+          duplicateFrom: null,
         });
       }
 

@@ -66,7 +66,7 @@
         </div>
       <% } %>
 
-      <% if (duplicateFrom) { %>
+      <% if (typeof duplicateFrom !== 'undefined' && duplicateFrom) { %>
         <div class="mb-5 flex items-center gap-3 rounded-xl border border-blue-light-200 bg-blue-light-50 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/30 dark:bg-blue-light-500/10 dark:text-blue-light-300">
           <%- include('/partials/icon', { name: 'info', className: 'h-5 w-5 shrink-0' }) %>
           <%= t('Duplicated from order {number}. Choose the destination warehouse and the customer order number.', { number: duplicateFrom[doc.numberField] }) %>
@@ -323,8 +323,8 @@
                     const itemUnit = String(item.unit || p?.unit || '');
                     const isKgUnit = ['kg', 'kgs', 'kilogram', 'kilograms'].includes(itemUnit.toLowerCase());
                     const savedWeight = item.weight_per_unit !== undefined ? Number(item.weight_per_unit) || 0 : 0;
-                    const weightedRow = savedWeight > 0 || (p && p.weighted && !isKgUnit);
-                    const weightValue = savedWeight > 0 ? savedWeight : (weightedRow && p && item.id === undefined ? Number(p.weightKg) || 0 : 0);
+                    const weightedRow = p ? Boolean(p.weighted && !isKgUnit) : savedWeight > 0;
+                    const weightValue = weightedRow ? (savedWeight > 0 ? savedWeight : (p ? Number(p.weightKg) || 0 : 0)) : 0;
                     const effectiveQty = Number(item.quantity || 0) * (weightValue > 0 ? weightValue : 1);
                   %>
                     <tr data-line class="align-top" data-weighted="<%= weightedRow ? '1' : '0' %>">
@@ -359,7 +359,7 @@
                         <% } %>
                       </td>
                       <td class="table-td" data-weight-cell>
-                        <input name="item_weight_per_unit[<%= i %>]" data-weight-unit type="number" min="0" step="0.001" value="<%= weightValue %>" class="form-input text-right <%= weightedRow ? '' : 'hidden' %>" <%= weightedRow ? '' : 'disabled' %>>
+                        <input name="item_weight_per_unit[<%= i %>]" data-weight-unit type="number" min="0" step="0.001" value="<%= weightValue %>" class="form-input text-right <%= weightedRow ? '' : 'hidden' %>">
                         <span class="block text-right text-xs text-gray-300 <%= weightedRow ? 'hidden' : '' %>" data-weight-empty>—</span>
                         <span class="mt-0.5 block text-[11px] text-gray-400 <%= weightedRow ? '' : 'hidden' %>" data-weight-total-wrapper><span data-total-weight><%= weightValue > 0 ? h.formatQty(Number(item.quantity || 0) * weightValue) : '0' %></span> kg</span>
                       </td>
@@ -429,7 +429,7 @@
                   <% } %>
                 </td>
                 <td class="table-td" data-weight-cell>
-                  <input name="item_weight_per_unit[__INDEX__]" data-weight-unit type="number" min="0" step="0.001" value="0" class="form-input hidden text-right" disabled>
+                  <input name="item_weight_per_unit[__INDEX__]" data-weight-unit type="number" min="0" step="0.001" value="0" class="form-input hidden text-right">
                   <span class="block text-right text-xs text-gray-300" data-weight-empty>—</span>
                   <span class="mt-0.5 block text-[11px] text-gray-400 hidden" data-weight-total-wrapper><span data-total-weight>0</span> kg</span>
                 </td>
