@@ -821,9 +821,11 @@ async function loadItems(config, id, customerId = null) {
   const codeSelect = customerId ? ', cpc.code AS customer_code' : '';
   const params = customerId ? [customerId, id] : [id];
   return query(
-    `SELECT i.*, p.sku, p.name, p.unit, p.type AS product_type, p.units_per_pack${codeSelect}
+    `SELECT i.*, p.sku, p.name, p.unit, p.type AS product_type, p.units_per_pack,
+            b.name AS brand_name${codeSelect}
        FROM \`${config.itemTable}\` i
        JOIN products p ON p.id = i.product_id
+       LEFT JOIN brands b ON b.id = p.brand_id
        ${codeJoin}
       WHERE i.\`${config.itemFk}\` = ?
       ORDER BY i.id ASC`,

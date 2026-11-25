@@ -17,6 +17,20 @@
         const customerOrder = doc.customerOrder
           ? row
           : (linkedOrder && linkedOrder.customer_order_no !== undefined ? linkedOrder : null);
+        const copySummary = doc.kind === 'purchase_order'
+          ? items.map((item) => {
+              const size = Math.max(1, Number(item.units_per_pack) || 1);
+              const packs = size > 1 ? Number(item.quantity) / size : null;
+              const quantity = Number(item.quantity) || 0;
+              const brand = String(item.brand_name || '').trim();
+              const name = String(item.name || '').trim();
+              const product = brand ? `${brand} - ${name}` : name;
+              const packText = packs === null
+                ? ''
+                : ` (${h.formatQty(packs)} ${packs === 1 ? t('Pack') : t('Packs')})`;
+              return `${product}: ${h.formatQty(quantity)} ${quantity === 1 ? t('unit') : t('units')}${packText}`;
+            }).join('\n')
+          : '';
       %>
 
       <div class="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -44,6 +58,13 @@
             <a href="<%= doc.basePath %>/<%= row.id %>/edit" class="btn btn-secondary btn-sm">
               <%- include('/partials/icon', { name: 'pencil', className: 'h-4 w-4' }) %> Edit
             </a>
+          <% } %>
+          <% if (doc.kind === 'purchase_order') { %>
+            <button type="button" class="btn btn-secondary btn-sm" data-copy-po-summary>
+              <%- include('/partials/icon', { name: 'copy', className: 'h-4 w-4' }) %>
+              <span data-copy-po-label><%= t('Copy summary') %></span>
+            </button>
+            <textarea id="po-copy-summary" class="sr-only" readonly tabindex="-1" aria-hidden="true"><%= copySummary %></textarea>
           <% } %>
           <% if (isSalesInvoice && row.status === 'draft') { %>
             <a href="/sales/import-arca?invoice_id=<%= row.id %>" class="btn btn-secondary btn-sm">
@@ -392,4 +413,31 @@
       </div>
     </div>
   </main>
+  <script>
+    (() => {
+      const button = document.querySelector('[data-copy-po-summary]');
+      const source = document.getElementById('po-copy-summary');
+      const label = button ? button.querySelector('[data-copy-po-label]') : null;
+      if (!button || !source || !label) return;
+      const original = label.textContent;
+      const copied = <%- JSON.stringify(t('Summary copied')) %>;
+      let timer = null;
+
+      button.addEventListener('click', async () => {
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(source.value);
+          } else {
+            source.select();
+            document.execCommand('copy');
+          }
+          label.textContent = copied;
+          clearTimeout(timer);
+          timer = setTimeout(() => { label.textContent = original; }, 2000);
+        } catch (error) {
+          source.select();
+        }
+      });
+    })();
+  </script>
   <%- include('/layouts/footer') %>

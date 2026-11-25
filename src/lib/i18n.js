@@ -584,6 +584,8 @@ const ES = {
     'Usá esta opción para facturas históricas. Solo se aplica cuando el estado es Recibida o Pagada.',
   'Stock not posted': 'Stock no contabilizado',
   'Print / PDF': 'Imprimir / PDF',
+  'Copy summary': 'Copiar resumen',
+  'Summary copied': 'Resumen copiado',
   'Print / Save PDF': 'Imprimir / Guardar PDF',
   'Delete {number}? This cannot be undone.': '¿Eliminar {number}? Esta acción no se puede deshacer.',
   'Are you sure you want to continue?': '¿Seguro que querés continuar?',
