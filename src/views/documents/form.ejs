@@ -13,6 +13,7 @@
         const skipStockChecked = Boolean(row.skip_stock) || Number(row.stock_skipped) === 1;
         const netLineEntry = true;
         const supportsPackUnits = doc.kind === 'purchase_order' || doc.kind === 'sales_order';
+        const isPurchaseOrder = doc.kind === 'purchase_order';
         const standardVatValues = (vatRateOptions || []).map((option) => String(option.value));
         const defaultVatValue = standardVatValues.includes(Number(defaultTaxRate || 0).toFixed(2))
           ? Number(defaultTaxRate || 0).toFixed(2)
@@ -285,8 +286,8 @@
           </div>
         <% } %>
 
-        <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-4">
-          <div class="card xl:col-span-3">
+        <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div class="card">
             <div class="card-header">
               <div>
                 <h2 class="card-title">Line items</h2>
@@ -297,7 +298,7 @@
               </button>
             </div>
             <div class="table-wrap">
-              <table class="table-base table-fixed <%= netLineEntry ? 'min-w-[1200px]' : 'min-w-[1080px]' %>">
+              <table class="table-base table-fixed <%= isPurchaseOrder ? 'min-w-[1120px]' : (netLineEntry ? 'min-w-[1200px]' : 'min-w-[1080px]') %>">
                 <thead>
                   <tr>
                     <th class="table-th w-8">#</th>
@@ -305,8 +306,8 @@
                     <% if (!netLineEntry) { %><th class="table-th w-[160px]"><%= t('Description') %></th><% } %>
                     <th class="table-th <%= qtyWidthClass %> whitespace-normal text-right"><%= t('Qty') %></th>
                     <th class="table-th w-20 whitespace-normal text-right"><%= t('Weight / unit') %></th>
-                    <th class="table-th w-32 whitespace-normal text-right"><%= netLineEntry ? t('Unit price (gross)') : t('Unit price') %></th>
-                    <th class="table-th w-24 whitespace-normal text-right"><%= t('VAT %') %></th>
+                    <th class="table-th <%= isPurchaseOrder ? 'w-44' : 'w-32' %> whitespace-normal text-right"><%= netLineEntry ? t('Unit price (gross)') : t('Unit price') %></th>
+                    <% if (!isPurchaseOrder) { %><th class="table-th w-24 whitespace-normal text-right"><%= t('VAT %') %></th><% } %>
                     <% if (netLineEntry) { %><th class="table-th w-32 whitespace-normal text-right"><%= t('Gross price') %></th><% } %>
                     <th class="table-th w-32 whitespace-normal text-right"><%= t('Line total') %></th>
                     <th class="table-th w-12"></th>
@@ -338,6 +339,9 @@
                         }) %>
                         <span class="mt-1 block text-[11px] text-gray-400" data-unit><%= item.unit || p?.unit || '' %></span>
                         <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
+                        <% if (isPurchaseOrder) { %>
+                          <input type="hidden" data-tax value="<%= Number(p && p.taxRate !== undefined ? p.taxRate : itemTaxValue).toFixed(2) %>">
+                        <% } %>
                       </td>
                       <% if (!netLineEntry) { %>
                         <td class="table-td">
@@ -372,16 +376,18 @@
                         <% } %>
                         <span class="mt-0.5 block text-[11px] text-gray-400" data-price-unit><%= weightedRow ? '/kg' : (itemUnit ? `/${itemUnit}` : '') %></span>
                       </td>
-                      <td class="table-td">
-                        <select name="item_tax_rate[<%= i %>]" data-tax class="form-select text-right">
-                          <% (vatRateOptions || []).forEach((option) => { %>
-                            <option value="<%= option.value %>" <%= itemTaxValue === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
-                          <% }) %>
-                          <% if (!itemHasStandardVat) { %>
-                            <option value="<%= itemTaxValue %>" selected><%= itemTaxValue %>% (<%= t('legacy') %>)</option>
-                          <% } %>
-                        </select>
-                      </td>
+                      <% if (!isPurchaseOrder) { %>
+                        <td class="table-td">
+                          <select name="item_tax_rate[<%= i %>]" data-tax class="form-select text-right">
+                            <% (vatRateOptions || []).forEach((option) => { %>
+                              <option value="<%= option.value %>" <%= itemTaxValue === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+                            <% }) %>
+                            <% if (!itemHasStandardVat) { %>
+                              <option value="<%= itemTaxValue %>" selected><%= itemTaxValue %>% (<%= t('legacy') %>)</option>
+                            <% } %>
+                          </select>
+                        </td>
+                      <% } %>
                       <% if (netLineEntry) { %>
                         <td class="table-td text-right pt-7 text-gray-600 dark:text-gray-300" data-net-total><%= money(effectiveQty * itemNet) %></td>
                       <% } %>
@@ -411,6 +417,9 @@
                   }) %>
                   <span class="mt-1 block text-[11px] text-gray-400" data-unit></span>
                   <span class="mt-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400" data-customer-code></span>
+                  <% if (isPurchaseOrder) { %>
+                    <input type="hidden" data-tax value="<%= defaultVatValue %>">
+                  <% } %>
                 </td>
                 <% if (!netLineEntry) { %>
                   <td class="table-td"><input name="item_description[__INDEX__]" data-description class="form-input" placeholder="Optional"></td>
@@ -442,13 +451,15 @@
                   <% } %>
                   <span class="mt-0.5 block text-[11px] text-gray-400" data-price-unit></span>
                 </td>
-                <td class="table-td">
-                  <select name="item_tax_rate[__INDEX__]" data-tax class="form-select text-right">
-                    <% (vatRateOptions || []).forEach((option) => { %>
-                      <option value="<%= option.value %>" <%= defaultVatValue === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
-                    <% }) %>
-                  </select>
-                </td>
+                <% if (!isPurchaseOrder) { %>
+                  <td class="table-td">
+                    <select name="item_tax_rate[__INDEX__]" data-tax class="form-select text-right">
+                      <% (vatRateOptions || []).forEach((option) => { %>
+                        <option value="<%= option.value %>" <%= defaultVatValue === String(option.value) ? 'selected' : '' %>><%= option.label %></option>
+                      <% }) %>
+                    </select>
+                  </td>
+                <% } %>
                 <% if (netLineEntry) { %><td class="table-td pt-7 text-right text-gray-600 dark:text-gray-300" data-net-total></td><% } %>
                 <td class="table-td pt-7 text-right"><span class="font-medium" data-line-total></span><span class="mt-0.5 block text-[11px] text-gray-400" data-tax-hint></span></td>
                 <td class="table-td pt-4 text-right">

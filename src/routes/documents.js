@@ -57,7 +57,7 @@ async function loadProductUnitMeta(ids) {
   const unique = [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
   if (!unique.length) return new Map();
   const rows = await query(
-    `SELECT id, units_per_pack, sold_by_weight, weight_kg, unit
+    `SELECT id, units_per_pack, sold_by_weight, weight_kg, unit, cost_vat_rate, sale_vat_rate
        FROM products WHERE id IN (${unique.map(() => '?').join(',')})`,
     unique,
   );
@@ -66,10 +66,12 @@ async function loadProductUnitMeta(ids) {
     soldByWeight: Number(row.sold_by_weight) === 1,
     weightKg: Math.max(0, Number(row.weight_kg) || 0),
     unit: String(row.unit || '').toLowerCase(),
+    costVatRate: row.cost_vat_rate === null ? null : Number(row.cost_vat_rate),
+    saleVatRate: row.sale_vat_rate === null ? null : Number(row.sale_vat_rate),
   }]));
 }
 
-async function parseItems(body, defaultTaxRate) {
+async function parseItems(body, config, defaultTaxRate) {
   const ids = arr(body.item_product_id);
   const descriptions = arr(body.item_description);
   const quantities = arr(body.item_quantity);
@@ -96,7 +98,11 @@ async function parseItems(body, defaultTaxRate) {
     const weightPerUnit = soldByWeight
       ? round3(Math.max(0, postedWeight > 0 ? postedWeight : (meta.weightKg || 0)))
       : 0;
-    const taxRate = taxes[i] === undefined || taxes[i] === '' ? Number(defaultTaxRate || 0) : toNumber(taxes[i], 0);
+    const productTaxRate = config.priceField === 'cost_price' ? meta.costVatRate : meta.saleVatRate;
+    const fallbackTaxRate = productTaxRate === null || productTaxRate === undefined
+      ? Number(defaultTaxRate || 0)
+      : Number(productTaxRate);
+    const taxRate = taxes[i] === undefined || taxes[i] === '' ? fallbackTaxRate : toNumber(taxes[i], 0);
     if (quantity <= 0) continue;
     const effectiveQuantity = weightPerUnit > 0 ? quantity * weightPerUnit : quantity;
     let grossUnitPrice = enteredPrice;
@@ -1361,7 +1367,7 @@ function makeDocumentRouter(config) {
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
       const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
-      const items = await parseItems(req.body, defaultTaxRate);
+      const items = await parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
       let levyResult = { rows: [], error: null };
@@ -1827,7 +1833,7 @@ function makeDocumentRouter(config) {
       const defaultTaxRate = Number(appSettings.default_tax_rate || 0);
       const partyId = Number.parseInt(req.body[config.party.field], 10);
       const skipStock = Boolean(config.hasStockPosting && req.body.skip_stock);
-      const items = await parseItems(req.body, defaultTaxRate);
+      const items = await parseItems(req.body, config, defaultTaxRate);
       const errors = {};
       const itemErrors = [];
       let levyResult = { rows: [], error: null };

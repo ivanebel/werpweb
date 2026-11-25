@@ -20,17 +20,22 @@
   const defaultTax = Number(form.getAttribute('data-default-tax') || 0);
   const defaultTaxValue = Number(defaultTax || 0).toFixed(2);
   const packUnits = form.getAttribute('data-pack-units') === '1';
-  const applyTaxRate = (select, rate) => {
-    if (!select) return Number(rate) || 0;
-    const value = Number(rate || 0).toFixed(2);
-    if ([...select.options].some((option) => option.value === value)) {
-      select.value = value;
+  const applyTaxRate = (field, rate) => {
+    if (!field) return Number(rate) || 0;
+    if (field.tagName !== 'SELECT') {
+      const value = Number(rate || 0).toFixed(2);
+      field.value = value;
       return Number(value);
     }
-    const preferred = [...select.options].find((option) => option.value === defaultTaxValue);
-    const fallback = preferred || [...select.options].find((option) => option.value === '21.00') || select.options[0];
+    const value = Number(rate || 0).toFixed(2);
+    if ([...field.options].some((option) => option.value === value)) {
+      field.value = value;
+      return Number(value);
+    }
+    const preferred = [...field.options].find((option) => option.value === defaultTaxValue);
+    const fallback = preferred || [...field.options].find((option) => option.value === '21.00') || field.options[0];
     if (fallback) {
-      select.value = fallback.value;
+      field.value = fallback.value;
       return Number(fallback.value);
     }
     return Number(rate) || 0;
