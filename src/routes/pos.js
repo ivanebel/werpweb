@@ -309,6 +309,7 @@ async function loadItemTotals(scope) {
             COALESCE(SUM(${NET_LINE_REVENUE}),0) AS revenue
        FROM pos_sale_items i
        JOIN pos_sales s ON s.id = i.sale_id
+       LEFT JOIN products p ON p.id = i.product_id
        JOIN pos_locations l ON l.id = s.pos_id
       WHERE ${scope.sql}`,
     scope.params,
@@ -394,6 +395,7 @@ async function loadProductCount(scope) {
       `SELECT COUNT(DISTINCT COALESCE(i.product_id, 0))
          FROM pos_sale_items i
          JOIN pos_sales s ON s.id = i.sale_id
+         LEFT JOIN products p ON p.id = i.product_id
          JOIN pos_locations l ON l.id = s.pos_id
         WHERE ${scope.sql}`,
       scope.params,
