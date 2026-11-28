@@ -77,7 +77,7 @@
                       <% } else if (f.type === 'select') { %>
                         <% const numericValue = value !== '' && value !== null && value !== undefined && !Number.isNaN(Number(value)); const matchesOption = (opt) => String(value) === String(opt.value) || (f.allowLegacy && numericValue && Number(value) === Number(opt.value)); const showLegacy = f.allowLegacy && value !== '' && value !== null && value !== undefined && !(f.options || []).some(matchesOption); %>
                         <select id="field-<%= f.name %>" name="<%= f.name %>" class="form-select <%= errors[f.name] ? 'form-input-error' : '' %>" <%= f.required ? 'required' : '' %>>
-                          <% if (!f.required) { %><option value=""><%= t('- None -') %></option><% } %>
+                          <% if (!f.required && !(f.options || []).some(opt => String(opt.value) === '')) { %><option value=""><%= t('- None -') %></option><% } %>
                           <% if (showLegacy) { %><option value="<%= value %>" selected><%= Number(value).toFixed(2) %>% (<%= t('legacy') %>)</option><% } %>
                           <% (f.options || []).forEach(opt => { %>
                             <option value="<%= opt.value %>"<% Object.entries(opt.data || {}).forEach(([key, val]) => { %> data-<%= key %>="<%= val %>"<% }) %> <%= matchesOption(opt) ? 'selected' : '' %>><%= opt.label %></option>

@@ -144,6 +144,7 @@ async function upgradeSchema(conn, dbName) {
   await addColumn(conn, dbName, 'products', 'packs_per_pallet', 'INT UNSIGNED NULL AFTER units_per_pack');
   await addColumn(conn, dbName, 'products', 'sold_by_weight', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER packs_per_pallet');
   await addColumn(conn, dbName, 'products', 'weight_kg', 'DECIMAL(14,3) NOT NULL DEFAULT 0 AFTER sold_by_weight');
+  await addColumn(conn, dbName, 'products', 'warehouse_rack', 'VARCHAR(4) NULL AFTER reorder_level');
   const addedCostGross = await addColumn(conn, dbName, 'products', 'cost_gross_price', 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER unit');
   await addColumn(conn, dbName, 'products', 'cost_vat_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER cost_gross_price');
   await addColumn(conn, dbName, 'products', 'cost_levy_rate', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER cost_vat_rate');

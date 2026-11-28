@@ -20,6 +20,23 @@ const statusOptions = [
   { value: 'inactive', label: 'Inactive' },
 ];
 
+const rackOptions = [
+  { value: 'Auto', label: 'Auto' },
+  { value: 'C1', label: 'Cold room C1' },
+  { value: 'C2', label: 'Cold room C2' },
+  { value: 'C3', label: 'Cold room C3' },
+  { value: 'C4', label: 'Cold room C4' },
+  { value: 'R1', label: 'Ambient R1' },
+  { value: 'R2', label: 'Ambient R2' },
+  { value: 'R3', label: 'Ambient R3' },
+  { value: 'R4', label: 'Ambient R4' },
+  { value: 'R5', label: 'Ambient R5' },
+  { value: 'R6', label: 'Ambient R6' },
+  { value: 'R7', label: 'Ambient R7' },
+  { value: 'R8', label: 'Ambient R8' },
+  { value: '', label: 'Unassigned' },
+];
+
 async function brandOptions() {
   const rows = await query('SELECT id, name FROM brands ORDER BY name');
   return rows.map((r) => ({ value: String(r.id), label: r.name }));
@@ -206,6 +223,7 @@ const fields = [
 
   { name: 'stock_qty', label: 'Stock on hand', type: 'decimal', default: 0, section: 'Inventory', help: 'Changing this value records a manual stock adjustment.' },
   { name: 'reorder_level', label: 'Reorder level', type: 'decimal', min: 0, default: 0, section: 'Inventory' },
+  { name: 'warehouse_rack', label: 'Warehouse rack', type: 'select', options: rackOptions, default: null, section: 'Inventory', help: 'Rack used by the warehouse game to place this product. Auto lets the game choose.' },
   { name: 'track_stock', label: 'Track stock', type: 'checkbox', default: 1, section: 'Inventory' },
   { name: 'is_sellable', label: 'Can be sold', type: 'checkbox', default: 1, section: 'Sales & purchasing' },
   { name: 'is_purchasable', label: 'Can be purchased', type: 'checkbox', default: 1, section: 'Sales & purchasing' },

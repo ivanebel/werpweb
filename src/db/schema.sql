@@ -293,6 +293,7 @@ CREATE TABLE IF NOT EXISTS products (
   sale_price    DECIMAL(14,2) NOT NULL DEFAULT 0,
   stock_qty     DECIMAL(14,4) NOT NULL DEFAULT 0,
   reorder_level DECIMAL(14,3) NOT NULL DEFAULT 0,
+  warehouse_rack VARCHAR(4) NULL,
   is_sellable   TINYINT(1) NOT NULL DEFAULT 1,
   is_purchasable TINYINT(1) NOT NULL DEFAULT 1,
   is_manufactured TINYINT(1) NOT NULL DEFAULT 0,
